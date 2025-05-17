@@ -1,0 +1,167 @@
+import { useQuery } from "@tanstack/react-query";
+import { User, League } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Trophy, Medal, Calendar, Award, Users } from "lucide-react";
+import { Helmet } from "react-helmet";
+import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+export default function LeaderboardPage() {
+  const [selectedLeagueId, setSelectedLeagueId] = useState<number>(1);
+  
+  // Get all leagues for the selector
+  const { data: leagues, isLoading: isLoadingLeagues } = useQuery<League[]>({
+    queryKey: ["/api/leagues"],
+  });
+  
+  // Get leaderboard data for the selected league
+  const { data: leaderboard, isLoading: isLoadingLeaderboard } = useQuery<User[]>({
+    queryKey: [`/api/league/${selectedLeagueId}/leaderboard`],
+    enabled: !!selectedLeagueId
+  });
+
+  const formatDate = () => {
+    const now = new Date();
+    return now.toLocaleDateString(undefined, { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <Helmet>
+        <title>Leaderboard | NFL Upset Pool</title>
+        <meta name="description" content="View the current standings and rankings in our NFL upset pool competition." />
+      </Helmet>
+      
+      <div className="mb-8">
+        <div className="flex items-center mb-4">
+          <Trophy className="h-7 w-7 text-yellow-500 mr-3" />
+          <h1 className="text-3xl font-bold text-gray-900">Leaderboard</h1>
+        </div>
+        <p className="text-gray-600 max-w-2xl">
+          Track who's leading the pack in picking NFL underdogs. Points are awarded based on the spread when your underdog team wins outright.
+        </p>
+      </div>
+      
+      {/* League Selector */}
+      <div className="mb-8">
+        <div className="flex items-center mb-2">
+          <Users className="h-5 w-5 text-primary mr-2" />
+          <h2 className="text-lg font-medium">Select League</h2>
+        </div>
+        {isLoadingLeagues ? (
+          <Skeleton className="h-10 w-64" />
+        ) : (
+          <Select
+            value={selectedLeagueId.toString()}
+            onValueChange={(value) => setSelectedLeagueId(Number(value))}
+          >
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder="Select a league" />
+            </SelectTrigger>
+            <SelectContent>
+              {leagues?.map((league) => (
+                <SelectItem key={league.id} value={league.id.toString()}>
+                  {league.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+      
+      {/* Leaderboard Table */}
+      <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+        <div className="bg-gradient-to-r from-primary/20 to-secondary/20 px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center">
+            <Award className="h-5 w-5 text-yellow-500 mr-2" />
+            <h3 className="text-lg font-medium text-gray-900">Season Standings</h3>
+          </div>
+          <div className="flex items-center text-sm text-gray-500 mt-1">
+            <Calendar className="h-3.5 w-3.5 mr-1" />
+            <span>As of {formatDate()}</span>
+          </div>
+        </div>
+        <div className="px-4 py-3">
+          {isLoadingLeaderboard ? (
+            <div className="p-4">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="flex items-center space-x-4 py-3">
+                  <Skeleton className="h-5 w-5" />
+                  <Skeleton className="h-5 w-12" />
+                  <div className="flex items-center flex-1">
+                    <Skeleton className="h-8 w-8 rounded-full mr-2" />
+                    <Skeleton className="h-5 w-24" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pooler</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {leaderboard && leaderboard.length > 0 ? (
+                  leaderboard.map((user, index) => (
+                    <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-4 whitespace-nowrap text-sm">
+                        <div className="flex items-center">
+                          {index === 0 ? (
+                            <Medal className="h-5 w-5 text-yellow-500 mr-1" />
+                          ) : index === 1 ? (
+                            <Medal className="h-5 w-5 text-gray-400 mr-1" />
+                          ) : index === 2 ? (
+                            <Medal className="h-5 w-5 text-amber-700 mr-1" />
+                          ) : (
+                            <span className="font-medium text-gray-700 mx-1">{index + 1}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap">
+                        <div className="text-sm font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full inline-block">
+                          {user.totalPoints || "0"} pts
+                        </div>
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <div className="flex items-center">
+                          <Avatar className="h-7 w-7 mr-2 border border-gray-200">
+                            <AvatarImage src={user.profileImageUrl || ""} alt={user.username} />
+                            <AvatarFallback className="bg-primary/10 text-primary">
+                              {user.username?.[0]?.toUpperCase() || "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{user.username}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="px-3 py-8 text-center">
+                      <div className="flex flex-col items-center text-gray-500">
+                        <Trophy className="h-10 w-10 text-gray-300 mb-2" />
+                        <p className="font-medium">No entries yet</p>
+                        <p className="text-xs mt-1">Make your pick to join the leaderboard!</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

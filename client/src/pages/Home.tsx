@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import LeagueHeader from "@/components/LeagueHeader";
 import ContentTabs from "@/components/ContentTabs";
 import NFLGameCard from "@/components/NFLGameCard";
-import Leaderboard from "@/components/Leaderboard";
 import { NFLWeek, NFLGame, UserPick } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
@@ -18,6 +17,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Shield, MessageSquare } from "lucide-react";
+import { Helmet } from "react-helmet";
 
 type Tab = "spreads" | "messageboard";
 type SortOption = "spread" | "homeUnderdog" | "gameTime";
@@ -141,17 +142,26 @@ export default function Home() {
       {/* Content Tabs */}
       <ContentTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div>
         {/* Pick Selection */}
         {activeTab === "spreads" && (
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-gray-900">
+          <div>
+            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6 border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-primary/10 to-secondary/10">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <h3 className="text-xl font-medium text-gray-900 flex items-center">
+                    <Shield className="h-5 w-5 text-primary mr-2" />
                     {currentWeek ? `Week ${currentWeek.weekNumber} Pick Selection` : "Pick Selection"}
                   </h3>
-                  <div className="relative inline-block text-left">
+                  
+                  {userPick && (
+                    <div className="bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-medium flex items-center">
+                      <span className="mr-2">Current Pick:</span> 
+                      <span className="font-bold">{userPick.pickedTeam?.name || "Selected Team"}</span>
+                    </div>
+                  )}
+                  
+                  <div className="relative inline-block">
                     <Select 
                       value={sortOption} 
                       onValueChange={(value) => setSortOption(value as SortOption)}
@@ -172,48 +182,69 @@ export default function Home() {
               <div className="px-6 py-4">
                 {isLoading ? (
                   // Loading skeleton
-                  Array.from({ length: 3 }).map((_, index) => (
-                    <div key={index} className="mb-4">
-                      <Skeleton className="h-24 w-full rounded-lg" />
-                    </div>
-                  ))
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div key={index} className="mb-4">
+                        <Skeleton className="h-36 w-full rounded-lg" />
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <>
                     {sortedGames && sortedGames.length > 0 ? (
                       <form id="pick-form" onSubmit={(e) => { e.preventDefault(); handleSubmitPick(); }}>
-                        {sortedGames.map((game) => (
-                          <NFLGameCard
-                            key={game.id}
-                            game={game}
-                            selectedTeamId={userPick && game.id === userPick.gameId ? userPick.pickedTeamId : selectedTeamId}
-                            onSelect={handleTeamSelection}
-                            disabled={arePicksLocked || !isAuthenticated}
-                          />
-                        ))}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {sortedGames.map((game) => (
+                            <NFLGameCard
+                              key={game.id}
+                              game={game}
+                              selectedTeamId={userPick && game.id === userPick.gameId ? userPick.pickedTeamId : selectedTeamId}
+                              onSelect={handleTeamSelection}
+                              disabled={arePicksLocked || !isAuthenticated}
+                            />
+                          ))}
+                        </div>
                         
                         {!isAuthenticated ? (
-                          <div className="mt-6 bg-blue-50 p-4 rounded-md">
-                            <p className="text-center text-blue-700">Please <a href="/api/login" className="font-bold underline">log in</a> to make your pick</p>
+                          <div className="mt-8 bg-blue-50 p-6 rounded-md shadow-sm border border-blue-200">
+                            <p className="text-center text-blue-700 font-medium">Please <a href="/api/login" className="font-bold underline hover:text-blue-800 transition-colors">log in</a> to make your pick</p>
                           </div>
                         ) : arePicksLocked ? (
-                          <div className="mt-6 bg-yellow-50 p-4 rounded-md">
-                            <p className="text-center text-yellow-700">Picks are locked for this week</p>
+                          <div className="mt-8 bg-yellow-50 p-6 rounded-md shadow-sm border border-yellow-200">
+                            <p className="text-center text-yellow-700 font-medium">Picks are locked for this week until 1:00 PM EST Sunday</p>
                           </div>
                         ) : (
-                          <div className="mt-6">
+                          <div className="mt-8 text-center">
                             <Button 
                               type="submit" 
-                              className="w-full" 
+                              className="px-8 py-6 text-lg font-bold" 
                               disabled={isSubmittingPick || !selectedTeamId}
                             >
-                              {isSubmittingPick ? "Submitting..." : "Submit My Pick"}
+                              {isSubmittingPick ? (
+                                <span className="flex items-center">
+                                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  Submitting...
+                                </span>
+                              ) : hasSubmittedPick ? "Update My Pick" : "Submit My Pick"}
                             </Button>
+                            {selectedTeamId && (
+                              <p className="mt-2 text-gray-600">
+                                {hasSubmittedPick ? "You can change your pick until the picks lock." : "Your pick will be locked at 1:00 PM EST on Sunday."}
+                              </p>
+                            )}
                           </div>
                         )}
                       </form>
                     ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        No games available for this week
+                      <div className="text-center py-12 px-4">
+                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <h3 className="mt-2 text-lg font-medium text-gray-900">No games available</h3>
+                        <p className="mt-1 text-gray-500">There are no games available for this week.</p>
                       </div>
                     )}
                   </>
@@ -224,22 +255,24 @@ export default function Home() {
         )}
 
         {activeTab === "messageboard" && (
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Messageboard</h3>
+          <div>
+            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6 border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-primary/10 to-secondary/10">
+                <h3 className="text-xl font-medium text-gray-900 flex items-center">
+                  <MessageSquare className="h-5 w-5 text-primary mr-2" />
+                  League Discussion
+                </h3>
               </div>
-              <div className="px-6 py-12 text-center">
-                <p className="text-gray-500">Messageboard feature coming soon!</p>
+              <div className="p-12 text-center">
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                <h3 className="mt-2 text-lg font-medium text-gray-900">Coming Soon</h3>
+                <p className="mt-1 text-gray-500">The messageboard feature will be available in a future update.</p>
               </div>
             </div>
           </div>
         )}
-        
-        {/* Leaderboard */}
-        <div className="lg:col-span-1">
-          <Leaderboard leagueId={leagueId} />
-        </div>
       </div>
     </div>
   );

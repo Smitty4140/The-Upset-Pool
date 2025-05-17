@@ -33,7 +33,10 @@ export default function Header() {
             </div>
             <nav className="ml-6 flex space-x-8">
               <NavLink href="/" active={location === "/"}>
-                My Leagues
+                My Picks
+              </NavLink>
+              <NavLink href="/leaderboard" active={location === "/leaderboard"}>
+                Leaderboard
               </NavLink>
               <NavLink href="/profile" active={location === "/profile"}>
                 Profile
