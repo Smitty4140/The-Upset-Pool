@@ -203,7 +203,7 @@ export default function Home() {
                             <NFLGameCard
                               key={game.id}
                               game={game}
-                              selectedTeamId={userPick && game.id === userPick.gameId ? userPick.pickedTeamId : selectedTeamId}
+                              selectedTeamId={selectedTeamId}
                               onSelect={handleTeamSelection}
                               disabled={arePicksLocked || !isAuthenticated}
                             />
