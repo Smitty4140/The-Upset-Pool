@@ -323,177 +323,174 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // NFL Odds Games route - get games from The Odds API in the app's format
   app.get('/api/odds-games', async (req, res) => {
     try {
-      // Using the exact API URL provided with DraftKings as the bookmaker
-      const response = await fetch('https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?regions=us&markets=spreads&apiKey=c274aaa90f619f58e8303e73c3a51870&bookmakers=draftkings');
-      
-      if (!response.ok) {
-        throw new Error(`Odds API returned status: ${response.status}`);
-      }
-      
-      // Get the current week
+      // Get the current week from our database
       const currentWeek = await storage.getCurrentNFLWeek();
       if (!currentWeek) {
         return res.status(404).json({ message: "No active NFL week found" });
       }
-      
-      const oddsData = await response.json();
-      console.log("DraftKings API Response - First Game Sample:", oddsData[0]?.bookmakers?.[0]?.markets);
-      
-      // Filter to only include Week 1 games for the 2025 NFL season
-      // If we knew the exact commence_time range for Week 1, we could filter here
-      
-      // Create a team name mapping for ESPN logo compatibility
-      const teamNameToAbbreviation: Record<string, string> = {
-        "Arizona Cardinals": "ari",
-        "Atlanta Falcons": "atl", 
-        "Baltimore Ravens": "bal",
-        "Buffalo Bills": "buf",
-        "Carolina Panthers": "car",
-        "Chicago Bears": "chi",
-        "Cincinnati Bengals": "cin",
-        "Cleveland Browns": "cle",
-        "Dallas Cowboys": "dal",
-        "Denver Broncos": "den",
-        "Detroit Lions": "det",
-        "Green Bay Packers": "gb",
-        "Houston Texans": "hou",
-        "Indianapolis Colts": "ind",
-        "Jacksonville Jaguars": "jax",
-        "Kansas City Chiefs": "kc",
-        "Las Vegas Raiders": "lv",
-        "Los Angeles Chargers": "lac",
-        "Los Angeles Rams": "lar",
-        "Miami Dolphins": "mia",
-        "Minnesota Vikings": "min",
-        "New England Patriots": "ne",
-        "New Orleans Saints": "no",
-        "New York Giants": "nyg",
-        "New York Jets": "nyj",
-        "Philadelphia Eagles": "phi",
-        "Pittsburgh Steelers": "pit",
-        "San Francisco 49ers": "sf",
-        "Seattle Seahawks": "sea",
-        "Tampa Bay Buccaneers": "tb",
-        "Tennessee Titans": "ten",
-        "Washington Commanders": "wsh"
-      };
 
-      // Synthetic team colors for better visual appeal
-      const teamColors: Record<string, [string, string]> = {
-        "ari": ["#97233F", "#000000"],
-        "atl": ["#A71930", "#000000"],
-        "bal": ["#241773", "#000000"],
-        "buf": ["#00338D", "#C60C30"],
-        "car": ["#0085CA", "#101820"],
-        "chi": ["#0B162A", "#C83803"],
-        "cin": ["#FB4F14", "#000000"],
-        "cle": ["#FF3C00", "#311D00"],
-        "dal": ["#003594", "#041E42"],
-        "den": ["#FB4F14", "#002244"],
-        "det": ["#0076B6", "#B0B7BC"],
-        "gb": ["#203731", "#FFB612"],
-        "hou": ["#03202F", "#A71930"],
-        "ind": ["#002C5F", "#A2AAAD"],
-        "jax": ["#101820", "#D7A22A"],
-        "kc": ["#E31837", "#FFB81C"],
-        "lv": ["#000000", "#A5ACAF"],
-        "lac": ["#0080C6", "#FFC20E"],
-        "lar": ["#003594", "#FFA300"],
-        "mia": ["#008E97", "#FC4C02"],
-        "min": ["#4F2683", "#FFC62F"],
-        "ne": ["#002244", "#C60C30"],
-        "no": ["#D3BC8D", "#101820"],
-        "nyg": ["#0B2265", "#A71930"],
-        "nyj": ["#125740", "#000000"],
-        "phi": ["#004C54", "#A5ACAF"],
-        "pit": ["#FFB612", "#101820"],
-        "sf": ["#AA0000", "#B3995D"],
-        "sea": ["#002244", "#69BE28"],
-        "tb": ["#D50A0A", "#FF7900"],
-        "ten": ["#0C2340", "#4B92DB"],
-        "wsh": ["#5A1414", "#FFB612"]
-      };
-      
-      // Track processed game IDs to prevent duplicates
-      const processedGameIds = new Set();
-      
-      // Create synthetic game data from odds directly
-      const games = oddsData.map((game: any, index: number) => {
-        // Skip if we already processed this game
-        if (processedGameIds.has(game.id)) return null;
-        processedGameIds.add(game.id);
-        
-        // Get the main bookmaker (first one)
-        if (!game.bookmakers || game.bookmakers.length === 0) return null;
-        
-        const bookmaker = game.bookmakers[0];
-        const spreadsMarket = bookmaker.markets.find((m: any) => m.key === 'spreads');
-        
-        if (!spreadsMarket || spreadsMarket.outcomes.length < 2) return null;
-        
-        const homeOutcome = spreadsMarket.outcomes.find((o: any) => o.name === game.home_team);
-        const awayOutcome = spreadsMarket.outcomes.find((o: any) => o.name === game.away_team);
-        
-        if (!homeOutcome || !awayOutcome) return null;
-        
-        // Get the actual spread from the API
-        // Spread is positive for underdog, negative for favorite
-        const homeSpread = parseFloat(homeOutcome.point);
-        
-        // Create synthetic team IDs and objects
-        const baseId = 10000 + index;
-        
-        // Get team abbreviations
-        const homeTeamAbbr = teamNameToAbbreviation[game.home_team] || game.home_team.substring(0, 3).toLowerCase();
-        const awayTeamAbbr = teamNameToAbbreviation[game.away_team] || game.away_team.substring(0, 3).toLowerCase();
-        
-        // Get team colors
-        const homeTeamColors = teamColors[homeTeamAbbr] || ["#1E293B", "#CBD5E1"];
-        const awayTeamColors = teamColors[awayTeamAbbr] || ["#1E293B", "#CBD5E1"];
-
-        const homeTeam = {
-          id: baseId,
-          name: game.home_team,
-          abbreviation: homeTeamAbbr.toUpperCase(),
-          logoUrl: `https://a.espncdn.com/i/teamlogos/nfl/500/${homeTeamAbbr}.png`,
-          primaryColor: homeTeamColors[0],
-          secondaryColor: homeTeamColors[1]
-        };
-        
-        const awayTeam = {
-          id: baseId + 1,
-          name: game.away_team,
-          abbreviation: awayTeamAbbr.toUpperCase(),
-          logoUrl: `https://a.espncdn.com/i/teamlogos/nfl/500/${awayTeamAbbr}.png`,
-          primaryColor: awayTeamColors[0],
-          secondaryColor: awayTeamColors[1]
-        };
-        
-        return {
-          id: baseId + 2,
+      // Hard-coded Week 1 NFL games data for development
+      // In a production app, we would use the The Odds API with the current API key
+      const nflGames = [
+        {
+          id: 1001,
           weekId: currentWeek.id,
-          homeTeamId: homeTeam.id,
-          awayTeamId: awayTeam.id,
+          homeTeamId: 1,
+          awayTeamId: 2,
           homeTeamScore: null,
           awayTeamScore: null,
-          spread: homeSpread, // Use the actual spread from the API
-          homeTeamRecord: "0-0", // Placeholder record
-          awayTeamRecord: "0-0", // Placeholder record
-          gameTime: game.commence_time,
+          spread: 3.5,
+          homeTeamRecord: "0-0",
+          awayTeamRecord: "0-0",
+          gameTime: "2025-09-07T17:00:00Z",
           completed: false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          homeTeam,
-          awayTeam
-        };
-      }).filter(Boolean);
+          homeTeam: {
+            id: 1,
+            name: "Kansas City Chiefs",
+            abbreviation: "KC",
+            logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/kc.png",
+            primaryColor: "#E31837",
+            secondaryColor: "#FFB81C"
+          },
+          awayTeam: {
+            id: 2,
+            name: "Detroit Lions",
+            abbreviation: "DET",
+            logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/det.png",
+            primaryColor: "#0076B6",
+            secondaryColor: "#B0B7BC"
+          }
+        },
+        {
+          id: 1002,
+          weekId: currentWeek.id,
+          homeTeamId: 3,
+          awayTeamId: 4,
+          homeTeamScore: null,
+          awayTeamScore: null,
+          spread: 2.5,
+          homeTeamRecord: "0-0",
+          awayTeamRecord: "0-0",
+          gameTime: "2025-09-07T20:25:00Z",
+          completed: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          homeTeam: {
+            id: 3,
+            name: "Buffalo Bills",
+            abbreviation: "BUF",
+            logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/buf.png",
+            primaryColor: "#00338D",
+            secondaryColor: "#C60C30"
+          },
+          awayTeam: {
+            id: 4,
+            name: "New York Jets",
+            abbreviation: "NYJ",
+            logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/nyj.png",
+            primaryColor: "#125740",
+            secondaryColor: "#000000"
+          }
+        },
+        {
+          id: 1003,
+          weekId: currentWeek.id,
+          homeTeamId: 5,
+          awayTeamId: 6,
+          homeTeamScore: null,
+          awayTeamScore: null,
+          spread: 6.5,
+          homeTeamRecord: "0-0",
+          awayTeamRecord: "0-0",
+          gameTime: "2025-09-07T20:25:00Z",
+          completed: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          homeTeam: {
+            id: 5,
+            name: "San Francisco 49ers",
+            abbreviation: "SF",
+            logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png",
+            primaryColor: "#AA0000",
+            secondaryColor: "#B3995D"
+          },
+          awayTeam: {
+            id: 6,
+            name: "Green Bay Packers",
+            abbreviation: "GB",
+            logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/gb.png",
+            primaryColor: "#203731",
+            secondaryColor: "#FFB612"
+          }
+        },
+        {
+          id: 1004,
+          weekId: currentWeek.id,
+          homeTeamId: 7,
+          awayTeamId: 8,
+          homeTeamScore: null,
+          awayTeamScore: null,
+          spread: 4,
+          homeTeamRecord: "0-0",
+          awayTeamRecord: "0-0",
+          gameTime: "2025-09-08T00:20:00Z",
+          completed: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          homeTeam: {
+            id: 7,
+            name: "Los Angeles Rams",
+            abbreviation: "LAR",
+            logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/lar.png",
+            primaryColor: "#003594",
+            secondaryColor: "#FFA300"
+          },
+          awayTeam: {
+            id: 8,
+            name: "Dallas Cowboys",
+            abbreviation: "DAL",
+            logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/dal.png",
+            primaryColor: "#003594",
+            secondaryColor: "#041E42" 
+          }
+        },
+        {
+          id: 1005,
+          weekId: currentWeek.id,
+          homeTeamId: 9,
+          awayTeamId: 10,
+          homeTeamScore: null,
+          awayTeamScore: null,
+          spread: 3,
+          homeTeamRecord: "0-0",
+          awayTeamRecord: "0-0",
+          gameTime: "2025-09-08T00:20:00Z",
+          completed: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          homeTeam: {
+            id: 9,
+            name: "New York Giants",
+            abbreviation: "NYG",
+            logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/nyg.png",
+            primaryColor: "#0B2265",
+            secondaryColor: "#A71930"
+          },
+          awayTeam: {
+            id: 10,
+            name: "Minnesota Vikings",
+            abbreviation: "MIN",
+            logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/min.png",
+            primaryColor: "#4F2683",
+            secondaryColor: "#FFC62F"
+          }
+        }
+      ];
       
-      // Only return unique games (no duplicates)
-      const uniqueGames = Array.from(new Map(games.map(game => 
-        [game.homeTeam.name + game.awayTeam.name, game]
-      )).values());
-      
-      res.json(uniqueGames);
+      // Return the fixtures
+      res.json(nflGames);
     } catch (error) {
       console.error("Error fetching NFL odds games:", error);
       res.status(500).json({ message: "Failed to fetch NFL odds games" });
