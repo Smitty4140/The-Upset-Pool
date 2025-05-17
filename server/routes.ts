@@ -323,9 +323,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // NFL Odds Games route - get games from The Odds API in the app's format
   app.get('/api/odds-games', async (req, res) => {
     try {
-      const apiKey = 'c274aaa90f619f58e8303e73c3a51870'; // Using the provided API key
-      // Use the spreads market to get actual point spreads
-      const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?regions=us&markets=spreads&oddsFormat=american&apiKey=${apiKey}`);
+      // Using the exact API URL provided with DraftKings as the bookmaker
+      const response = await fetch('https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?regions=us&markets=spreads&apiKey=c274aaa90f619f58e8303e73c3a51870&bookmakers=draftkings');
       
       if (!response.ok) {
         throw new Error(`Odds API returned status: ${response.status}`);
@@ -338,6 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const oddsData = await response.json();
+      console.log("DraftKings API Response - First Game Sample:", oddsData[0]?.bookmakers?.[0]?.markets);
       
       // Filter to only include Week 1 games for the 2025 NFL season
       // If we knew the exact commence_time range for Week 1, we could filter here
