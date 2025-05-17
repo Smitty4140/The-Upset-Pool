@@ -73,8 +73,14 @@ export default function Home() {
   // Use odds games if available, otherwise fall back to database games
   const allGames = oddsGames && oddsGames.length > 0 ? oddsGames : fallbackGames;
   
-  // Filter games by the selected week
-  const games = allGames?.filter(game => activeWeekId ? game.weekId === activeWeekId : true);
+  // Filter games by the selected week and sort by date
+  const games = useMemo(() => {
+    if (!allGames) return [];
+    
+    return allGames
+      .filter(game => activeWeekId ? game.weekId === activeWeekId : true)
+      .sort((a, b) => new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime());
+  }, [allGames, activeWeekId]);
   
   const isLoadingGames = isLoadingOddsGames || (isLoadingFallbackGames && (!oddsGames || oddsGames.length === 0));
 
@@ -252,15 +258,49 @@ export default function Home() {
                   <>
                     {sortedGames && sortedGames.length > 0 ? (
                       <form id="pick-form" onSubmit={(e) => { e.preventDefault(); handleSubmitPick(); }}>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {sortedGames.map((game) => (
-                            <NFLGameCard
-                              key={game.id}
-                              game={game}
-                              selectedTeamId={selectedTeamId}
-                              onSelect={handleTeamSelection}
-                              disabled={arePicksLocked || !isAuthenticated}
-                            />
+                        {/* Group games by date */}
+                        <div className="space-y-8">
+                          {/* Group and organize games by date */}
+                          {Object.entries(
+                            sortedGames.reduce((acc: Record<string, NFLGame[]>, game) => {
+                              // Get date in a readable format (e.g., "Sep 14, 2025")
+                              const gameDate = new Date(game.gameTime);
+                              const dateKey = gameDate.toLocaleDateString('en-US', { 
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric',
+                              });
+                              
+                              if (!acc[dateKey]) {
+                                acc[dateKey] = [];
+                              }
+                              
+                              acc[dateKey].push(game);
+                              return acc;
+                            }, {})
+                          ).map(([dateKey, gamesOnDate]) => (
+                            <div key={dateKey} className="mb-6">
+                              {/* Date header */}
+                              <div className="mb-4 pb-2 border-b border-gray-200">
+                                <h4 className="text-lg font-semibold text-gray-800 flex items-center">
+                                  <Calendar className="h-4 w-4 mr-2 text-primary" />
+                                  {dateKey}
+                                </h4>
+                              </div>
+                              
+                              {/* Games grid for this date */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {gamesOnDate.map((game) => (
+                                  <NFLGameCard
+                                    key={game.id}
+                                    game={game}
+                                    selectedTeamId={selectedTeamId}
+                                    onSelect={handleTeamSelection}
+                                    disabled={arePicksLocked || !isAuthenticated}
+                                  />
+                                ))}
+                              </div>
+                            </div>
                           ))}
                         </div>
                         
