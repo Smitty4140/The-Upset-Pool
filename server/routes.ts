@@ -338,11 +338,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const oddsData = await response.json();
       
-      // Import the function from odds.ts
-      const { convertOddsToNFLGames } = await import('./odds');
+      // Create a team name mapping for ESPN logo compatibility
+      const teamNameToAbbreviation: Record<string, string> = {
+        "Arizona Cardinals": "ari",
+        "Atlanta Falcons": "atl", 
+        "Baltimore Ravens": "bal",
+        "Buffalo Bills": "buf",
+        "Carolina Panthers": "car",
+        "Chicago Bears": "chi",
+        "Cincinnati Bengals": "cin",
+        "Cleveland Browns": "cle",
+        "Dallas Cowboys": "dal",
+        "Denver Broncos": "den",
+        "Detroit Lions": "det",
+        "Green Bay Packers": "gb",
+        "Houston Texans": "hou",
+        "Indianapolis Colts": "ind",
+        "Jacksonville Jaguars": "jax",
+        "Kansas City Chiefs": "kc",
+        "Las Vegas Raiders": "lv",
+        "Los Angeles Chargers": "lac",
+        "Los Angeles Rams": "lar",
+        "Miami Dolphins": "mia",
+        "Minnesota Vikings": "min",
+        "New England Patriots": "ne",
+        "New Orleans Saints": "no",
+        "New York Giants": "nyg",
+        "New York Jets": "nyj",
+        "Philadelphia Eagles": "phi",
+        "Pittsburgh Steelers": "pit",
+        "San Francisco 49ers": "sf",
+        "Seattle Seahawks": "sea",
+        "Tampa Bay Buccaneers": "tb",
+        "Tennessee Titans": "ten",
+        "Washington Commanders": "wsh"
+      };
+
+      // Synthetic team colors for better visual appeal
+      const teamColors: Record<string, [string, string]> = {
+        "ari": ["#97233F", "#000000"],
+        "atl": ["#A71930", "#000000"],
+        "bal": ["#241773", "#000000"],
+        "buf": ["#00338D", "#C60C30"],
+        "car": ["#0085CA", "#101820"],
+        "chi": ["#0B162A", "#C83803"],
+        "cin": ["#FB4F14", "#000000"],
+        "cle": ["#FF3C00", "#311D00"],
+        "dal": ["#003594", "#041E42"],
+        "den": ["#FB4F14", "#002244"],
+        "det": ["#0076B6", "#B0B7BC"],
+        "gb": ["#203731", "#FFB612"],
+        "hou": ["#03202F", "#A71930"],
+        "ind": ["#002C5F", "#A2AAAD"],
+        "jax": ["#101820", "#D7A22A"],
+        "kc": ["#E31837", "#FFB81C"],
+        "lv": ["#000000", "#A5ACAF"],
+        "lac": ["#0080C6", "#FFC20E"],
+        "lar": ["#003594", "#FFA300"],
+        "mia": ["#008E97", "#FC4C02"],
+        "min": ["#4F2683", "#FFC62F"],
+        "ne": ["#002244", "#C60C30"],
+        "no": ["#D3BC8D", "#101820"],
+        "nyg": ["#0B2265", "#A71930"],
+        "nyj": ["#125740", "#000000"],
+        "phi": ["#004C54", "#A5ACAF"],
+        "pit": ["#FFB612", "#101820"],
+        "sf": ["#AA0000", "#B3995D"],
+        "sea": ["#002244", "#69BE28"],
+        "tb": ["#D50A0A", "#FF7900"],
+        "ten": ["#0C2340", "#4B92DB"],
+        "wsh": ["#5A1414", "#FFB612"]
+      };
       
-      // Convert odds to NFL games format
-      const games = await convertOddsToNFLGames(oddsData, currentWeek.id);
+      // Create synthetic game data from odds directly
+      const games = oddsData.map((game: any, index: number) => {
+        // Get the main bookmaker (first one)
+        if (!game.bookmakers || game.bookmakers.length === 0) return null;
+        
+        const bookmaker = game.bookmakers[0];
+        const h2hMarket = bookmaker.markets.find((m: any) => m.key === 'h2h');
+        
+        if (!h2hMarket || h2hMarket.outcomes.length < 2) return null;
+        
+        const homeOutcome = h2hMarket.outcomes.find((o: any) => o.name === game.home_team);
+        const awayOutcome = h2hMarket.outcomes.find((o: any) => o.name === game.away_team);
+        
+        if (!homeOutcome || !awayOutcome) return null;
+        
+        // Calculate spread from American odds
+        let spread = 0;
+        if (homeOutcome.price < 0 && awayOutcome.price > 0) {
+          // Home team is favored
+          spread = parseFloat((Math.round(-homeOutcome.price / 100 * 2.5 * 2) / 2).toFixed(1));
+        } else if (awayOutcome.price < 0 && homeOutcome.price > 0) {
+          // Away team is favored
+          spread = parseFloat((-Math.round(-awayOutcome.price / 100 * 2.5 * 2) / 2).toFixed(1));
+        }
+        
+        // Create synthetic team IDs and objects
+        const baseId = 10000 + index;
+        
+        // Get team abbreviations
+        const homeTeamAbbr = teamNameToAbbreviation[game.home_team] || game.home_team.substring(0, 3).toLowerCase();
+        const awayTeamAbbr = teamNameToAbbreviation[game.away_team] || game.away_team.substring(0, 3).toLowerCase();
+        
+        // Get team colors
+        const homeTeamColors = teamColors[homeTeamAbbr] || ["#1E293B", "#CBD5E1"];
+        const awayTeamColors = teamColors[awayTeamAbbr] || ["#1E293B", "#CBD5E1"];
+
+        const homeTeam = {
+          id: baseId,
+          name: game.home_team,
+          abbreviation: homeTeamAbbr.toUpperCase(),
+          logoUrl: `https://a.espncdn.com/i/teamlogos/nfl/500/${homeTeamAbbr}.png`,
+          primaryColor: homeTeamColors[0],
+          secondaryColor: homeTeamColors[1]
+        };
+        
+        const awayTeam = {
+          id: baseId + 1,
+          name: game.away_team,
+          abbreviation: awayTeamAbbr.toUpperCase(),
+          logoUrl: `https://a.espncdn.com/i/teamlogos/nfl/500/${awayTeamAbbr}.png`,
+          primaryColor: awayTeamColors[0],
+          secondaryColor: awayTeamColors[1]
+        };
+        
+        return {
+          id: baseId + 2,
+          weekId: currentWeek.id,
+          homeTeamId: homeTeam.id,
+          awayTeamId: awayTeam.id,
+          homeTeamScore: null,
+          awayTeamScore: null,
+          spread,
+          homeTeamRecord: "0-0", // Placeholder record
+          awayTeamRecord: "0-0", // Placeholder record
+          gameTime: game.commence_time,
+          completed: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          homeTeam,
+          awayTeam
+        };
+      }).filter(Boolean);
       
       res.json(games);
     } catch (error) {
