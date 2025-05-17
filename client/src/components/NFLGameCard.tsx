@@ -85,7 +85,9 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
               </div>
               <div>
                 <div className="font-medium text-gray-900">{firstTeam.name}</div>
-                <div className="text-xs text-gray-500">{firstTeam.record || "(0-0)"}</div>
+                <div className="text-xs text-gray-500">
+                  {isFirstTeamHome ? game.homeTeamRecord || "(0-0)" : game.awayTeamRecord || "(0-0)"}
+                </div>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {isFirstTeamHome && (
                     <div className="text-xs inline-block bg-blue-100 text-blue-800 font-medium px-2 py-0.5 rounded-full">
@@ -143,7 +145,9 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
               </div>
               <div>
                 <div className="font-medium text-gray-900">{secondTeam.name}</div>
-                <div className="text-xs text-gray-500">{secondTeam.record || "(0-0)"}</div>
+                <div className="text-xs text-gray-500">
+                  {isSecondTeamHome ? game.homeTeamRecord || "(0-0)" : game.awayTeamRecord || "(0-0)"}
+                </div>
                 {isSecondTeamHome && (
                   <div className="text-xs mt-1 inline-block bg-blue-100 text-blue-800 font-medium px-2 py-0.5 rounded-full">
                     HOME

@@ -324,7 +324,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/odds-games', async (req, res) => {
     try {
       const apiKey = 'c274aaa90f619f58e8303e73c3a51870'; // Using the provided API key
-      const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?regions=us&oddsFormat=american&apiKey=${apiKey}`);
+      // Use the spreads market to get actual point spreads
+      const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?regions=us&markets=spreads&oddsFormat=american&apiKey=${apiKey}`);
       
       if (!response.ok) {
         throw new Error(`Odds API returned status: ${response.status}`);
@@ -337,6 +338,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const oddsData = await response.json();
+      
+      // Filter to only include Week 1 games for the 2025 NFL season
+      // If we knew the exact commence_time range for Week 1, we could filter here
       
       // Create a team name mapping for ESPN logo compatibility
       const teamNameToAbbreviation: Record<string, string> = {
@@ -410,30 +414,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "wsh": ["#5A1414", "#FFB612"]
       };
       
+      // Track processed game IDs to prevent duplicates
+      const processedGameIds = new Set();
+      
       // Create synthetic game data from odds directly
       const games = oddsData.map((game: any, index: number) => {
+        // Skip if we already processed this game
+        if (processedGameIds.has(game.id)) return null;
+        processedGameIds.add(game.id);
+        
         // Get the main bookmaker (first one)
         if (!game.bookmakers || game.bookmakers.length === 0) return null;
         
         const bookmaker = game.bookmakers[0];
-        const h2hMarket = bookmaker.markets.find((m: any) => m.key === 'h2h');
+        const spreadsMarket = bookmaker.markets.find((m: any) => m.key === 'spreads');
         
-        if (!h2hMarket || h2hMarket.outcomes.length < 2) return null;
+        if (!spreadsMarket || spreadsMarket.outcomes.length < 2) return null;
         
-        const homeOutcome = h2hMarket.outcomes.find((o: any) => o.name === game.home_team);
-        const awayOutcome = h2hMarket.outcomes.find((o: any) => o.name === game.away_team);
+        const homeOutcome = spreadsMarket.outcomes.find((o: any) => o.name === game.home_team);
+        const awayOutcome = spreadsMarket.outcomes.find((o: any) => o.name === game.away_team);
         
         if (!homeOutcome || !awayOutcome) return null;
         
-        // Calculate spread from American odds
-        let spread = 0;
-        if (homeOutcome.price < 0 && awayOutcome.price > 0) {
-          // Home team is favored
-          spread = parseFloat((Math.round(-homeOutcome.price / 100 * 2.5 * 2) / 2).toFixed(1));
-        } else if (awayOutcome.price < 0 && homeOutcome.price > 0) {
-          // Away team is favored
-          spread = parseFloat((-Math.round(-awayOutcome.price / 100 * 2.5 * 2) / 2).toFixed(1));
-        }
+        // Get the actual spread from the API
+        // Spread is positive for underdog, negative for favorite
+        const homeSpread = parseFloat(homeOutcome.point);
         
         // Create synthetic team IDs and objects
         const baseId = 10000 + index;
@@ -471,7 +476,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           awayTeamId: awayTeam.id,
           homeTeamScore: null,
           awayTeamScore: null,
-          spread,
+          spread: homeSpread, // Use the actual spread from the API
           homeTeamRecord: "0-0", // Placeholder record
           awayTeamRecord: "0-0", // Placeholder record
           gameTime: game.commence_time,
@@ -483,7 +488,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }).filter(Boolean);
       
-      res.json(games);
+      // Only return unique games (no duplicates)
+      const uniqueGames = Array.from(new Map(games.map(game => 
+        [game.homeTeam.name + game.awayTeam.name, game]
+      )).values());
+      
+      res.json(uniqueGames);
     } catch (error) {
       console.error("Error fetching NFL odds games:", error);
       res.status(500).json({ message: "Failed to fetch NFL odds games" });
