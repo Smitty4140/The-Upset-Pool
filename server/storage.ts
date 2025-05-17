@@ -1,5 +1,5 @@
 import { eq, and, sql, desc, asc, not, gte, lt, isNull } from "drizzle-orm";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { 
   users, 
   nflTeams, 
@@ -373,66 +373,70 @@ export class DatabaseStorage implements IStorage {
 
   async getUnderdogGames(weekId: number): Promise<(NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam })[]> {
     try {
-      const result = await db.execute(sql`
+      // If no weekId is provided, get the current week
+      if (!weekId) {
+        const currentWeek = await this.getCurrentNFLWeek();
+        if (!currentWeek) {
+          return [];
+        }
+        weekId = currentWeek.id;
+      }
+
+      // Use raw query with pool to avoid Drizzle ORM issues
+      const { rows } = await pool.query(`
         SELECT 
           g.*,
-          ht.id as "homeTeam_id", 
-          ht.name as "homeTeam_name",
-          ht.abbreviation as "homeTeam_abbreviation",
-          ht.logo_url as "homeTeam_logoUrl",
-          ht.primary_color as "homeTeam_primaryColor",
-          ht.secondary_color as "homeTeam_secondaryColor",
-          at.id as "awayTeam_id", 
-          at.name as "awayTeam_name",
-          at.abbreviation as "awayTeam_abbreviation",
-          at.logo_url as "awayTeam_logoUrl",
-          at.primary_color as "awayTeam_primaryColor",
-          at.secondary_color as "awayTeam_secondaryColor"
+          ht.id AS "homeTeamId", 
+          ht.name AS "homeTeamName",
+          ht.abbreviation AS "homeTeamAbbreviation",
+          ht.logo_url AS "homeTeamLogoUrl",
+          ht.primary_color AS "homeTeamPrimaryColor",
+          ht.secondary_color AS "homeTeamSecondaryColor",
+          at.id AS "awayTeamId", 
+          at.name AS "awayTeamName",
+          at.abbreviation AS "awayTeamAbbreviation",
+          at.logo_url AS "awayTeamLogoUrl",
+          at.primary_color AS "awayTeamPrimaryColor",
+          at.secondary_color AS "awayTeamSecondaryColor"
         FROM nfl_games g
         JOIN nfl_teams ht ON g.home_team_id = ht.id
         JOIN nfl_teams at ON g.away_team_id = at.id
-        WHERE g.week_id = ${weekId} AND g.spread IS NOT NULL
+        WHERE g.week_id = $1 AND g.spread IS NOT NULL
         ORDER BY ABS(g.spread) DESC
-      `);
+      `, [weekId]);
       
-      // Filter for underdog games and transform the raw results
-      const games = [];
-      
-      for (const game of result) {
-        games.push({
-          id: game.id,
-          weekId: game.week_id,
-          homeTeamId: game.home_team_id,
-          awayTeamId: game.away_team_id,
-          homeTeamScore: game.home_team_score,
-          awayTeamScore: game.away_team_score,
-          spread: game.spread,
-          homeTeamRecord: game.home_team_record,
-          awayTeamRecord: game.away_team_record,
-          gameTime: game.game_time,
-          completed: game.completed,
-          createdAt: game.created_at,
-          updatedAt: game.updated_at,
-          homeTeam: {
-            id: game.homeTeam_id,
-            name: game.homeTeam_name,
-            abbreviation: game.homeTeam_abbreviation,
-            logoUrl: game.homeTeam_logoUrl,
-            primaryColor: game.homeTeam_primaryColor,
-            secondaryColor: game.homeTeam_secondaryColor
-          },
-          awayTeam: {
-            id: game.awayTeam_id,
-            name: game.awayTeam_name,
-            abbreviation: game.awayTeam_abbreviation,
-            logoUrl: game.awayTeam_logoUrl,
-            primaryColor: game.awayTeam_primaryColor,
-            secondaryColor: game.awayTeam_secondaryColor
-          }
-        });
-      }
-      
-      return games;
+      // Transform the rows into properly structured objects
+      return rows.map(game => ({
+        id: game.id,
+        weekId: game.week_id,
+        homeTeamId: game.home_team_id,
+        awayTeamId: game.away_team_id,
+        homeTeamScore: game.home_team_score,
+        awayTeamScore: game.away_team_score,
+        spread: game.spread,
+        homeTeamRecord: game.home_team_record,
+        awayTeamRecord: game.away_team_record,
+        gameTime: game.game_time,
+        completed: game.completed,
+        createdAt: game.created_at,
+        updatedAt: game.updated_at,
+        homeTeam: {
+          id: game.homeTeamId,
+          name: game.homeTeamName,
+          abbreviation: game.homeTeamAbbreviation,
+          logoUrl: game.homeTeamLogoUrl,
+          primaryColor: game.homeTeamPrimaryColor,
+          secondaryColor: game.homeTeamSecondaryColor
+        },
+        awayTeam: {
+          id: game.awayTeamId,
+          name: game.awayTeamName,
+          abbreviation: game.awayTeamAbbreviation,
+          logoUrl: game.awayTeamLogoUrl,
+          primaryColor: game.awayTeamPrimaryColor,
+          secondaryColor: game.awayTeamSecondaryColor
+        }
+      }));
     } catch (error) {
       console.error("Error getting underdog games:", error);
       return [];
