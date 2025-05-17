@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -9,6 +9,7 @@ import NFLOddsDisplay from "@/components/NFLOddsDisplay";
 import { NFLWeek, NFLGame, UserPick, User } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
+
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -42,20 +43,10 @@ export default function Home() {
     queryKey: ["/api/nfl-weeks/current"],
   });
 
-  // Get odds games for the week
-  const { data: oddsGames, isLoading: isLoadingOddsGames } = useQuery<NFLGame[]>({
-    queryKey: ["/api/odds-games"],
-  });
-  
-  // Get all underdog games for the week as fallback
-  const { data: fallbackGames, isLoading: isLoadingFallbackGames } = useQuery<NFLGame[]>({
+  // Get all NFL games for the week
+  const { data: games, isLoading: isLoadingGames } = useQuery<NFLGame[]>({
     queryKey: ["/api/nfl-games/underdog"],
-    enabled: !oddsGames || oddsGames.length === 0,
   });
-  
-  // Use odds games if available, otherwise fall back to database games
-  const games = oddsGames && oddsGames.length > 0 ? oddsGames : fallbackGames;
-  const isLoadingGames = isLoadingOddsGames || (isLoadingFallbackGames && (!oddsGames || oddsGames.length === 0));
 
   // Get the user's pick for this week
   const { data: userPick, isLoading: isLoadingPick } = useQuery<UserPick | null>({
