@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Football } from "lucide-react";
+import { Shield } from "lucide-react";
 
 export default function Header() {
   const [location] = useLocation();
@@ -28,7 +28,7 @@ export default function Header() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <div className="flex-shrink-0 flex items-center">
-              <Football className="h-8 w-8 text-accent mr-2" />
+              <Shield className="h-8 w-8 text-accent mr-2" />
               <h1 className="text-2xl font-bold text-white">Upset Pool</h1>
             </div>
             <nav className="ml-6 flex space-x-8">
