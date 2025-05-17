@@ -1,5 +1,7 @@
 import { NFLGame } from "@/lib/types";
 import { getTeamLogo } from "@/lib/teamLogos";
+import { formatGameTime } from "@/lib/formatDate";
+import { Clock } from "lucide-react";
 
 type NFLGameCardProps = {
   game: NFLGame;
@@ -25,11 +27,17 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
   const awayTeamRadioId = `pick-${game.awayTeam.abbreviation}-${game.id}`;
 
   return (
-    <div className="game-card transition-all duration-150 ease-in-out border border-gray-200 rounded-lg mb-4 last:mb-0 overflow-hidden hover:border-primary-300">
-      <div className="p-4">
+    <div className="game-card transition-all duration-150 ease-in-out border border-gray-200 rounded-lg mb-4 last:mb-0 overflow-hidden shadow-sm hover:shadow-md">
+      {/* Game time header */}
+      <div className="bg-blue-50 border-b border-blue-100 px-4 py-2 flex items-center text-xs text-blue-800">
+        <Clock className="h-3 w-3 mr-1" />
+        <span>{formatGameTime(game.gameTime)}</span>
+      </div>
+      
+      <div className="p-4 bg-gradient-to-b from-white to-gray-50">
         <div className="flex flex-col sm:flex-row sm:items-center">
           {/* Away Team */}
-          <div className="flex items-center flex-1">
+          <div className="flex items-center flex-1 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
             <div className="relative w-6 h-6 mr-3">
               <input 
                 type="radio" 
@@ -43,11 +51,15 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
               />
               <label 
                 htmlFor={awayTeamRadioId} 
-                className={`team-selection-indicator absolute inset-0 w-6 h-6 rounded-full border-2 ${disabled || !isAwayUnderdog ? 'border-gray-200 bg-gray-100 cursor-not-allowed' : 'border-gray-300 cursor-pointer'}`}
+                className={`team-selection-indicator absolute inset-0 w-6 h-6 rounded-full border-2 ${
+                  disabled || !isAwayUnderdog 
+                    ? 'border-gray-200 bg-gray-100 cursor-not-allowed' 
+                    : 'border-secondary cursor-pointer hover:border-primary'
+                }`}
               ></label>
             </div>
             <div className="flex items-center">
-              <div className="w-10 h-10 flex-shrink-0 mr-3">
+              <div className="w-12 h-12 flex-shrink-0 mr-3 bg-gray-50 rounded-full p-1 border border-gray-200">
                 <img 
                   src={getTeamLogo(game.awayTeam.abbreviation)} 
                   alt={`${game.awayTeam.name} logo`} 
@@ -55,24 +67,26 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
                 />
               </div>
               <div>
-                <div className="font-medium">{game.awayTeam.name}</div>
+                <div className="font-medium text-gray-900">{game.awayTeam.name}</div>
                 <div className="text-xs text-gray-500">{game.awayTeamRecord || "(0-0)"}</div>
                 {isAwayUnderdog && (
-                  <div className="text-xs text-green-600 font-medium">UNDERDOG</div>
+                  <div className="text-xs mt-1 inline-block bg-green-100 text-green-800 font-medium px-2 py-0.5 rounded-full">
+                    UNDERDOG
+                  </div>
                 )}
               </div>
             </div>
           </div>
           
           {/* Middle Spread Section */}
-          <div className="my-4 sm:my-0 px-4 py-2 rounded-md bg-gray-100 text-center sm:mx-4">
-            <span className={`font-semibold ${isHomeUnderdog || isAwayUnderdog ? "text-green-600" : "text-gray-600"}`}>
+          <div className="my-4 sm:my-0 px-6 py-3 rounded-full bg-gradient-to-r from-blue-500 to-secondary text-white text-center sm:mx-4 font-bold shadow-sm">
+            <span>
               {spreadText}
             </span>
           </div>
           
           {/* Home Team */}
-          <div className="flex items-center flex-1">
+          <div className="flex items-center flex-1 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
             <div className="relative w-6 h-6 mr-3">
               <input 
                 type="radio" 
@@ -86,11 +100,15 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
               />
               <label 
                 htmlFor={homeTeamRadioId} 
-                className={`team-selection-indicator absolute inset-0 w-6 h-6 rounded-full border-2 ${disabled || !isHomeUnderdog ? 'border-gray-200 bg-gray-100 cursor-not-allowed' : 'border-gray-300 cursor-pointer'}`}
+                className={`team-selection-indicator absolute inset-0 w-6 h-6 rounded-full border-2 ${
+                  disabled || !isHomeUnderdog 
+                    ? 'border-gray-200 bg-gray-100 cursor-not-allowed' 
+                    : 'border-secondary cursor-pointer hover:border-primary'
+                }`}
               ></label>
             </div>
             <div className="flex items-center">
-              <div className="w-10 h-10 flex-shrink-0 mr-3">
+              <div className="w-12 h-12 flex-shrink-0 mr-3 bg-gray-50 rounded-full p-1 border border-gray-200">
                 <img 
                   src={getTeamLogo(game.homeTeam.abbreviation)} 
                   alt={`${game.homeTeam.name} logo`} 
@@ -98,11 +116,15 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
                 />
               </div>
               <div>
-                <div className="font-medium">{game.homeTeam.name}</div>
+                <div className="font-medium text-gray-900">{game.homeTeam.name}</div>
                 <div className="text-xs text-gray-500">{game.homeTeamRecord || "(0-0)"}</div>
-                <div className="text-xs text-gray-700 font-medium">HOME</div>
+                <div className="text-xs mt-1 inline-block bg-blue-100 text-blue-800 font-medium px-2 py-0.5 rounded-full">
+                  HOME
+                </div>
                 {isHomeUnderdog && (
-                  <div className="text-xs text-green-600 font-medium">UNDERDOG</div>
+                  <div className="text-xs ml-1 mt-1 inline-block bg-green-100 text-green-800 font-medium px-2 py-0.5 rounded-full">
+                    UNDERDOG
+                  </div>
                 )}
               </div>
             </div>

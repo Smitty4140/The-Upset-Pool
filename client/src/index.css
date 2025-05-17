@@ -3,31 +3,37 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 20 14.3% 4.1%;
-  --muted: 60 4.8% 95.9%;
-  --muted-foreground: 25 5.3% 44.7%;
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --muted: 210 40% 93%;
+  --muted-foreground: 215 25% 27%;
   --popover: 0 0% 100%;
-  --popover-foreground: 20 14.3% 4.1%;
+  --popover-foreground: 222 47% 11%;
   --card: 0 0% 100%;
-  --card-foreground: 20 14.3% 4.1%;
-  --border: 20 5.9% 90%;
-  --input: 20 5.9% 90%;
-  --primary: 223 83% 48%;
-  --primary-foreground: 211 100% 99%;
-  --secondary: 60 4.8% 95.9%;
-  --secondary-foreground: 24 9.8% 10%;
-  --accent: 60 4.8% 95.9%;
-  --accent-foreground: 24 9.8% 10%;
+  --card-foreground: 222 47% 11%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --primary: 211 100% 35%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 217 92% 51%;
+  --secondary-foreground: 210 40% 98%;
+  --accent: 53 100% 50%;
+  --accent-foreground: 222 47% 11%;
   --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 60 9.1% 97.8%;
-  --ring: 223 83% 48%;
-  --radius: 0.5rem;
+  --destructive-foreground: 210 40% 98%;
+  --ring: 211 100% 35%;
+  --radius: 0.75rem;
 
   /* NFL Team colors for success/warning/danger */
   --success: 142 76% 36%;
   --warning: 38 92% 50%;
   --danger: 0 84% 60%;
+  
+  /* Custom colors for NFL theme */
+  --nfl-blue: 211 100% 35%;
+  --nfl-red: 0 84% 60%;
+  --nfl-gold: 45 93% 47%;
+  --nfl-green: 142 76% 36%;
 }
 
 .dark {
