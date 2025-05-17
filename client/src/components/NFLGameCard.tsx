@@ -61,9 +61,13 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
             <div className="flex items-center">
               <div className="w-12 h-12 flex-shrink-0 mr-3 bg-gray-50 rounded-full p-1 border border-gray-200">
                 <img 
-                  src={getTeamLogo(game.awayTeam.abbreviation)} 
+                  src={game.awayTeam.logoUrl || getTeamLogo(game.awayTeam.abbreviation)} 
                   alt={`${game.awayTeam.name} logo`} 
                   className="w-full h-full object-contain" 
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = 'https://placehold.co/100x100?text=' + game.awayTeam.abbreviation;
+                  }}
                 />
               </div>
               <div>
@@ -110,9 +114,13 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
             <div className="flex items-center">
               <div className="w-12 h-12 flex-shrink-0 mr-3 bg-gray-50 rounded-full p-1 border border-gray-200">
                 <img 
-                  src={getTeamLogo(game.homeTeam.abbreviation)} 
+                  src={game.homeTeam.logoUrl || getTeamLogo(game.homeTeam.abbreviation)} 
                   alt={`${game.homeTeam.name} logo`} 
                   className="w-full h-full object-contain" 
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = 'https://placehold.co/100x100?text=' + game.homeTeam.abbreviation;
+                  }}
                 />
               </div>
               <div>
