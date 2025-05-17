@@ -343,9 +343,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Seed NFL weeks data if needed
+  app.get('/api/seed-nfl-weeks', async (_req, res) => {
+    try {
+      const { seedNFLWeeks } = await import('./seedData');
+      const weeks = await seedNFLWeeks();
+      res.json({ message: `Successfully seeded ${weeks.length} NFL weeks` });
+    } catch (error) {
+      console.error("Error seeding NFL weeks:", error);
+      res.status(500).json({ message: "Failed to seed NFL weeks" });
+    }
+  });
+  
+  // Helper function to determine which NFL week a game belongs to based on its date
+  function determineNFLWeek(gameDate: string, weeks: any[]): number | null {
+    const gameTime = new Date(gameDate);
+    
+    for (const week of weeks) {
+      const startDate = new Date(week.startDate);
+      const endDate = new Date(week.endDate);
+      
+      // Check if game date falls within this week's range
+      if (gameTime >= startDate && gameTime <= endDate) {
+        return week.id;
+      }
+    }
+    
+    // If no match, return the first week's ID as fallback
+    return weeks.length > 0 ? weeks[0].id : null;
+  }
+  
   // NFL Odds Games route - get games from The Odds API in the app's format
   app.get('/api/odds-games', async (req, res) => {
     try {
+      // Get all NFL weeks
+      const allWeeks = await storage.getNFLWeeks();
+      if (!allWeeks || allWeeks.length === 0) {
+        return res.status(404).json({ message: "No NFL weeks found. Please run /api/seed-nfl-weeks first." });
+      }
+      
       // Get the current week from our database
       const currentWeek = await storage.getCurrentNFLWeek();
       if (!currentWeek) {
@@ -558,10 +594,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               secondaryColor: awayTeamColors[1]
             };
             
+            // Determine the correct NFL week based on the game date
+            const gameWeekId = determineNFLWeek(game.commence_time, allWeeks) || currentWeek.id;
+            
             // Create game object
             return {
               id: baseId + 2,
-              weekId: currentWeek.id,
+              weekId: gameWeekId, // Use the correctly determined week ID
               homeTeamId: homeTeam.id,
               awayTeamId: awayTeam.id,
               homeTeamScore: null,
