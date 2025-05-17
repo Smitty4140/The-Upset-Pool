@@ -305,7 +305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // NFL Odds API route
   app.get('/api/nfl-odds', async (req, res) => {
     try {
-      const apiKey = 'c274aaa90f619f58e8303e73c3a51870'; // Using the provided API key
+      const apiKey = process.env.THE_ODDS_API_KEY;
       const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?regions=us&oddsFormat=american&apiKey=${apiKey}`);
       
       if (!response.ok) {
@@ -329,9 +329,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No active NFL week found" });
       }
 
-      // Hard-coded Week 1 NFL games data for development
-      // In a production app, we would use the The Odds API with the current API key
-      const nflGames = [
+      // Get real NFL data from The Odds API using the provided API key
+      const apiKey = process.env.THE_ODDS_API_KEY;
+      const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?regions=us&markets=spreads&apiKey=${apiKey}&bookmakers=draftkings`);
+      
+      if (!response.ok) {
+        throw new Error(`Odds API returned status: ${response.status}`);
+      }
+      
+      const oddsData = await response.json();
+      console.log(`Successfully fetched ${oddsData.length} NFL games from The Odds API`);
+      
+      // Create a team name mapping for ESPN logo compatibility
+      const teamNameToAbbreviation: Record<string, string> = {
+        "Arizona Cardinals": "ari",
+        "Atlanta Falcons": "atl", 
+        "Baltimore Ravens": "bal",
+        "Buffalo Bills": "buf",
+        "Carolina Panthers": "car",
+        "Chicago Bears": "chi",
+        "Cincinnati Bengals": "cin",
+        "Cleveland Browns": "cle",
+        "Dallas Cowboys": "dal",
+        "Denver Broncos": "den",
+        "Detroit Lions": "det",
+        "Green Bay Packers": "gb",
+        "Houston Texans": "hou",
+        "Indianapolis Colts": "ind",
+        "Jacksonville Jaguars": "jax",
+        "Kansas City Chiefs": "kc",
+        "Las Vegas Raiders": "lv",
+        "Los Angeles Chargers": "lac",
+        "Los Angeles Rams": "lar",
+        "Miami Dolphins": "mia",
+        "Minnesota Vikings": "min",
+        "New England Patriots": "ne",
+        "New Orleans Saints": "no",
+        "New York Giants": "nyg",
+        "New York Jets": "nyj",
+        "Philadelphia Eagles": "phi",
+        "Pittsburgh Steelers": "pit",
+        "San Francisco 49ers": "sf",
+        "Seattle Seahawks": "sea",
+        "Tampa Bay Buccaneers": "tb",
+        "Tennessee Titans": "ten",
+        "Washington Commanders": "wsh"
+      };
+
+      // Synthetic team colors for better visual appeal
+      const teamColors: Record<string, [string, string]> = {
+        "ari": ["#97233F", "#000000"],
+        "atl": ["#A71930", "#000000"],
+        "bal": ["#241773", "#000000"],
+        "buf": ["#00338D", "#C60C30"],
+        "car": ["#0085CA", "#101820"],
+        "chi": ["#0B162A", "#C83803"],
+        "cin": ["#FB4F14", "#000000"],
+        "cle": ["#FF3C00", "#311D00"],
+        "dal": ["#003594", "#041E42"],
+        "den": ["#FB4F14", "#002244"],
+        "det": ["#0076B6", "#B0B7BC"],
+        "gb": ["#203731", "#FFB612"],
+        "hou": ["#03202F", "#A71930"],
+        "ind": ["#002C5F", "#A2AAAD"],
+        "jax": ["#101820", "#D7A22A"],
+        "kc": ["#E31837", "#FFB81C"],
+        "lv": ["#000000", "#A5ACAF"],
+        "lac": ["#0080C6", "#FFC20E"],
+        "lar": ["#003594", "#FFA300"],
+        "mia": ["#008E97", "#FC4C02"],
+        "min": ["#4F2683", "#FFC62F"],
+        "ne": ["#002244", "#C60C30"],
+        "no": ["#D3BC8D", "#101820"],
+        "nyg": ["#0B2265", "#A71930"],
+        "nyj": ["#125740", "#000000"],
+        "phi": ["#004C54", "#A5ACAF"],
+        "pit": ["#FFB612", "#101820"],
+        "sf": ["#AA0000", "#B3995D"],
+        "sea": ["#002244", "#69BE28"],
+        "tb": ["#D50A0A", "#FF7900"],
+        "ten": ["#0C2340", "#4B92DB"],
+        "wsh": ["#5A1414", "#FFB612"]
+      };
+      
+      // Track processed game IDs to prevent duplicates
+      const processedGameIds = new Set();
+      
+      // Convert Odds API data to our app's format
+      const nflGames = oddsData.map((game: any, index: number) => {
+        // Skip if we already processed this game
+        if (processedGameIds.has(game.id)) return null;
+        processedGameIds.add(game.id);
+        
+        // Get the DraftKings bookmaker data
+        if (!game.bookmakers || game.bookmakers.length === 0) return null;
+        
+        const bookmaker = game.bookmakers[0]; // DraftKings bookmaker
+        const spreadsMarket = bookmaker.markets.find((m: any) => m.key === 'spreads');
+        
+        if (!spreadsMarket || spreadsMarket.outcomes.length < 2) return null;
+        
+        const homeOutcome = spreadsMarket.outcomes.find((o: any) => o.name === game.home_team);
+        const awayOutcome = spreadsMarket.outcomes.find((o: any) => o.name === game.away_team);
+        
+        if (!homeOutcome || !awayOutcome) return null;
+        
+        // Get the actual spread from the API
+        // DraftKings provides negative values for favorites and positive for underdogs
+        const homeSpread = parseFloat(homeOutcome.point);
+        
+        // Create synthetic team IDs and objects
+        const baseId = 10000 + index;
+        
+        // Get team abbreviations
+        const homeTeamAbbr = teamNameToAbbreviation[game.home_team] || game.home_team.substring(0, 3).toLowerCase();
+        const awayTeamAbbr = teamNameToAbbreviation[game.away_team] || game.away_team.substring(0, 3).toLowerCase();
+        
+        // Get team colors
+        const homeTeamColors = teamColors[homeTeamAbbr] || ["#1E293B", "#CBD5E1"];
+        const awayTeamColors = teamColors[awayTeamAbbr] || ["#1E293B", "#CBD5E1"];
+        
+        // Create team objects
+        const homeTeam = {
+          id: baseId,
+          name: game.home_team,
+          abbreviation: homeTeamAbbr.toUpperCase(),
+          logoUrl: `https://a.espncdn.com/i/teamlogos/nfl/500/${homeTeamAbbr}.png`,
+          primaryColor: homeTeamColors[0],
+          secondaryColor: homeTeamColors[1]
+        };
+        
+        const awayTeam = {
+          id: baseId + 1,
+          name: game.away_team,
+          abbreviation: awayTeamAbbr.toUpperCase(),
+          logoUrl: `https://a.espncdn.com/i/teamlogos/nfl/500/${awayTeamAbbr}.png`,
+          primaryColor: awayTeamColors[0],
+          secondaryColor: awayTeamColors[1]
+        };
+        
+        // Create game object
+        return {
+          id: baseId + 2,
+          weekId: currentWeek.id,
+          homeTeamId: homeTeam.id,
+          awayTeamId: awayTeam.id,
+          homeTeamScore: null,
+          awayTeamScore: null,
+          spread: homeSpread, // Use the actual spread from the API
+          homeTeamRecord: "0-0", // Placeholder record
+          awayTeamRecord: "0-0", // Placeholder record
+          gameTime: game.commence_time,
+          completed: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          homeTeam,
+          awayTeam
+        };
+      }).filter(Boolean);
+      
+      // If we couldn't get any games from The Odds API, use these fallback games
+      if (nflGames.length === 0) {
+        const fallbackGames = [
         {
           id: 1001,
           weekId: currentWeek.id,
@@ -489,8 +648,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       ];
       
-      // Return the fixtures
-      res.json(nflGames);
+      // Check if we got real NFL data from the Odds API
+      if (nflGames.length > 0) {
+        console.log(`Returning ${nflGames.length} real NFL games from The Odds API`);
+        return res.json(nflGames);
+      }
+      
+      // If we reach here, use the fallback games
+      console.log('No real NFL games found, returning fallback game data');
+      return res.json(fallbackGames);
     } catch (error) {
       console.error("Error fetching NFL odds games:", error);
       res.status(500).json({ message: "Failed to fetch NFL odds games" });

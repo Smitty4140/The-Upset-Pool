@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCountdown } from "@/hooks/useCountdown";
+import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NFLWeek, League } from "@/lib/types";
 import { formatWeeklyDate } from "@/lib/formatDate";
@@ -22,8 +23,12 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick }: LeagueHeade
   });
 
   // Countdown to picks lock (Sunday 1 PM EST)
-  // Store the picksLockAt value and create Date object only once
-  const lockDate = currentWeek?.picksLockAt ? new Date(currentWeek.picksLockAt) : null;
+  // Memoize the lock date to prevent infinite renders
+  const lockDate = useMemo(() => 
+    currentWeek?.picksLockAt ? new Date(currentWeek.picksLockAt) : null, 
+    [currentWeek?.picksLockAt]
+  );
+  
   const { days, hours, minutes, isExpired } = useCountdown(lockDate);
 
   if (isLoadingWeek || isLoadingLeague) {
