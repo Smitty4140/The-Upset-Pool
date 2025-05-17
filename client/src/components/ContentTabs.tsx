@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Shield, MessageSquare } from "lucide-react";
+import { Shield, MessageSquare, Trophy } from "lucide-react";
+import { Link } from "wouter";
 
-type Tab = "spreads" | "messageboard";
+type Tab = "spreads" | "messageboard" | "leaderboard";
 
 type ContentTabsProps = {
   activeTab: Tab;
@@ -23,6 +24,17 @@ export default function ContentTabs({ activeTab, onTabChange }: ContentTabsProps
           >
             <Shield className={`h-4 w-4 mr-2 ${activeTab === "spreads" ? "text-primary" : "text-gray-500"}`} />
             Game Spreads
+          </button>
+          <button
+            onClick={() => onTabChange("leaderboard")}
+            className={`${
+              activeTab === "leaderboard"
+                ? "bg-white border-primary text-primary"
+                : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300 hover:bg-white/50"
+            } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm flex items-center transition-all duration-200`}
+          >
+            <Trophy className={`h-4 w-4 mr-2 ${activeTab === "leaderboard" ? "text-yellow-500" : "text-gray-500"}`} />
+            Leaderboard
           </button>
           <button
             onClick={() => onTabChange("messageboard")}

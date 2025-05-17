@@ -232,46 +232,129 @@ export class DatabaseStorage implements IStorage {
 
   // NFL Game operations
   async getNFLGames(weekId: number): Promise<(NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam })[]> {
-    return await db
-      .select({
-        ...nflGames,
-        homeTeam: nflTeams,
-        awayTeam: {
-          id: sql`away_team.id`,
-          name: sql`away_team.name`,
-          abbreviation: sql`away_team.abbreviation`,
-          logoUrl: sql`away_team.logo_url`,
-          primaryColor: sql`away_team.primary_color`,
-          secondaryColor: sql`away_team.secondary_color`,
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          g.*,
+          ht.id as "homeTeam_id", 
+          ht.name as "homeTeam_name",
+          ht.abbreviation as "homeTeam_abbreviation",
+          ht.logo_url as "homeTeam_logoUrl",
+          ht.primary_color as "homeTeam_primaryColor",
+          ht.secondary_color as "homeTeam_secondaryColor",
+          at.id as "awayTeam_id", 
+          at.name as "awayTeam_name",
+          at.abbreviation as "awayTeam_abbreviation",
+          at.logo_url as "awayTeam_logoUrl",
+          at.primary_color as "awayTeam_primaryColor",
+          at.secondary_color as "awayTeam_secondaryColor"
+        FROM nfl_games g
+        JOIN nfl_teams ht ON g.home_team_id = ht.id
+        JOIN nfl_teams at ON g.away_team_id = at.id
+        WHERE g.week_id = ${weekId}
+        ORDER BY g.game_time
+      `);
+      
+      // Transform the raw results into properly structured objects
+      return result.map((game: any) => ({
+        id: game.id,
+        weekId: game.week_id,
+        homeTeamId: game.home_team_id,
+        awayTeamId: game.away_team_id,
+        homeTeamScore: game.home_team_score,
+        awayTeamScore: game.away_team_score,
+        spread: game.spread,
+        homeTeamRecord: game.home_team_record,
+        awayTeamRecord: game.away_team_record,
+        gameTime: game.game_time,
+        completed: game.completed,
+        createdAt: game.created_at,
+        updatedAt: game.updated_at,
+        homeTeam: {
+          id: game.homeTeam_id,
+          name: game.homeTeam_name,
+          abbreviation: game.homeTeam_abbreviation,
+          logoUrl: game.homeTeam_logoUrl,
+          primaryColor: game.homeTeam_primaryColor,
+          secondaryColor: game.homeTeam_secondaryColor
         },
-      })
-      .from(nflGames)
-      .innerJoin(nflTeams, eq(nflGames.homeTeamId, nflTeams.id))
-      .innerJoin(nflTeams.as('away_team'), eq(nflGames.awayTeamId, sql`away_team.id`))
-      .where(eq(nflGames.weekId, weekId))
-      .orderBy(nflGames.gameTime);
+        awayTeam: {
+          id: game.awayTeam_id,
+          name: game.awayTeam_name,
+          abbreviation: game.awayTeam_abbreviation,
+          logoUrl: game.awayTeam_logoUrl,
+          primaryColor: game.awayTeam_primaryColor,
+          secondaryColor: game.awayTeam_secondaryColor
+        }
+      }));
+    } catch (error) {
+      console.error("Error in getNFLGames:", error);
+      return [];
+    }
   }
 
   async getNFLGame(id: number): Promise<(NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam }) | undefined> {
-    const [game] = await db
-      .select({
-        ...nflGames,
-        homeTeam: nflTeams,
-        awayTeam: {
-          id: sql`away_team.id`,
-          name: sql`away_team.name`,
-          abbreviation: sql`away_team.abbreviation`,
-          logoUrl: sql`away_team.logo_url`,
-          primaryColor: sql`away_team.primary_color`,
-          secondaryColor: sql`away_team.secondary_color`,
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          g.*,
+          ht.id as "homeTeam_id", 
+          ht.name as "homeTeam_name",
+          ht.abbreviation as "homeTeam_abbreviation",
+          ht.logo_url as "homeTeam_logoUrl",
+          ht.primary_color as "homeTeam_primaryColor",
+          ht.secondary_color as "homeTeam_secondaryColor",
+          at.id as "awayTeam_id", 
+          at.name as "awayTeam_name",
+          at.abbreviation as "awayTeam_abbreviation",
+          at.logo_url as "awayTeam_logoUrl",
+          at.primary_color as "awayTeam_primaryColor",
+          at.secondary_color as "awayTeam_secondaryColor"
+        FROM nfl_games g
+        JOIN nfl_teams ht ON g.home_team_id = ht.id
+        JOIN nfl_teams at ON g.away_team_id = at.id
+        WHERE g.id = ${id}
+      `);
+      
+      if (result.length === 0) return undefined;
+      
+      const game: any = result[0];
+      
+      return {
+        id: game.id,
+        weekId: game.week_id,
+        homeTeamId: game.home_team_id,
+        awayTeamId: game.away_team_id,
+        homeTeamScore: game.home_team_score,
+        awayTeamScore: game.away_team_score,
+        spread: game.spread,
+        homeTeamRecord: game.home_team_record,
+        awayTeamRecord: game.away_team_record,
+        gameTime: game.game_time,
+        completed: game.completed,
+        createdAt: game.created_at,
+        updatedAt: game.updated_at,
+        homeTeam: {
+          id: game.homeTeam_id,
+          name: game.homeTeam_name,
+          abbreviation: game.homeTeam_abbreviation,
+          logoUrl: game.homeTeam_logoUrl,
+          primaryColor: game.homeTeam_primaryColor,
+          secondaryColor: game.homeTeam_secondaryColor
         },
-      })
-      .from(nflGames)
-      .innerJoin(nflTeams, eq(nflGames.homeTeamId, nflTeams.id))
-      .innerJoin(nflTeams.as('away_team'), eq(nflGames.awayTeamId, sql`away_team.id`))
-      .where(eq(nflGames.id, id));
-    
-    return game;
+        awayTeam: {
+          id: game.awayTeam_id,
+          name: game.awayTeam_name,
+          abbreviation: game.awayTeam_abbreviation,
+          logoUrl: game.awayTeam_logoUrl,
+          primaryColor: game.awayTeam_primaryColor,
+          secondaryColor: game.awayTeam_secondaryColor
+        }
+      };
+    } catch (error) {
+      console.error("Error in getNFLGame:", error);
+      return undefined;
+    }
   }
 
   async createNFLGame(game: InsertNFLGame): Promise<NFLGame> {
@@ -290,11 +373,66 @@ export class DatabaseStorage implements IStorage {
 
   async getUnderdogGames(weekId: number): Promise<(NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam })[]> {
     try {
-      const games = await this.getNFLGames(weekId);
-      return games.filter(game => {
-        // If spread is positive, home team is underdog. If negative, away team is underdog.
-        return game.spread !== null;
-      });
+      const result = await db.execute(sql`
+        SELECT 
+          g.*,
+          ht.id as "homeTeam_id", 
+          ht.name as "homeTeam_name",
+          ht.abbreviation as "homeTeam_abbreviation",
+          ht.logo_url as "homeTeam_logoUrl",
+          ht.primary_color as "homeTeam_primaryColor",
+          ht.secondary_color as "homeTeam_secondaryColor",
+          at.id as "awayTeam_id", 
+          at.name as "awayTeam_name",
+          at.abbreviation as "awayTeam_abbreviation",
+          at.logo_url as "awayTeam_logoUrl",
+          at.primary_color as "awayTeam_primaryColor",
+          at.secondary_color as "awayTeam_secondaryColor"
+        FROM nfl_games g
+        JOIN nfl_teams ht ON g.home_team_id = ht.id
+        JOIN nfl_teams at ON g.away_team_id = at.id
+        WHERE g.week_id = ${weekId} AND g.spread IS NOT NULL
+        ORDER BY ABS(g.spread) DESC
+      `);
+      
+      // Filter for underdog games and transform the raw results
+      const games = [];
+      
+      for (const game of result) {
+        games.push({
+          id: game.id,
+          weekId: game.week_id,
+          homeTeamId: game.home_team_id,
+          awayTeamId: game.away_team_id,
+          homeTeamScore: game.home_team_score,
+          awayTeamScore: game.away_team_score,
+          spread: game.spread,
+          homeTeamRecord: game.home_team_record,
+          awayTeamRecord: game.away_team_record,
+          gameTime: game.game_time,
+          completed: game.completed,
+          createdAt: game.created_at,
+          updatedAt: game.updated_at,
+          homeTeam: {
+            id: game.homeTeam_id,
+            name: game.homeTeam_name,
+            abbreviation: game.homeTeam_abbreviation,
+            logoUrl: game.homeTeam_logoUrl,
+            primaryColor: game.homeTeam_primaryColor,
+            secondaryColor: game.homeTeam_secondaryColor
+          },
+          awayTeam: {
+            id: game.awayTeam_id,
+            name: game.awayTeam_name,
+            abbreviation: game.awayTeam_abbreviation,
+            logoUrl: game.awayTeam_logoUrl,
+            primaryColor: game.awayTeam_primaryColor,
+            secondaryColor: game.awayTeam_secondaryColor
+          }
+        });
+      }
+      
+      return games;
     } catch (error) {
       console.error("Error getting underdog games:", error);
       return [];
