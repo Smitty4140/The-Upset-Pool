@@ -14,17 +14,30 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
   // Determine which teams are underdogs based on the spread
   const isHomeUnderdog = Number(game.spread) > 0;
   const isAwayUnderdog = Number(game.spread) < 0;
+  
+  // Determine the absolute spread value for display
+  const spreadValue = Math.abs(Number(game.spread));
+  const spreadText = spreadValue === 0 ? "EVEN" : `+${spreadValue}`;
 
-  // Label text for spread
-  const spreadText = isHomeUnderdog 
-    ? `+${game.spread}` // Home team is underdog (positive spread)
-    : isAwayUnderdog 
-      ? `${game.spread}` // Away team is underdog (negative spread)
-      : "EVEN"; // No underdog (spread is 0)
-
+  // Set up underdog and favorite teams for display
+  // We want to show the underdog first, followed by the favorite
+  const underdogTeam = isHomeUnderdog ? game.homeTeam : isAwayUnderdog ? game.awayTeam : null;
+  const favoriteTeam = isHomeUnderdog ? game.awayTeam : isAwayUnderdog ? game.homeTeam : null;
+  
+  // If there's no clear underdog (spread is 0), use home/away
+  const firstTeam = underdogTeam || game.awayTeam;
+  const secondTeam = favoriteTeam || game.homeTeam;
+  
+  // Is the first team displayed the actual underdog?
+  const isFirstTeamUnderdog = !!underdogTeam;
+  
+  // Is the first team the home team?
+  const isFirstTeamHome = firstTeam.id === game.homeTeam.id;
+  const isSecondTeamHome = secondTeam.id === game.homeTeam.id;
+  
   // Radio button IDs
-  const homeTeamRadioId = `pick-${game.homeTeam.abbreviation}-${game.id}`;
-  const awayTeamRadioId = `pick-${game.awayTeam.abbreviation}-${game.id}`;
+  const firstTeamRadioId = `pick-${firstTeam.abbreviation}-${game.id}`;
+  const secondTeamRadioId = `pick-${secondTeam.abbreviation}-${game.id}`;
 
   return (
     <div className="game-card transition-all duration-150 ease-in-out border border-gray-200 rounded-lg mb-4 last:mb-0 overflow-hidden shadow-sm hover:shadow-md">
@@ -36,23 +49,23 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
       
       <div className="p-4 bg-gradient-to-b from-white to-gray-50">
         <div className="flex flex-col sm:flex-row sm:items-center">
-          {/* Away Team */}
+          {/* First Team (Underdog or Away) */}
           <div className="flex items-center flex-1 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
             <div className="relative w-6 h-6 mr-3">
               <input 
                 type="radio" 
                 name="pick" 
-                value={game.awayTeam.id.toString()} 
-                id={awayTeamRadioId} 
+                value={firstTeam.id.toString()} 
+                id={firstTeamRadioId} 
                 className="sr-only team-selection-radio" 
-                checked={selectedTeamId === game.awayTeam.id}
-                onChange={() => onSelect(game.id, game.awayTeam.id)}
-                disabled={disabled || !isAwayUnderdog}
+                checked={selectedTeamId === firstTeam.id}
+                onChange={() => onSelect(game.id, firstTeam.id)}
+                disabled={disabled || !isFirstTeamUnderdog}
               />
               <label 
-                htmlFor={awayTeamRadioId} 
+                htmlFor={firstTeamRadioId} 
                 className={`team-selection-indicator absolute inset-0 w-6 h-6 rounded-full border-2 ${
-                  disabled || !isAwayUnderdog 
+                  disabled || !isFirstTeamUnderdog 
                     ? 'border-gray-200 bg-gray-100 cursor-not-allowed' 
                     : 'border-secondary cursor-pointer hover:border-primary'
                 }`}
@@ -61,77 +74,84 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
             <div className="flex items-center">
               <div className="w-12 h-12 flex-shrink-0 mr-3 bg-gray-50 rounded-full p-1 border border-gray-200">
                 <img 
-                  src={game.awayTeam.logoUrl || getTeamLogo(game.awayTeam.abbreviation)} 
-                  alt={`${game.awayTeam.name} logo`} 
+                  src={firstTeam.logoUrl || getTeamLogo(firstTeam.abbreviation)} 
+                  alt={`${firstTeam.name} logo`} 
                   className="w-full h-full object-contain" 
                   onError={(e) => {
                     e.currentTarget.onerror = null;
-                    e.currentTarget.src = 'https://placehold.co/100x100?text=' + game.awayTeam.abbreviation;
+                    e.currentTarget.src = 'https://placehold.co/100x100?text=' + firstTeam.abbreviation;
                   }}
                 />
               </div>
               <div>
-                <div className="font-medium text-gray-900">{game.awayTeam.name}</div>
-                <div className="text-xs text-gray-500">{game.awayTeamRecord || "(0-0)"}</div>
-                {isAwayUnderdog && (
-                  <div className="text-xs mt-1 inline-block bg-green-100 text-green-800 font-medium px-2 py-0.5 rounded-full">
-                    UNDERDOG
+                <div className="font-medium text-gray-900">{firstTeam.name}</div>
+                <div className="text-xs text-gray-500">{firstTeam.record || "(0-0)"}</div>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {isFirstTeamHome && (
+                    <div className="text-xs inline-block bg-blue-100 text-blue-800 font-medium px-2 py-0.5 rounded-full">
+                      HOME
+                    </div>
+                  )}
+                  {isFirstTeamUnderdog && (
+                    <div className="text-xs inline-block bg-green-100 text-green-800 font-medium px-2 py-0.5 rounded-full">
+                      UNDERDOG {spreadText}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Middle Versus Section */}
+          <div className="my-4 sm:my-0 px-6 py-3 rounded-full bg-gradient-to-r from-blue-500 to-secondary text-white text-center sm:mx-4 font-bold shadow-sm">
+            <span>VS</span>
+          </div>
+          
+          {/* Second Team (Favorite or Home) */}
+          <div className="flex items-center flex-1 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
+            <div className="relative w-6 h-6 mr-3">
+              <input 
+                type="radio" 
+                name="pick" 
+                value={secondTeam.id.toString()} 
+                id={secondTeamRadioId} 
+                className="sr-only team-selection-radio" 
+                checked={selectedTeamId === secondTeam.id}
+                onChange={() => onSelect(game.id, secondTeam.id)}
+                disabled={disabled || isFirstTeamUnderdog}
+              />
+              <label 
+                htmlFor={secondTeamRadioId} 
+                className={`team-selection-indicator absolute inset-0 w-6 h-6 rounded-full border-2 ${
+                  disabled || isFirstTeamUnderdog 
+                    ? 'border-gray-200 bg-gray-100 cursor-not-allowed' 
+                    : 'border-secondary cursor-pointer hover:border-primary'
+                }`}
+              ></label>
+            </div>
+            <div className="flex items-center">
+              <div className="w-12 h-12 flex-shrink-0 mr-3 bg-gray-50 rounded-full p-1 border border-gray-200">
+                <img 
+                  src={secondTeam.logoUrl || getTeamLogo(secondTeam.abbreviation)} 
+                  alt={`${secondTeam.name} logo`} 
+                  className="w-full h-full object-contain" 
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = 'https://placehold.co/100x100?text=' + secondTeam.abbreviation;
+                  }}
+                />
+              </div>
+              <div>
+                <div className="font-medium text-gray-900">{secondTeam.name}</div>
+                <div className="text-xs text-gray-500">{secondTeam.record || "(0-0)"}</div>
+                {isSecondTeamHome && (
+                  <div className="text-xs mt-1 inline-block bg-blue-100 text-blue-800 font-medium px-2 py-0.5 rounded-full">
+                    HOME
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-          
-          {/* Middle Spread Section */}
-          <div className="my-4 sm:my-0 px-6 py-3 rounded-full bg-gradient-to-r from-blue-500 to-secondary text-white text-center sm:mx-4 font-bold shadow-sm">
-            <span>
-              {spreadText}
-            </span>
-          </div>
-          
-          {/* Home Team */}
-          <div className="flex items-center flex-1 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-            <div className="relative w-6 h-6 mr-3">
-              <input 
-                type="radio" 
-                name="pick" 
-                value={game.homeTeam.id.toString()} 
-                id={homeTeamRadioId} 
-                className="sr-only team-selection-radio" 
-                checked={selectedTeamId === game.homeTeam.id}
-                onChange={() => onSelect(game.id, game.homeTeam.id)}
-                disabled={disabled || !isHomeUnderdog}
-              />
-              <label 
-                htmlFor={homeTeamRadioId} 
-                className={`team-selection-indicator absolute inset-0 w-6 h-6 rounded-full border-2 ${
-                  disabled || !isHomeUnderdog 
-                    ? 'border-gray-200 bg-gray-100 cursor-not-allowed' 
-                    : 'border-secondary cursor-pointer hover:border-primary'
-                }`}
-              ></label>
-            </div>
-            <div className="flex items-center">
-              <div className="w-12 h-12 flex-shrink-0 mr-3 bg-gray-50 rounded-full p-1 border border-gray-200">
-                <img 
-                  src={game.homeTeam.logoUrl || getTeamLogo(game.homeTeam.abbreviation)} 
-                  alt={`${game.homeTeam.name} logo`} 
-                  className="w-full h-full object-contain" 
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = 'https://placehold.co/100x100?text=' + game.homeTeam.abbreviation;
-                  }}
-                />
-              </div>
-              <div>
-                <div className="font-medium text-gray-900">{game.homeTeam.name}</div>
-                <div className="text-xs text-gray-500">{game.homeTeamRecord || "(0-0)"}</div>
-                <div className="text-xs mt-1 inline-block bg-blue-100 text-blue-800 font-medium px-2 py-0.5 rounded-full">
-                  HOME
-                </div>
-                {isHomeUnderdog && (
+                {!isFirstTeamUnderdog && (
                   <div className="text-xs ml-1 mt-1 inline-block bg-green-100 text-green-800 font-medium px-2 py-0.5 rounded-full">
-                    UNDERDOG
+                    UNDERDOG {spreadText}
                   </div>
                 )}
               </div>
