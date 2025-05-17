@@ -59,6 +59,8 @@ async function upsertUser(
 ) {
   await storage.upsertUser({
     id: claims["sub"],
+    // Generate a username from email or sub if not available
+    username: claims["email"] ? claims["email"].split('@')[0] : `user_${claims["sub"]}`,
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],

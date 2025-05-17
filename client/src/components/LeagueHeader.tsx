@@ -22,8 +22,9 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick }: LeagueHeade
   });
 
   // Countdown to picks lock (Sunday 1 PM EST)
-  const targetDate = currentWeek?.picksLockAt ? new Date(currentWeek.picksLockAt) : null;
-  const { days, hours, minutes, isExpired } = useCountdown(targetDate);
+  // Store the picksLockAt string instead of creating a new Date object each render
+  const lockAtString = currentWeek?.picksLockAt || null;
+  const { days, hours, minutes, isExpired } = useCountdown(lockAtString ? new Date(lockAtString) : null);
 
   if (isLoadingWeek || isLoadingLeague) {
     return (
