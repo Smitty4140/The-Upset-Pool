@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import LeagueHeader from "@/components/LeagueHeader";
 import ContentTabs from "@/components/ContentTabs";
 import NFLGameCard from "@/components/NFLGameCard";
+import NFLOddsDisplay from "@/components/NFLOddsDisplay";
 import { NFLWeek, NFLGame, UserPick, User } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
@@ -22,7 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
 
-type Tab = "spreads" | "messageboard" | "leaderboard";
+type Tab = "spreads" | "messageboard" | "leaderboard" | "odds";
 type SortOption = "spread" | "homeUnderdog" | "gameTime";
 
 export default function Home() {
@@ -151,9 +152,16 @@ export default function Home() {
       <LeagueHeader leagueId={leagueId} hasSubmittedPick={hasSubmittedPick} />
 
       {/* Content Tabs */}
-      <ContentTabs activeTab={activeTab} onTabChange={setActiveTab} />
+      <ContentTabs activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab)} />
 
       <div>
+        {/* NFL Odds Display */}
+        {activeTab === "odds" && (
+          <div>
+            <NFLOddsDisplay className="mt-2" />
+          </div>
+        )}
+        
         {/* Pick Selection */}
         {activeTab === "spreads" && (
           <div>
