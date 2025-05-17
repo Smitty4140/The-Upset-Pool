@@ -58,30 +58,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // NFL Games routes
   app.get('/api/nfl-games', async (req, res) => {
-    const weekIdSchema = z.object({
-      weekId: z.string().transform(val => parseInt(val))
-    });
-
     try {
-      const { weekId } = weekIdSchema.parse(req.query);
-      const games = await storage.getNFLGames(weekId);
+      // If weekId is provided as a query parameter, use it
+      if (req.query.weekId) {
+        const weekIdSchema = z.object({
+          weekId: z.string().transform(val => parseInt(val))
+        });
+        
+        const { weekId } = weekIdSchema.parse(req.query);
+        const games = await storage.getNFLGames(weekId);
+        return res.json(games);
+      }
+      
+      // Otherwise, get the current week and use that
+      const currentWeek = await storage.getCurrentNFLWeek();
+      if (!currentWeek) {
+        return res.status(404).json({ message: "No active NFL week found" });
+      }
+      
+      const games = await storage.getNFLGames(currentWeek.id);
       res.json(games);
     } catch (error) {
-      res.status(400).json({ message: "Invalid week ID" });
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid week ID format" });
+      }
+      res.status(500).json({ message: "Failed to fetch games" });
     }
   });
 
   app.get('/api/nfl-games/underdog', async (req, res) => {
-    const weekIdSchema = z.object({
-      weekId: z.string().transform(val => parseInt(val))
-    });
-
     try {
-      const { weekId } = weekIdSchema.parse(req.query);
-      const games = await storage.getUnderdogGames(weekId);
+      // If weekId is provided as a query parameter, use it
+      if (req.query.weekId) {
+        const weekIdSchema = z.object({
+          weekId: z.string().transform(val => parseInt(val))
+        });
+        
+        const { weekId } = weekIdSchema.parse(req.query);
+        const games = await storage.getUnderdogGames(weekId);
+        return res.json(games);
+      } 
+      
+      // Otherwise, get the current week and use that
+      const currentWeek = await storage.getCurrentNFLWeek();
+      if (!currentWeek) {
+        return res.status(404).json({ message: "No active NFL week found" });
+      }
+      
+      const games = await storage.getUnderdogGames(currentWeek.id);
       res.json(games);
     } catch (error) {
-      res.status(400).json({ message: "Invalid week ID" });
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid week ID format" });
+      }
+      res.status(500).json({ message: "Failed to fetch games" });
     }
   });
 

@@ -17,8 +17,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, MessageSquare } from "lucide-react";
+import { Shield, MessageSquare, Trophy } from "lucide-react";
 import { Helmet } from "react-helmet";
+import { Link } from "wouter";
 
 type Tab = "spreads" | "messageboard";
 type SortOption = "spread" | "homeUnderdog" | "gameTime";
@@ -41,8 +42,7 @@ export default function Home() {
 
   // Get all underdog games for the week
   const { data: games, isLoading: isLoadingGames } = useQuery<NFLGame[]>({
-    queryKey: ["/api/nfl-games/underdog", { weekId: currentWeek?.id }],
-    enabled: !!currentWeek?.id,
+    queryKey: ["/api/nfl-games/underdog"],
   });
 
   // Get the user's pick for this week
@@ -102,12 +102,12 @@ export default function Home() {
   const hasSubmittedPick = !!userPick;
 
   // Initialize selection with user's current pick if it exists
-  useState(() => {
+  useEffect(() => {
     if (userPick) {
       setSelectedGameId(userPick.gameId);
       setSelectedTeamId(userPick.pickedTeamId);
     }
-  });
+  }, [userPick]);
 
   // Sort games based on selected option
   const sortedGames = games ? [...games].sort((a, b) => {
@@ -136,6 +136,11 @@ export default function Home() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Helmet>
+        <title>Pick Your Underdog | NFL Upset Pool</title>
+        <meta name="description" content="Select your underdog team for this week's NFL games. Earn points based on the spread when your team wins outright." />
+      </Helmet>
+      
       {/* League Header with countdown */}
       <LeagueHeader leagueId={leagueId} hasSubmittedPick={hasSubmittedPick} />
 

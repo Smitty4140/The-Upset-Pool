@@ -289,11 +289,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUnderdogGames(weekId: number): Promise<(NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam })[]> {
-    const games = await this.getNFLGames(weekId);
-    return games.filter(game => {
-      // If spread is positive, home team is underdog. If negative, away team is underdog.
-      return game.spread !== null;
-    });
+    try {
+      const games = await this.getNFLGames(weekId);
+      return games.filter(game => {
+        // If spread is positive, home team is underdog. If negative, away team is underdog.
+        return game.spread !== null;
+      });
+    } catch (error) {
+      console.error("Error getting underdog games:", error);
+      return [];
+    }
   }
 
   // User Pick operations
