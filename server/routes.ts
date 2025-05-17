@@ -301,6 +301,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch leaderboard" });
     }
   });
+  
+  // NFL Odds API route
+  app.get('/api/nfl-odds', async (req, res) => {
+    try {
+      const apiKey = 'c274aaa90f619f58e8303e73c3a51870'; // Using the provided API key
+      const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?regions=us&oddsFormat=american&apiKey=${apiKey}`);
+      
+      if (!response.ok) {
+        throw new Error(`Odds API returned status: ${response.status}`);
+      }
+      
+      const oddsData = await response.json();
+      res.json(oddsData);
+    } catch (error) {
+      console.error("Error fetching NFL odds:", error);
+      res.status(500).json({ message: "Failed to fetch NFL odds" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

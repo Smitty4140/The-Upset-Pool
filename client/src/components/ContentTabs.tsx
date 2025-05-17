@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Shield, MessageSquare, Trophy } from "lucide-react";
+import { Shield, MessageSquare, Trophy, LineChart } from "lucide-react";
 import { Link } from "wouter";
 
-type Tab = "spreads" | "messageboard" | "leaderboard";
+type Tab = "spreads" | "messageboard" | "leaderboard" | "odds";
 
 type ContentTabsProps = {
   activeTab: Tab;
