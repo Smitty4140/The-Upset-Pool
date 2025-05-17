@@ -319,6 +319,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch NFL odds" });
     }
   });
+  
+  // NFL Odds Games route - get games from The Odds API in the app's format
+  app.get('/api/odds-games', async (req, res) => {
+    try {
+      const apiKey = 'c274aaa90f619f58e8303e73c3a51870'; // Using the provided API key
+      const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?regions=us&oddsFormat=american&apiKey=${apiKey}`);
+      
+      if (!response.ok) {
+        throw new Error(`Odds API returned status: ${response.status}`);
+      }
+      
+      // Get the current week
+      const currentWeek = await storage.getCurrentNFLWeek();
+      if (!currentWeek) {
+        return res.status(404).json({ message: "No active NFL week found" });
+      }
+      
+      const oddsData = await response.json();
+      
+      // Import the function from odds.ts
+      const { convertOddsToNFLGames } = await import('./odds');
+      
+      // Convert odds to NFL games format
+      const games = await convertOddsToNFLGames(oddsData, currentWeek.id);
+      
+      res.json(games);
+    } catch (error) {
+      console.error("Error fetching NFL odds games:", error);
+      res.status(500).json({ message: "Failed to fetch NFL odds games" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

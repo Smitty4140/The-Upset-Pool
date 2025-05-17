@@ -42,10 +42,20 @@ export default function Home() {
     queryKey: ["/api/nfl-weeks/current"],
   });
 
-  // Get all underdog games for the week
-  const { data: games, isLoading: isLoadingGames } = useQuery<NFLGame[]>({
-    queryKey: ["/api/nfl-games/underdog"],
+  // Get odds games for the week
+  const { data: oddsGames, isLoading: isLoadingOddsGames } = useQuery<NFLGame[]>({
+    queryKey: ["/api/odds-games"],
   });
+  
+  // Get all underdog games for the week as fallback
+  const { data: fallbackGames, isLoading: isLoadingFallbackGames } = useQuery<NFLGame[]>({
+    queryKey: ["/api/nfl-games/underdog"],
+    enabled: !oddsGames || oddsGames.length === 0,
+  });
+  
+  // Use odds games if available, otherwise fall back to database games
+  const games = oddsGames && oddsGames.length > 0 ? oddsGames : fallbackGames;
+  const isLoadingGames = isLoadingOddsGames || (isLoadingFallbackGames && (!oddsGames || oddsGames.length === 0));
 
   // Get the user's pick for this week
   const { data: userPick, isLoading: isLoadingPick } = useQuery<UserPick | null>({
