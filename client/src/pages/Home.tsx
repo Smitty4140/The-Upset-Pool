@@ -6,6 +6,7 @@ import LeagueHeader from "@/components/LeagueHeader";
 import ContentTabs from "@/components/ContentTabs";
 import NFLGameCard from "@/components/NFLGameCard";
 import NFLOddsDisplay from "@/components/NFLOddsDisplay";
+import WeekSelector from "@/components/WeekSelector";
 import { NFLWeek, NFLGame, UserPick, User } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
@@ -34,14 +35,29 @@ export default function Home() {
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>("spread");
+  const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
 
   // Default league ID - in a real app we would fetch the user's leagues
   const leagueId = 1;
 
+  // Get all NFL weeks
+  const { data: allWeeks, isLoading: isLoadingAllWeeks } = useQuery<NFLWeek[]>({
+    queryKey: ["/api/nfl-weeks"],
+  });
+
   // Get the current NFL week
   const { data: currentWeek, isLoading: isLoadingWeek } = useQuery<NFLWeek>({
     queryKey: ["/api/nfl-weeks/current"],
+    onSuccess: (data) => {
+      // Initialize selected week with current week if not already set
+      if (!selectedWeekId && data?.id) {
+        setSelectedWeekId(data.id);
+      }
+    }
   });
+
+  // The active week is either the selected week or the current week
+  const activeWeekId = selectedWeekId || currentWeek?.id;
 
   // Get NFL games from odds API in our app's format
   const { data: oddsGames, isLoading: isLoadingOddsGames } = useQuery<NFLGame[]>({
@@ -55,7 +71,11 @@ export default function Home() {
   });
   
   // Use odds games if available, otherwise fall back to database games
-  const games = oddsGames && oddsGames.length > 0 ? oddsGames : fallbackGames;
+  const allGames = oddsGames && oddsGames.length > 0 ? oddsGames : fallbackGames;
+  
+  // Filter games by the selected week
+  const games = allGames?.filter(game => activeWeekId ? game.weekId === activeWeekId : true);
+  
   const isLoadingGames = isLoadingOddsGames || (isLoadingFallbackGames && (!oddsGames || oddsGames.length === 0));
 
   // Get the user's pick for this week
@@ -181,7 +201,7 @@ export default function Home() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <h3 className="text-xl font-medium text-gray-900 flex items-center">
                     <Shield className="h-5 w-5 text-primary mr-2" />
-                    {currentWeek ? `Week ${currentWeek.weekNumber} Pick Selection` : "Pick Selection"}
+                    Pick Selection
                   </h3>
                   
                   {userPick && (
@@ -207,6 +227,15 @@ export default function Home() {
                     </Select>
                   </div>
                 </div>
+                
+                {/* Week Selector */}
+                {activeWeekId && (
+                  <WeekSelector 
+                    currentWeekId={activeWeekId} 
+                    onWeekChange={(weekId) => setSelectedWeekId(weekId)} 
+                    className="mt-4"
+                  />
+                )}
               </div>
 
               <div className="px-6 py-4">
