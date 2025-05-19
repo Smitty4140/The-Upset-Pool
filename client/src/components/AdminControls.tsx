@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, Lock, Unlock, UserCog } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { formatWeeklyDate } from "@/lib/formatDate";
 import { NFLWeek, League } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
@@ -43,9 +43,11 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
     queryKey: [`/api/leagues/${leagueId}/members`],
   });
 
-  const isAdmin = leagueMembers?.some(member => 
-    member.userId === user?.id && member.isAdmin
-  );
+  // Check if user is an admin for this league
+  const isAdmin = user && leagueMembers && Array.isArray(leagueMembers) && 
+    leagueMembers.some((member: any) => 
+      member.userId === user?.id && member.isAdmin
+    );
 
   // Check if picks are locked
   const arePicksLocked = currentWeek ? new Date() > new Date(currentWeek.picksLockAt) : false;
@@ -55,16 +57,23 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
     
     setIsUpdating(true);
     try {
-      const result = await apiRequest(
-        `/api/admin/week/${currentWeek.id}/toggle-lock`,
-        {
-          method: "POST",
-          body: {
-            leagueId,
-            locked: !arePicksLocked
-          }
-        }
-      );
+      const response = await fetch(`/api/admin/week/${currentWeek.id}/toggle-lock`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          leagueId,
+          locked: !arePicksLocked
+        }),
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to toggle pick lock status: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
 
       // Refetch current week to update the UI
       await refetchWeek();
@@ -74,7 +83,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
         description: result.message,
         variant: "default"
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
         description: error.message || "Failed to update pick lock status",
