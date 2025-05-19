@@ -60,19 +60,14 @@ export default function Home() {
   // BUT we will force it to be the current week for game selection
   const activeWeekId = currentWeek?.id;
 
-  // Get NFL games from odds API in our app's format
-  const { data: oddsGames, isLoading: isLoadingOddsGames } = useQuery<NFLGame[]>({
-    queryKey: ["/api/odds-games"],
+  // Get NFL games directly from the database for now to ensure numeric IDs work properly
+  const { data: databaseGames, isLoading: isLoadingDatabaseGames } = useQuery<NFLGame[]>({
+    queryKey: [`/api/nfl-games/week/${currentWeek?.id}`],
+    enabled: !!currentWeek,
   });
   
-  // Fallback to database games if no odds data is available
-  const { data: fallbackGames, isLoading: isLoadingFallbackGames } = useQuery<NFLGame[]>({
-    queryKey: ["/api/nfl-games/underdog"],
-    enabled: !oddsGames || oddsGames.length === 0,
-  });
-  
-  // Use odds games if available, otherwise fall back to database games
-  const allGames = oddsGames && oddsGames.length > 0 ? oddsGames : fallbackGames;
+  // Set the games from the database
+  const allGames = databaseGames;
   
   // Filter games by the selected week and sort by date
   const games = useMemo(() => {
@@ -83,7 +78,7 @@ export default function Home() {
       .sort((a, b) => new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime());
   }, [allGames, activeWeekId]);
   
-  const isLoadingGames = isLoadingOddsGames || (isLoadingFallbackGames && (!oddsGames || oddsGames.length === 0));
+  const isLoadingGames = isLoadingDatabaseGames;
 
   // Get the user's pick for this week
   const { data: userPick, isLoading: isLoadingPick, refetch: refetchUserPick } = useQuery<UserPick | null>({
