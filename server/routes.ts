@@ -877,8 +877,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Get the DraftKings bookmaker data
             if (!game.bookmakers || game.bookmakers.length === 0) return null;
             
-            const bookmaker = game.bookmakers[0]; // DraftKings bookmaker
-            const spreadsMarket = bookmaker.markets.find((m: any) => m.key === 'spreads');
+            // Try to find DraftKings data specifically
+            const draftKingsBookmaker = game.bookmakers.find((b: any) => b.key === 'draftkings') || game.bookmakers[0];
+            const spreadsMarket = draftKingsBookmaker.markets.find((m: any) => m.key === 'spreads');
             
             if (!spreadsMarket || spreadsMarket.outcomes.length < 2) return null;
             
@@ -891,8 +892,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // DraftKings provides negative values for favorites and positive for underdogs
             const homeSpread = parseFloat(homeOutcome.point);
             
-            // Create synthetic team IDs and objects
-            const baseId = 10000 + index;
+            // Create simple, consistent team and game IDs that match our helper functions
+            const gameId = index + 1; // Simple ID starting from 1
             
             // Get team abbreviations
             const homeTeamAbbr = teamNameToAbbreviation[game.home_team] || game.home_team.substring(0, 3).toLowerCase();
