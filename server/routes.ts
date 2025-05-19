@@ -438,9 +438,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       
+      console.log("Pick submission received:", req.body);
+      
       // Validate the request body
       const validationResult = userPickFormSchema.safeParse(req.body);
       if (!validationResult.success) {
+        console.error("Pick validation failed:", validationResult.error.errors);
         return res.status(400).json({ message: "Invalid pick data", errors: validationResult.error.errors });
       }
       
