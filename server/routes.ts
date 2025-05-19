@@ -357,8 +357,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Helper function to determine which NFL week a game belongs to based on its date
   function determineNFLWeek(gameDate: string, weeks: any[]): number | null {
+    // Parse game date
     const gameTime = new Date(gameDate);
     
+    // 2025 NFL Season pattern:
+    // Week 1: Early September 2025 (approx Sept 4-9)
+    // Week 2: Mid September 2025 (approx Sept 11-15)
+    // etc.
+    
+    // Map common NFL month patterns to weeks (approximate)
+    const month = gameTime.getMonth(); // 0 = January, 8 = September
+    const day = gameTime.getDate();
+    
+    if (month === 8) { // September
+      if (day <= 9) return 1; // Week 1: Sept 1-9
+      if (day <= 16) return 2; // Week 2: Sept 10-16
+      if (day <= 23) return 3; // Week 3: Sept 17-23
+      return 4; // Week 4: Sept 24-30
+    } 
+    else if (month === 9) { // October
+      if (day <= 7) return 5; // Week 5: Oct 1-7
+      if (day <= 14) return 6; // Week 6: Oct 8-14
+      if (day <= 21) return 7; // Week 7: Oct 15-21
+      return 8; // Week 8: Oct 22-31
+    }
+    else if (month === 10) { // November
+      if (day <= 7) return 9; // Week 9: Nov 1-7
+      if (day <= 14) return 10; // Week 10: Nov 8-14
+      if (day <= 21) return 11; // Week 11: Nov 15-21
+      return 12; // Week 12: Nov 22-30
+    }
+    else if (month === 11) { // December
+      if (day <= 7) return 13; // Week 13: Dec 1-7
+      if (day <= 14) return 14; // Week 14: Dec 8-14
+      if (day <= 21) return 15; // Week 15: Dec 15-21
+      return 16; // Week 16: Dec 22-31
+    }
+    else if (month === 0) { // January
+      return 17; // Week 17-18: Jan 1 onwards (end of regular season)
+    }
+    
+    // If no specific week mapping found, use the date range method as fallback
     for (const week of weeks) {
       const startDate = new Date(week.startDate);
       const endDate = new Date(week.endDate);
