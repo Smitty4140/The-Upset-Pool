@@ -6,9 +6,71 @@ import { z } from "zod";
 import { userPickFormSchema } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { db, pool } from "./db";
-import { userPicks, nflGames, nflWeeks, users } from "@shared/schema";
+import { userPicks, nflGames, nflWeeks, users, nflTeams } from "@shared/schema";
 import emailRoutes from "./routes/email";
 import { sendWelcomeEmail } from "./email";
+
+// Helper function to ensure all NFL teams exist in the database
+async function ensureNFLTeamsExist() {
+  // Get all teams from the database
+  const existingTeams = await db.select().from(nflTeams);
+  const existingTeamMap = new Map();
+  
+  // Create a map for quick lookup
+  existingTeams.forEach(team => {
+    existingTeamMap.set(team.name, team);
+  });
+  
+  // NFL Team data we want to ensure exists
+  const nflTeamData = [
+    { id: 1, name: "Kansas City Chiefs", abbreviation: "KC", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/kc.png", primaryColor: "#E31837", secondaryColor: "#FFB81C" },
+    { id: 2, name: "San Francisco 49ers", abbreviation: "SF", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png", primaryColor: "#AA0000", secondaryColor: "#B3995D" },
+    { id: 3, name: "Dallas Cowboys", abbreviation: "DAL", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/dal.png", primaryColor: "#003594", secondaryColor: "#869397" },
+    { id: 4, name: "Green Bay Packers", abbreviation: "GB", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/gb.png", primaryColor: "#203731", secondaryColor: "#FFB612" },
+    { id: 5, name: "Buffalo Bills", abbreviation: "BUF", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/buf.png", primaryColor: "#00338D", secondaryColor: "#C60C30" },
+    { id: 6, name: "Baltimore Ravens", abbreviation: "BAL", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/bal.png", primaryColor: "#241773", secondaryColor: "#000000" },
+    { id: 7, name: "Cincinnati Bengals", abbreviation: "CIN", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/cin.png", primaryColor: "#FB4F14", secondaryColor: "#000000" },
+    { id: 8, name: "Philadelphia Eagles", abbreviation: "PHI", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/phi.png", primaryColor: "#004C54", secondaryColor: "#A5ACAF" },
+    { id: 9, name: "Miami Dolphins", abbreviation: "MIA", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/mia.png", primaryColor: "#008E97", secondaryColor: "#FC4C02" },
+    { id: 10, name: "Los Angeles Rams", abbreviation: "LAR", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/lar.png", primaryColor: "#003594", secondaryColor: "#FFA300" },
+    { id: 11, name: "Detroit Lions", abbreviation: "DET", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/det.png", primaryColor: "#0076B6", secondaryColor: "#B0B7BC" },
+    { id: 12, name: "Chicago Bears", abbreviation: "CHI", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/chi.png", primaryColor: "#0B162A", secondaryColor: "#C83803" },
+    { id: 13, name: "New Orleans Saints", abbreviation: "NO", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/no.png", primaryColor: "#D3BC8D", secondaryColor: "#101820" },
+    { id: 14, name: "Atlanta Falcons", abbreviation: "ATL", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/atl.png", primaryColor: "#A71930", secondaryColor: "#000000" },
+    { id: 15, name: "New England Patriots", abbreviation: "NE", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/ne.png", primaryColor: "#002244", secondaryColor: "#C60C30" },
+    { id: 16, name: "New York Jets", abbreviation: "NYJ", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/nyj.png", primaryColor: "#125740", secondaryColor: "#000000" },
+    { id: 17, name: "Arizona Cardinals", abbreviation: "ARI", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/ari.png", primaryColor: "#97233F", secondaryColor: "#000000" },
+    { id: 18, name: "Los Angeles Chargers", abbreviation: "LAC", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/lac.png", primaryColor: "#0080C6", secondaryColor: "#FFC20E" },
+    { id: 19, name: "New York Giants", abbreviation: "NYG", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/nyg.png", primaryColor: "#0B2265", secondaryColor: "#A71930" },
+    { id: 20, name: "Washington Commanders", abbreviation: "WAS", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/wsh.png", primaryColor: "#5A1414", secondaryColor: "#FFB612" },
+    { id: 21, name: "Tennessee Titans", abbreviation: "TEN", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/ten.png", primaryColor: "#0C2340", secondaryColor: "#4B92DB" },
+    { id: 22, name: "Jacksonville Jaguars", abbreviation: "JAX", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/jax.png", primaryColor: "#006778", secondaryColor: "#9F792C" },
+    { id: 23, name: "Carolina Panthers", abbreviation: "CAR", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/car.png", primaryColor: "#0085CA", secondaryColor: "#101820" },
+    { id: 24, name: "Seattle Seahawks", abbreviation: "SEA", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/sea.png", primaryColor: "#002244", secondaryColor: "#69BE28" },
+    { id: 25, name: "Cleveland Browns", abbreviation: "CLE", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/cle.png", primaryColor: "#311D00", secondaryColor: "#FF3C00" },
+    { id: 26, name: "Pittsburgh Steelers", abbreviation: "PIT", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/pit.png", primaryColor: "#FFB612", secondaryColor: "#101820" },
+    { id: 27, name: "Minnesota Vikings", abbreviation: "MIN", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/min.png", primaryColor: "#4F2683", secondaryColor: "#FFC62F" },
+    { id: 28, name: "Las Vegas Raiders", abbreviation: "LV", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/lv.png", primaryColor: "#000000", secondaryColor: "#A5ACAF" },
+    { id: 29, name: "Houston Texans", abbreviation: "HOU", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/hou.png", primaryColor: "#03202F", secondaryColor: "#A71930" },
+    { id: 30, name: "Indianapolis Colts", abbreviation: "IND", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/ind.png", primaryColor: "#002C5F", secondaryColor: "#A2AAAD" },
+    { id: 31, name: "Denver Broncos", abbreviation: "DEN", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/den.png", primaryColor: "#FB4F14", secondaryColor: "#002244" },
+    { id: 32, name: "Tampa Bay Buccaneers", abbreviation: "TB", logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/tb.png", primaryColor: "#D50A0A", secondaryColor: "#FF7900" }
+  ];
+  
+  // Insert any missing teams
+  for (const teamData of nflTeamData) {
+    if (!existingTeamMap.has(teamData.name)) {
+      try {
+        await db.insert(nflTeams).values(teamData);
+        console.log(`Added team: ${teamData.name}`);
+      } catch (error) {
+        console.error(`Error adding team ${teamData.name}:`, error);
+      }
+    }
+  }
+  
+  return await db.select().from(nflTeams);
+}
 
 // Helper function to get NFL games data from the Odds API
 async function getOddsGamesData() {
@@ -20,6 +82,9 @@ async function getOddsGamesData() {
     if (response.ok) {
       const oddsData = await response.json();
       console.log(`Successfully fetched ${oddsData.length} NFL games from The Odds API`);
+      
+      // Ensure all NFL teams exist in the database
+      await ensureNFLTeamsExist();
       
       // Format the data to match our expected game structure
       return oddsData.map((game: any, index: number) => {
