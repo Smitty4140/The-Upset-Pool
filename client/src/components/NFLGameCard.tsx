@@ -58,14 +58,23 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
     <div 
       className={`game-card transition-all duration-150 ease-in-out border rounded-lg mb-4 last:mb-0 overflow-hidden shadow-sm 
         ${!disabled && underdogTeamId ? 'cursor-pointer hover:shadow-md' : ''} 
-        ${isGameSelected ? 'border-primary border-2' : 'border-gray-200'}
+        ${isGameSelected ? 'border-primary border-2 shadow-md relative' : 'border-gray-200'}
         ${disabled ? 'opacity-75' : ''}`}
       onClick={handleGameCardClick}
     >
       {/* Game time header */}
-      <div className="bg-blue-50 border-b border-blue-100 px-4 py-2 flex items-center text-xs text-blue-800">
-        <Clock className="h-3 w-3 mr-1" />
-        <span>{formatGameTime(game.gameTime)}</span>
+      <div className="bg-blue-50 border-b border-blue-100 px-4 py-2 flex items-center justify-between text-xs text-blue-800">
+        <div className="flex items-center">
+          <Clock className="h-3 w-3 mr-1" />
+          <span>{formatGameTime(game.gameTime)}</span>
+        </div>
+        
+        {/* Selected indicator */}
+        {isGameSelected && (
+          <div className="bg-primary text-white px-2 py-1 rounded-sm text-xs font-medium">
+            Selected Game
+          </div>
+        )}
       </div>
       
       <div className="p-4 bg-gradient-to-b from-white to-gray-50">
