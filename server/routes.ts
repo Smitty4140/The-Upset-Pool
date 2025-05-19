@@ -292,24 +292,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Week not found" });
       }
       
-      // Update the lock time to either in the past (locked) or far in the future (unlocked)
-      let picksLockAtStr: string;
-      if (!locked) {
-        // If we're unlocking, set the lock time to one week in the future
-        const futureDate = new Date();
-        futureDate.setDate(futureDate.getDate() + 7);
-        picksLockAtStr = futureDate.toISOString();
-      } else {
-        // If we're locking, set the lock time to one minute in the past
-        const pastDate = new Date();
-        pastDate.setMinutes(pastDate.getMinutes() - 1);
-        picksLockAtStr = pastDate.toISOString();
-      }
+      // Update the lock time directly using SQL
+      const picksLockAt = locked ? 
+        new Date(Date.now() - 60000) : // 1 minute in the past for locking
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days in the future for unlocking
       
-      // Update the week's picksLockAt time
-      const updatedWeek = await storage.updateNFLWeek(weekId, {
-        picksLockAt: picksLockAtStr
-      });
+      // Use direct SQL query to update the picksLockAt field
+      await db.execute(sql`
+        UPDATE nfl_weeks 
+        SET picks_lock_at = ${picksLockAt.toISOString()}
+        WHERE id = ${weekId}
+      `);
+      
+      // Fetch the updated week
+      const updatedWeek = await storage.getNFLWeek(weekId);
       
       if (!updatedWeek) {
         return res.status(500).json({ message: "Failed to update week lock status" });
