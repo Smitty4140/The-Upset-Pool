@@ -922,8 +922,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           leagueId,
           gameId: dbGame.id,
           pickedTeamId,
-          points: null,
-          correct: null
+          isUnderdog: pickedTeamIsUnderdog,
+          spreadAtTimeOfPick: String(spreadValue),
+          won: null,
+          pointsEarned: null
         });
         
         return res.json({
