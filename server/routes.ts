@@ -293,18 +293,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Update the lock time to either in the past (locked) or far in the future (unlocked)
-      const lockedTime = new Date();
+      let picksLockAtStr: string;
       if (!locked) {
         // If we're unlocking, set the lock time to one week in the future
-        lockedTime.setDate(lockedTime.getDate() + 7);
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + 7);
+        picksLockAtStr = futureDate.toISOString();
       } else {
         // If we're locking, set the lock time to one minute in the past
-        lockedTime.setMinutes(lockedTime.getMinutes() - 1);
+        const pastDate = new Date();
+        pastDate.setMinutes(pastDate.getMinutes() - 1);
+        picksLockAtStr = pastDate.toISOString();
       }
       
       // Update the week's picksLockAt time
       const updatedWeek = await storage.updateNFLWeek(weekId, {
-        picksLockAt: lockedTime.toISOString()
+        picksLockAt: picksLockAtStr
       });
       
       if (!updatedWeek) {
@@ -522,6 +526,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user pick:", error);
       res.status(500).json({ message: "Failed to fetch user pick" });
+    }
+  });
+  
+  // Get all users' picks for a specific week and league
+  app.get('/api/league/:leagueId/week/:weekId/picks', async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.leagueId);
+      const weekId = parseInt(req.params.weekId);
+      
+      if (isNaN(leagueId) || isNaN(weekId)) {
+        return res.status(400).json({ message: "Invalid league ID or week ID" });
+      }
+      
+      // Get all picks for the week and league
+      const picks = await storage.getUserPicksForWeek(weekId, leagueId);
+      
+      res.json(picks || []);
+    } catch (error) {
+      console.error("Error fetching picks for week:", error);
+      res.status(500).json({ message: "Failed to fetch picks for week" });
     }
   });
 

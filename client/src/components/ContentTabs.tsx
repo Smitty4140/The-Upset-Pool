@@ -1,19 +1,18 @@
-import { useState } from "react";
-import { Shield, MessageSquare, Trophy } from "lucide-react";
-import { Link } from "wouter";
+import { Eye, Shield, MessageSquare, Trophy } from "lucide-react";
 
-type Tab = "spreads" | "messageboard" | "leaderboard";
+type Tab = "spreads" | "messageboard" | "leaderboard" | "weeklypicks";
 
 type ContentTabsProps = {
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
+  isPicksLocked?: boolean;
 };
 
-export default function ContentTabs({ activeTab, onTabChange }: ContentTabsProps) {
+export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = false }: ContentTabsProps) {
   return (
     <div className="bg-gradient-to-r from-primary/5 to-secondary/5 rounded-lg shadow overflow-hidden mb-8 border border-gray-200">
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex" aria-label="Tabs">
+        <nav className="-mb-px flex overflow-x-auto" aria-label="Tabs">
           <button
             onClick={() => onTabChange("spreads")}
             className={`${
@@ -26,6 +25,20 @@ export default function ContentTabs({ activeTab, onTabChange }: ContentTabsProps
             Game Spreads
           </button>
 
+          {isPicksLocked && (
+            <button
+              onClick={() => onTabChange("weeklypicks")}
+              className={`${
+                activeTab === "weeklypicks"
+                  ? "bg-white border-primary text-primary"
+                  : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300 hover:bg-white/50"
+              } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm flex items-center transition-all duration-200`}
+            >
+              <Eye className={`h-4 w-4 mr-2 ${activeTab === "weeklypicks" ? "text-primary" : "text-gray-500"}`} />
+              Weekly Picks
+            </button>
+          )}
+
           <button
             onClick={() => onTabChange("leaderboard")}
             className={`${
@@ -37,6 +50,7 @@ export default function ContentTabs({ activeTab, onTabChange }: ContentTabsProps
             <Trophy className={`h-4 w-4 mr-2 ${activeTab === "leaderboard" ? "text-yellow-500" : "text-gray-500"}`} />
             Leaderboard
           </button>
+          
           <button
             onClick={() => onTabChange("messageboard")}
             className={`${
