@@ -10,6 +10,64 @@ import { userPicks, nflGames, nflWeeks, users } from "@shared/schema";
 import emailRoutes from "./routes/email";
 import { sendWelcomeEmail } from "./email";
 
+// Helper function to get NFL games data from the Odds API
+async function getOddsGamesData() {
+  // Try to get real NFL data from The Odds API
+  try {
+    const apiKey = process.env.THE_ODDS_API_KEY;
+    const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?regions=us&markets=spreads&apiKey=${apiKey}&bookmakers=draftkings`);
+    
+    if (response.ok) {
+      const oddsData = await response.json();
+      console.log(`Successfully fetched ${oddsData.length} NFL games from The Odds API`);
+      
+      // Format the data to match our expected game structure
+      return oddsData.map((game: any, index: number) => {
+        const gameId = index + 1; // Start at 1 instead of 0 for consistency
+        const homeTeam = game.home_team;
+        const awayTeam = game.away_team;
+        const bookmaker = game.bookmakers?.find(b => b.key === 'draftkings') || game.bookmakers?.[0];
+        let spread = 0;
+        
+        console.log(`Processing game: ${homeTeam} vs ${awayTeam}, ID: ${gameId}`);
+        
+        // Extract the spread from DraftKings data (or fallback to first bookmaker)
+        if (bookmaker && bookmaker.markets?.[0]?.outcomes) {
+          const homeOutcome = bookmaker.markets[0].outcomes.find((o: any) => o.name === homeTeam);
+          if (homeOutcome) {
+            spread = homeOutcome.point;
+            console.log(`Found spread for ${homeTeam}: ${spread}`);
+          }
+        }
+        
+        // Store original id from the API as reference
+        const originalId = game.id;
+        
+        return {
+          id: gameId,
+          originalId: originalId,
+          weekId: 1, // Assuming current week
+          homeTeamId: gameId * 2,
+          awayTeamId: gameId * 2 + 1,
+          homeTeam: { id: gameId * 2, name: homeTeam },
+          awayTeam: { id: gameId * 2 + 1, name: awayTeam },
+          spread: spread,
+          gameTime: game.commence_time,
+          // Determine underdog based on spread
+          underdogTeamId: spread > 0 ? gameId * 2 : gameId * 2 + 1,
+          underdogName: spread > 0 ? homeTeam : awayTeam,
+          underdogValue: Math.abs(spread)
+        };
+      });
+    }
+  } catch (error) {
+    console.error("Error fetching from The Odds API:", error);
+  }
+  
+  // Return empty array if API call fails
+  return [];
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -469,18 +527,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Picks are locked for this week" });
       }
       
-      // Get the game
-      const game = await storage.getNFLGame(gameId);
+      // Instead of looking for the game in the database, get it from the odds API data
+      // This is a temporary fix until we properly store the games in the database
+      const oddsGames = await getOddsGamesData();
+      
+      console.log(`Looking for game with ID: ${gameId} among ${oddsGames.length} games`);
+      const game = oddsGames.find(g => parseInt(g.id.toString()) === gameId);
+      
       if (!game) {
+        console.log(`Game not found with ID: ${gameId}`);
+        // Print game IDs for debugging
+        console.log("Available game IDs:", oddsGames.map(g => g.id).slice(0, 5), "...");
         return res.status(404).json({ message: "Game not found" });
       }
       
-      // Parse spread as number for comparison
-      const spreadValue = parseFloat(game.spread.toString());
+      // Get the underdog information from the game
+      const underdogTeamId = game.underdogTeamId;
+      const underdogValue = game.underdogValue;
       
-      // Determine if the picked team is an underdog
-      const isUnderdog = (parseInt(game.homeTeamId.toString()) === pickedTeamId && spreadValue > 0) || 
-                         (parseInt(game.awayTeamId.toString()) === pickedTeamId && spreadValue < 0);
+      console.log(`Game underdog: Team ID ${underdogTeamId} (${game.underdogName}) with spread value ${underdogValue}`);
+      console.log(`User selected team ID: ${pickedTeamId}`);
+      
+      // Determine if the picked team is the underdog
+      const isUnderdog = parseInt(underdogTeamId.toString()) === pickedTeamId;
+      
+      if (!isUnderdog) {
+        console.log("Selected team is not the underdog");
+        return res.status(400).json({ 
+          message: "Only underdog teams can be selected",
+          underdogTeamId: underdogTeamId,
+          underdogName: game.underdogName
+        });
+      }
+      
+      console.log("User picked the underdog team correctly!");
       
       // Check if user already has a pick for this week and league
       const existingPick = await storage.getUserPick(userId, currentWeek.id, leagueId);
