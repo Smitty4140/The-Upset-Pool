@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import LeagueHeader from "@/components/LeagueHeader";
+import AdminControls from "@/components/AdminControls";
 import ContentTabs from "@/components/ContentTabs";
 import NFLGameCard from "@/components/NFLGameCard";
 import WeekSelector from "@/components/WeekSelector";
@@ -207,6 +208,9 @@ export default function Home() {
       
       {/* League Header with countdown and user's current pick */}
       <LeagueHeader leagueId={leagueId} hasSubmittedPick={hasSubmittedPick} userPick={userPick} />
+      
+      {/* Admin Controls - only visible to league admins */}
+      <AdminControls leagueId={leagueId} />
 
       {/* Content Tabs */}
       <ContentTabs activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab)} />

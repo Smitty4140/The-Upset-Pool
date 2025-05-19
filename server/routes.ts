@@ -264,6 +264,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch NFL weeks" });
     }
   });
+  
+  // Toggle lock status for picks in a week (admin only)
+  app.post('/api/admin/week/:id/toggle-lock', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const weekId = parseInt(req.params.id);
+      const leagueId = parseInt(req.body.leagueId);
+      const locked = req.body.locked;
+      
+      // Validate input
+      if (isNaN(weekId) || isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid week ID or league ID" });
+      }
+      
+      // Verify user is an admin for this league
+      const leagueMembers = await storage.getLeagueMembers(leagueId);
+      const userMembership = leagueMembers.find(member => member.userId === userId);
+      
+      if (!userMembership || !userMembership.isAdmin) {
+        return res.status(403).json({ message: "You do not have admin permission for this league" });
+      }
+      
+      // Get the current week
+      const week = await storage.getNFLWeek(weekId);
+      if (!week) {
+        return res.status(404).json({ message: "Week not found" });
+      }
+      
+      // Update the lock time to either in the past (locked) or far in the future (unlocked)
+      const lockedTime = new Date();
+      if (!locked) {
+        // If we're unlocking, set the lock time to one week in the future
+        lockedTime.setDate(lockedTime.getDate() + 7);
+      } else {
+        // If we're locking, set the lock time to one minute in the past
+        lockedTime.setMinutes(lockedTime.getMinutes() - 1);
+      }
+      
+      // Update the week's picksLockAt time
+      const updatedWeek = await storage.updateNFLWeek(weekId, {
+        picksLockAt: lockedTime.toISOString()
+      });
+      
+      if (!updatedWeek) {
+        return res.status(500).json({ message: "Failed to update week lock status" });
+      }
+      
+      return res.json({
+        message: `Week ${week.weekNumber} picks are now ${locked ? 'locked' : 'unlocked'}`,
+        week: updatedWeek
+      });
+    } catch (error) {
+      console.error("Error toggling week lock status:", error);
+      return res.status(500).json({ message: "Failed to update week lock status" });
+    }
+  });
 
   // Get current NFL week
   app.get('/api/nfl-weeks/current', async (_req, res) => {
