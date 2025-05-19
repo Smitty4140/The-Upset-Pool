@@ -55,18 +55,18 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       onClick={handleGameCardClick}
     >
       {/* Game time header */}
-      <div className="bg-white px-4 py-2 flex items-center text-sm text-blue-800 border-b border-gray-100">
+      <div className="bg-white px-4 py-3 flex items-center text-sm text-blue-800 border-b border-gray-100">
         <div className="flex items-center">
-          <Clock className="h-4 w-4 mr-1 text-blue-700" />
-          <span>{formatGameTime(game.gameTime)}</span>
+          <Clock className="h-4 w-4 mr-2 text-blue-700" />
+          <span className="text-blue-800 font-medium">{formatGameTime(game.gameTime)}</span>
         </div>
       </div>
       
       <div className="bg-white">
         {/* Away Team Row */}
-        <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
+        <div className="px-4 py-4 flex items-center justify-between">
           <div className="flex items-center">
-            <div className="w-10 h-10 flex-shrink-0 mr-3">
+            <div className="w-12 h-12 flex-shrink-0 mr-3">
               <img 
                 src={awayTeam.logoUrl || getTeamLogo(awayTeam.abbreviation)} 
                 alt={`${awayTeam.name} logo`} 
@@ -77,26 +77,26 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
                 }}
               />
             </div>
-            <div className="font-semibold text-gray-800 text-lg">{awayTeam.name}</div>
+            <div className="font-bold text-gray-800 text-xl">{awayTeam.name}</div>
           </div>
           
           {/* Away Team spread if they're the underdog */}
           {isAwayUnderdog && (
-            <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-semibold text-base">
+            <div className="bg-blue-100 text-blue-800 px-4 py-1.5 rounded-full font-bold text-lg">
               {spreadText}
             </div>
           )}
         </div>
         
-        {/* AT text left aligned */}
-        <div className="px-4 py-1 text-xs text-gray-500 text-left">
+        {/* AT text aligned with team name */}
+        <div className="pl-19 ml-16 pb-1 text-xs text-gray-500 text-left">
           AT
         </div>
         
         {/* Home Team Row */}
-        <div className="px-4 py-3 flex items-center justify-between">
+        <div className="px-4 py-4 flex items-center justify-between">
           <div className="flex items-center">
-            <div className="w-10 h-10 flex-shrink-0 mr-3">
+            <div className="w-12 h-12 flex-shrink-0 mr-3">
               <img 
                 src={homeTeam.logoUrl || getTeamLogo(homeTeam.abbreviation)} 
                 alt={`${homeTeam.name} logo`}
@@ -107,12 +107,12 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
                 }}
               />
             </div>
-            <div className="font-semibold text-gray-800 text-lg">{homeTeam.name}</div>
+            <div className="font-bold text-gray-800 text-xl">{homeTeam.name}</div>
           </div>
           
           {/* Home Team spread if they're the underdog */}
           {isHomeUnderdog && (
-            <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-semibold text-base">
+            <div className="bg-blue-100 text-blue-800 px-4 py-1.5 rounded-full font-bold text-lg">
               {spreadText}
             </div>
           )}
