@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { NFLWeek, League } from "@/lib/types";
 import { formatWeeklyDate } from "@/lib/formatDate";
 import { Clock, Trophy, Calendar, AlertTriangle, CheckCircle2 } from "lucide-react";
+import SubmittedPickDisplay from "@/components/SubmittedPickDisplay";
 
 type LeagueHeaderProps = {
   leagueId: number;
@@ -75,44 +76,15 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
                 <AlertTriangle className="h-5 w-5 mr-1" />
                 <p className="font-medium">You have not submitted a pick for this week</p>
               </div>
-            ) : userPick && userPick.pickedTeam && userPick.game ? (
+            ) : userPick && userPick.pickedTeam ? (
               <div className="flex flex-col">
                 <div className="flex items-center text-green-600 mb-2">
                   <CheckCircle2 className="h-5 w-5 mr-1" />
                   <p className="font-medium">Pick submitted for this week</p>
                 </div>
                 
-                {/* Prominent pick display */}
-                <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200 shadow-sm">
-                  <div className="flex justify-between items-center mb-1">
-                    <div className="text-sm font-medium text-gray-600">Your Selected Game:</div>
-                    <div className="bg-primary text-white text-xs font-bold px-2 py-1 rounded-sm">
-                      Selected Pick
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center mt-1">
-                    <div className="w-10 h-10 flex-shrink-0 mr-3">
-                      <img 
-                        src={userPick.pickedTeam.logoUrl} 
-                        alt={`${userPick.pickedTeam.name} logo`} 
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-bold text-gray-900">{userPick.pickedTeam.name}</div>
-                      <div className="flex items-center text-sm">
-                        <span className="bg-lime-100 text-lime-800 px-2 py-0.5 rounded text-xs font-medium mr-2">
-                          UNDERDOG +{Math.abs(Number(userPick.game.spread || 0)).toFixed(1)}
-                        </span>
-                        <span className="text-gray-600 text-xs">
-                          vs. {userPick.game.homeTeam.id === userPick.pickedTeam.id ? 
-                            userPick.game.awayTeam.name : userPick.game.homeTeam.name}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {/* Display current pick with our dedicated component */}
+                <SubmittedPickDisplay userPick={userPick} />
               </div>
             ) : null}
             
