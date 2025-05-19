@@ -233,6 +233,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all users
+  app.get('/api/users', isAuthenticated, async (req: any, res) => {
+    try {
+      // Only allow admins to access this route (your account)
+      const userId = req.user.claims.sub;
+      if (userId !== "42820911") {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+      
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+  
+  // Add user to league (admin only)
+  app.post('/api/leagues/:id/members', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = parseInt(req.params.id);
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+      
+      // Only allow admins to access this route (your account)
+      const adminId = req.user.claims.sub;
+      if (adminId !== "42820911") {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+      
+      const { userId, isAdmin } = req.body;
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+      
+      // Verify user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Check if user is already a member
+      const userLeagues = await storage.getUserLeagues(userId);
+      const existingMembership = userLeagues.find(ul => ul.leagueId === leagueId);
+      
+      if (existingMembership) {
+        return res.status(400).json({ message: "User is already a member of this league" });
+      }
+      
+      // Add user to league
+      const leagueMember = await storage.addLeagueMember({
+        leagueId,
+        userId,
+        isAdmin: !!isAdmin,
+      });
+      
+      res.status(201).json(leagueMember);
+    } catch (error) {
+      console.error("Error adding member to league:", error);
+      res.status(500).json({ message: "Failed to add member to league" });
+    }
+  });
+  
+  // Update league member (toggle admin status)
+  app.patch('/api/leagues/:leagueId/members/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = parseInt(req.params.leagueId);
+      const memberId = req.params.userId;
+      const { isAdmin } = req.body;
+      
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+      
+      // Only allow admins to access this route (your account)
+      const adminId = req.user.claims.sub;
+      if (adminId !== "42820911") {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+      
+      // Check if membership exists
+      const userLeagues = await storage.getUserLeagues(memberId);
+      const existingMembership = userLeagues.find(ul => ul.leagueId === leagueId);
+      
+      if (!existingMembership) {
+        return res.status(404).json({ message: "League membership not found" });
+      }
+      
+      // Update member status
+      await storage.updateLeagueMember(leagueId, memberId, { isAdmin: !!isAdmin });
+      
+      res.json({ message: "Member updated successfully" });
+    } catch (error) {
+      console.error("Error updating league member:", error);
+      res.status(500).json({ message: "Failed to update league member" });
+    }
+  });
+  
+  // Remove user from league
+  app.delete('/api/leagues/:leagueId/members/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = parseInt(req.params.leagueId);
+      const memberId = req.params.userId;
+      
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+      
+      // Only allow admins to access this route (your account)
+      const adminId = req.user.claims.sub;
+      if (adminId !== "42820911") {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+      
+      // Remove user from league
+      await storage.removeLeagueMember(leagueId, memberId);
+      
+      res.json({ message: "Member removed successfully" });
+    } catch (error) {
+      console.error("Error removing league member:", error);
+      res.status(500).json({ message: "Failed to remove league member" });
+    }
+  });
+  
+  // Auto-add new users to the default league (NFL Upset Pool)
+  // This is triggered when a new user is created during auth setup
+  app.post('/api/auto-add-to-league', async (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+      
+      // Default to NFL Upset Pool league (ID 1)
+      const leagueId = 1;
+      
+      // Check if user is already a member
+      const userLeagues = await storage.getUserLeagues(userId);
+      const isAlreadyMember = userLeagues.some(ul => ul.leagueId === leagueId);
+      
+      if (isAlreadyMember) {
+        return res.status(200).json({ message: "User is already a member of this league" });
+      }
+      
+      // Add user to league
+      const leagueMember = await storage.addLeagueMember({
+        leagueId,
+        userId,
+        isAdmin: false,
+      });
+      
+      res.status(201).json(leagueMember);
+    } catch (error) {
+      console.error("Error auto-adding user to league:", error);
+      res.status(500).json({ message: "Failed to add user to league" });
+    }
+  });
+  
   // Submit a pick for the current week
   app.post('/api/user/pick', isAuthenticated, async (req: any, res) => {
     try {

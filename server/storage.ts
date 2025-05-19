@@ -30,6 +30,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
 
   // NFL Team operations
   getNFLTeams(): Promise<NFLTeam[]>;
@@ -46,6 +47,7 @@ export interface IStorage {
   getLeagueMembers(leagueId: number): Promise<(LeagueMember & { user: User })[]>;
   getUserLeagues(userId: string): Promise<(LeagueMember & { league: League })[]>;
   addLeagueMember(member: InsertLeagueMember): Promise<LeagueMember>;
+  updateLeagueMember(leagueId: number, userId: string, updates: Partial<InsertLeagueMember>): Promise<LeagueMember>;
   removeLeagueMember(leagueId: number, userId: string): Promise<void>;
 
   // NFL Week operations
@@ -169,6 +171,23 @@ export class DatabaseStorage implements IStorage {
     return createdMember;
   }
 
+  async updateLeagueMember(leagueId: number, userId: string, updates: Partial<InsertLeagueMember>): Promise<LeagueMember> {
+    const [updatedMember] = await db
+      .update(leagueMembers)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(
+        and(
+          eq(leagueMembers.leagueId, leagueId),
+          eq(leagueMembers.userId, userId)
+        )
+      )
+      .returning();
+    return updatedMember;
+  }
+
   async removeLeagueMember(leagueId: number, userId: string): Promise<void> {
     await db
       .delete(leagueMembers)
@@ -178,6 +197,13 @@ export class DatabaseStorage implements IStorage {
           eq(leagueMembers.userId, userId)
         )
       );
+  }
+  
+  async getAllUsers(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .orderBy(asc(users.username));
   }
 
   // NFL Week operations
