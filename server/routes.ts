@@ -893,7 +893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const homeSpread = parseFloat(homeOutcome.point);
             
             // Create simple, consistent team and game IDs that match our helper functions
-            const gameId = index + 1; // Simple ID starting from 1
+            const uniqueGameId = index + 1; // Simple ID starting from 1
             
             // Get team abbreviations
             const homeTeamAbbr = teamNameToAbbreviation[game.home_team] || game.home_team.substring(0, 3).toLowerCase();
@@ -903,9 +903,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const homeTeamColors = teamColors[homeTeamAbbr] || ["#1E293B", "#CBD5E1"];
             const awayTeamColors = teamColors[awayTeamAbbr] || ["#1E293B", "#CBD5E1"];
             
-            // Create team objects
+            // Use our consistent game ID format based on index
+            const uniqueGameId2 = index + 1; // Starting from 1
+            
+            // Create team objects with consistent IDs
             const homeTeam = {
-              id: baseId,
+              id: uniqueGameId2 * 2, // Even number for home team
               name: game.home_team,
               abbreviation: homeTeamAbbr.toUpperCase(),
               logoUrl: `https://a.espncdn.com/i/teamlogos/nfl/500/${homeTeamAbbr}.png`,
@@ -914,7 +917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
             
             const awayTeam = {
-              id: baseId + 1,
+              id: uniqueGameId2 * 2 + 1, // Odd number for away team
               name: game.away_team,
               abbreviation: awayTeamAbbr.toUpperCase(),
               logoUrl: `https://a.espncdn.com/i/teamlogos/nfl/500/${awayTeamAbbr}.png`,
@@ -925,9 +928,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Determine the correct NFL week based on the game date
             const gameWeekId = determineNFLWeek(game.commence_time, allWeeks) || currentWeek.id;
             
+            // Calculate which team is the underdog based on the spread
+            const underdogTeamId = homeSpread > 0 ? homeTeam.id : awayTeam.id;
+            const underdogName = homeSpread > 0 ? game.home_team : game.away_team;
+            const underdogValue = Math.abs(homeSpread);
+            
             // Create game object
             return {
-              id: baseId + 2,
+              id: uniqueGameId2, // Use the simple ID
+              originalId: game.id, // Store original API ID
               weekId: gameWeekId, // Use the correctly determined week ID
               homeTeamId: homeTeam.id,
               awayTeamId: awayTeam.id,
@@ -941,7 +950,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
               homeTeam,
-              awayTeam
+              awayTeam,
+              // Add underdog information
+              underdogTeamId,
+              underdogName,
+              underdogValue
             };
           }).filter(Boolean);
           
