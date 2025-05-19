@@ -66,7 +66,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         {/* Away Team Row */}
         <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
           <div className="flex items-center">
-            <div className="w-8 h-8 flex-shrink-0 mr-3">
+            <div className="w-10 h-10 flex-shrink-0 mr-3">
               <img 
                 src={awayTeam.logoUrl || getTeamLogo(awayTeam.abbreviation)} 
                 alt={`${awayTeam.name} logo`} 
@@ -77,26 +77,26 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
                 }}
               />
             </div>
-            <div className="font-semibold text-gray-800 text-base">{awayTeam.name}</div>
+            <div className="font-semibold text-gray-800 text-lg">{awayTeam.name}</div>
           </div>
           
           {/* Away Team spread if they're the underdog */}
           {isAwayUnderdog && (
-            <div className="ml-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold text-sm">
+            <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-semibold text-base">
               {spreadText}
             </div>
           )}
         </div>
         
-        {/* Divider with "AT" text */}
-        <div className="px-4 py-1 text-xs text-gray-500 text-center bg-gray-50">
+        {/* AT text left aligned */}
+        <div className="px-4 py-1 text-xs text-gray-500 text-left">
           AT
         </div>
         
         {/* Home Team Row */}
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center">
-            <div className="w-8 h-8 flex-shrink-0 mr-3">
+            <div className="w-10 h-10 flex-shrink-0 mr-3">
               <img 
                 src={homeTeam.logoUrl || getTeamLogo(homeTeam.abbreviation)} 
                 alt={`${homeTeam.name} logo`}
@@ -107,12 +107,12 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
                 }}
               />
             </div>
-            <div className="font-semibold text-gray-800 text-base">{homeTeam.name}</div>
+            <div className="font-semibold text-gray-800 text-lg">{homeTeam.name}</div>
           </div>
           
           {/* Home Team spread if they're the underdog */}
           {isHomeUnderdog && (
-            <div className="ml-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold text-sm">
+            <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-semibold text-base">
               {spreadText}
             </div>
           )}
