@@ -571,7 +571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gameId,
           pickedTeamId,
           isUnderdog,
-          spreadAtTimeOfPick: Math.abs(spreadValue),
+          spreadAtTimeOfPick: underdogValue || 0,
         });
         
         return res.json(updatedPick);
@@ -584,7 +584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gameId,
           pickedTeamId,
           isUnderdog,
-          spreadAtTimeOfPick: Math.abs(spreadValue),
+          spreadAtTimeOfPick: underdogValue || 0,
           won: null,
           pointsEarned: null,
         });
