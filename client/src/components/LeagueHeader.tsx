@@ -69,40 +69,53 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
               </div>
             )}
             
-            <div className={`flex flex-col`}>
-              <div className={`flex items-center ${hasSubmittedPick ? "text-green-600" : "text-red-600"}`}>
-                {hasSubmittedPick ? (
-                  <>
-                    <CheckCircle2 className="h-5 w-5 mr-1" />
-                    <p className="font-medium">You have submitted a pick for this week</p>
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="h-5 w-5 mr-1" />
-                    <p className="font-medium">You have not submitted a pick for this week</p>
-                  </>
-                )}
+            {/* Status message and pick selection */}
+            {!hasSubmittedPick ? (
+              <div className="flex items-center text-red-600">
+                <AlertTriangle className="h-5 w-5 mr-1" />
+                <p className="font-medium">You have not submitted a pick for this week</p>
               </div>
-              
-              {/* Display current pick if exists (only visible to user) */}
-              {hasSubmittedPick && userPick && userPick.pickedTeam && (
-                <div className="mt-2 bg-green-50 text-green-800 px-4 py-2 rounded-md border border-green-200 flex items-center">
-                  <div className="w-8 h-8 mr-2 flex-shrink-0">
-                    <img 
-                      src={userPick.pickedTeam.logoUrl} 
-                      alt={`${userPick.pickedTeam.name} logo`} 
-                      className="w-full h-full object-contain"
-                    />
+            ) : userPick && userPick.pickedTeam && userPick.game ? (
+              <div className="flex flex-col">
+                <div className="flex items-center text-green-600 mb-2">
+                  <CheckCircle2 className="h-5 w-5 mr-1" />
+                  <p className="font-medium">Pick submitted for this week</p>
+                </div>
+                
+                {/* Prominent pick display */}
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200 shadow-sm">
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="text-sm font-medium text-gray-600">Your Selected Game:</div>
+                    <div className="bg-primary text-white text-xs font-bold px-2 py-1 rounded-sm">
+                      Selected Pick
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium">Your current pick: <span className="font-bold">{userPick.pickedTeam.name}</span></p>
-                    <p className="text-xs">
-                      <span className="font-semibold">Spread:</span> +{Math.abs(Number(userPick.game?.spread || 0)).toFixed(1)}
-                    </p>
+                  
+                  <div className="flex items-center mt-1">
+                    <div className="w-10 h-10 flex-shrink-0 mr-3">
+                      <img 
+                        src={userPick.pickedTeam.logoUrl} 
+                        alt={`${userPick.pickedTeam.name} logo`} 
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-bold text-gray-900">{userPick.pickedTeam.name}</div>
+                      <div className="flex items-center text-sm">
+                        <span className="bg-lime-100 text-lime-800 px-2 py-0.5 rounded text-xs font-medium mr-2">
+                          UNDERDOG +{Math.abs(Number(userPick.game.spread || 0)).toFixed(1)}
+                        </span>
+                        <span className="text-gray-600 text-xs">
+                          vs. {userPick.game.homeTeam.id === userPick.pickedTeam.id ? 
+                            userPick.game.awayTeam.name : userPick.game.homeTeam.name}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : null}
+            
           </div>
           
           <div className="mt-6 md:mt-0">
