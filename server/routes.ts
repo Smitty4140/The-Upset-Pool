@@ -575,28 +575,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dbGame = gamesInDb.find(g => g.homeTeamId === game.homeTeamId && g.awayTeamId === game.awayTeamId);
         
         if (!dbGame) {
-          // We need to create the game in our database
-          console.log("Game not found in database, creating new game record...");
+          console.log("Game not found in database, creating new game record using direct SQL...");
           
-          // Use a guaranteed safe date string for game time
-          const currentDate = new Date();
-          const safeGameTime = currentDate.toISOString();
+          // Use direct SQL query to insert the game, bypassing the ORM issues
+          const { rows } = await pool.query(`
+            INSERT INTO nfl_games 
+              (week_id, home_team_id, away_team_id, spread, home_team_record, away_team_record, game_time, completed)
+            VALUES 
+              ($1, $2, $3, $4, $5, $6, NOW(), $7)
+            RETURNING *
+          `, [
+            currentWeek.id,
+            parseInt(game.homeTeamId.toString()),
+            parseInt(game.awayTeamId.toString()),
+            parseFloat(game.spread ? game.spread.toString() : "0"),
+            "0-0",
+            "0-0",
+            false
+          ]);
           
-          console.log("Using safe game time:", safeGameTime);
-            
-          // Create the game with minimal required data
-          dbGame = await storage.createNFLGame({
-            weekId: currentWeek.id,
-            homeTeamId: parseInt(game.homeTeamId.toString()),
-            awayTeamId: parseInt(game.awayTeamId.toString()),
-            homeTeamScore: null,
-            awayTeamScore: null,
-            spread: parseFloat(game.spread ? game.spread.toString() : "0"),
-            homeTeamRecord: "0-0", 
-            awayTeamRecord: "0-0",
-            gameTime: safeGameTime,
-            completed: false
-          });
+          if (rows && rows.length > 0) {
+            dbGame = rows[0];
+            console.log("Successfully created game with ID:", dbGame.id);
+          } else {
+            throw new Error("Failed to create game record using direct SQL");
+          }
           console.log("Created new game with ID:", dbGame.id);
         } else {
           console.log("Found existing game in database with ID:", dbGame.id);
