@@ -1,21 +1,21 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/hooks/useAuth";
-import { useState } from "react";
-import { Redirect } from "wouter";
+import { Card, CardContent } from "@/components/ui/card";
 import { FaTrophy, FaFootballBall, FaChartLine, FaUsers } from "react-icons/fa";
-import { ArrowRight, CalendarDays, TrendingUp, Award, Users, AlertTriangle } from "lucide-react";
-// Using a placeholder image since we're having trouble importing from assets
-const upsetPoolImage = "https://img.freepik.com/free-vector/american-football-background-with-trophy_23-2147654095.jpg";
+import { ArrowRight, CalendarDays, TrendingUp, Award, AlertTriangle } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
+import { useLocation } from "wouter";
 
-export default function Landing() {
-  const { isAuthenticated, isLoading } = useAuth();
-  const [showRules, setShowRules] = useState(false);
-
+export default function Welcome() {
+  const { user, isLoading } = useAuth();
+  const [_, navigate] = useLocation();
+  
   // Redirect to home if already logged in
-  if (isAuthenticated && !isLoading) {
-    return <Redirect to="/" />;
-  }
+  useEffect(() => {
+    if (user && !isLoading) {
+      navigate("/");
+    }
+  }, [user, isLoading, navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-slate-50">
@@ -40,22 +40,14 @@ export default function Landing() {
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </a>
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="lg" 
-                    className="w-full sm:w-auto" 
-                    onClick={() => setShowRules(!showRules)}
-                  >
-                    {showRules ? "Hide Rules" : "View Rules"}
-                  </Button>
                 </div>
               </div>
             </div>
             <div className="mt-12 relative sm:max-w-lg sm:mx-auto lg:mt-0 lg:max-w-none lg:mx-0 lg:col-span-6 lg:flex lg:items-center">
-              <div className="relative mx-auto w-full rounded-lg shadow-lg lg:max-w-md">
+              <div className="relative mx-auto w-full rounded-lg shadow-lg lg:max-w-md overflow-hidden">
                 <img
-                  className="w-full rounded-lg"
-                  src={upsetPoolImage}
+                  className="w-full h-auto object-cover"
+                  src="https://img.freepik.com/free-vector/american-football-background-with-trophy_23-2147654095.jpg"
                   alt="NFL Upset Pool"
                 />
               </div>
@@ -64,73 +56,71 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Rules Section - Conditionally displayed */}
-      {showRules && (
-        <section className="py-12 bg-slate-50 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center">
-              <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
-                Pool Rules
-              </h2>
-              <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-                How to play and win in our NFL Upset Pool
-              </p>
-            </div>
-            
-            <div className="mt-10">
-              <div className="grid gap-6 md:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <CalendarDays className="h-5 w-5 mr-2 text-primary" />
-                      Weekly Selections
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p>Select one underdog team each week to win outright. Picks lock at 1 PM EST on Sundays.</p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <TrendingUp className="h-5 w-5 mr-2 text-primary" />
-                      Scoring
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p>If your selected underdog wins, you earn points equal to the point spread. No points for losses.</p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <AlertTriangle className="h-5 w-5 mr-2 text-yellow-500" />
-                      Underdogs Only
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p>You can only select teams with a positive point spread (the team not favored to win).</p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <Award className="h-5 w-5 mr-2 text-primary" />
-                      Winning
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p>The player with the most total points at the end of the NFL regular season wins the pool!</p>
-                  </CardContent>
-                </Card>
-              </div>
+      {/* Rules Section */}
+      <section className="py-12 bg-slate-50 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center">
+            <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+              How It Works
+            </h2>
+            <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
+              Simple rules, exciting gameplay, big rewards
+            </p>
+          </div>
+          
+          <div className="mt-10">
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center mb-4">
+                    <div className="mr-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-white">
+                      <CalendarDays className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-lg font-medium">Weekly Selections</h3>
+                  </div>
+                  <p>Select one underdog team each week to win outright. Picks lock at 1 PM EST on Sundays.</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center mb-4">
+                    <div className="mr-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-white">
+                      <TrendingUp className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-lg font-medium">Scoring</h3>
+                  </div>
+                  <p>If your selected underdog wins, you earn points equal to the point spread. No points for losses.</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center mb-4">
+                    <div className="mr-4 flex h-12 w-12 items-center justify-center rounded-lg bg-yellow-500 text-white">
+                      <AlertTriangle className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-lg font-medium">Underdogs Only</h3>
+                  </div>
+                  <p>You can only select teams with a positive point spread (the team not favored to win).</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center mb-4">
+                    <div className="mr-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-white">
+                      <Award className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-lg font-medium">Winning</h3>
+                  </div>
+                  <p>The player with the most total points at the end of the NFL regular season wins the pool!</p>
+                </CardContent>
+              </Card>
             </div>
           </div>
-        </section>
-      )}
+        </div>
+      </section>
       
       {/* Features Section */}
       <section className="py-12 bg-white px-4 sm:px-6 lg:px-8">
