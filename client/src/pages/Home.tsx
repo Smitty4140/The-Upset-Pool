@@ -47,13 +47,14 @@ export default function Home() {
   // Get the current NFL week
   const { data: currentWeek, isLoading: isLoadingWeek } = useQuery<NFLWeek>({
     queryKey: ["/api/nfl-weeks/current"],
-    onSuccess: (data) => {
-      // Initialize selected week with current week if not already set
-      if (!selectedWeekId && data?.id) {
-        setSelectedWeekId(data.id);
-      }
-    }
   });
+  
+  // Set selected week when current week loads
+  useEffect(() => {
+    if (currentWeek?.id && !selectedWeekId) {
+      setSelectedWeekId(currentWeek.id);
+    }
+  }, [currentWeek, selectedWeekId]);
 
   // The active week is either the selected week or the current week
   // BUT we will force it to be the current week for game selection
