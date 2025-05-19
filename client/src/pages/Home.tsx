@@ -134,12 +134,26 @@ export default function Home() {
       return;
     }
 
+    // Get the selected team's information
+    const selectedGame = games?.find(game => game.id === selectedGameId);
+    const isHomeTeamSelected = selectedGame?.homeTeam.id === selectedTeamId;
+    const selectedTeamInfo = isHomeTeamSelected ? selectedGame?.homeTeam : selectedGame?.awayTeam;
+    
     submitPick({
       gameId: selectedGameId,
       pickedTeamId: selectedTeamId,
       leagueId,
       weekId: currentWeek.id,
     });
+    
+    // Show a toast with the selected team to make it obvious
+    if (selectedTeamInfo) {
+      toast({
+        title: "Pick Submitted",
+        description: `You've selected ${selectedTeamInfo.name} as your underdog pick!`,
+        variant: "default",
+      });
+    }
   };
 
   // Check if user has a pick
