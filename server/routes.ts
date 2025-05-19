@@ -577,16 +577,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!dbGame) {
           // We need to create the game in our database
           console.log("Game not found in database, creating new game record...");
+          
+          // Use a guaranteed safe date string for game time
+          const currentDate = new Date();
+          const safeGameTime = currentDate.toISOString();
+          
+          console.log("Using safe game time:", safeGameTime);
+            
+          // Create the game with minimal required data
           dbGame = await storage.createNFLGame({
             weekId: currentWeek.id,
-            homeTeamId: game.homeTeamId,
-            awayTeamId: game.awayTeamId,
+            homeTeamId: parseInt(game.homeTeamId.toString()),
+            awayTeamId: parseInt(game.awayTeamId.toString()),
             homeTeamScore: null,
             awayTeamScore: null,
-            spread: game.spread,
+            spread: parseFloat(game.spread ? game.spread.toString() : "0"),
             homeTeamRecord: "0-0", 
             awayTeamRecord: "0-0",
-            gameTime: typeof game.gameTime === 'string' ? game.gameTime : new Date().toISOString(),
+            gameTime: safeGameTime,
             completed: false
           });
           console.log("Created new game with ID:", dbGame.id);
