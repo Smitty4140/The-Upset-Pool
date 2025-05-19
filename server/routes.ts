@@ -440,14 +440,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("Pick submission received:", req.body);
       
-      // Validate the request body
-      const validationResult = userPickFormSchema.safeParse(req.body);
-      if (!validationResult.success) {
-        console.error("Pick validation failed:", validationResult.error.errors);
-        return res.status(400).json({ message: "Invalid pick data", errors: validationResult.error.errors });
-      }
+      // Parse the incoming data safely
+      const gameId = parseInt(req.body.gameId);
+      const pickedTeamId = parseInt(req.body.pickedTeamId);
+      const leagueId = parseInt(req.body.leagueId);
+      const weekId = parseInt(req.body.weekId);
       
-      const pickData = validationResult.data;
+      // Validate the basic data
+      if (isNaN(gameId) || isNaN(pickedTeamId) || isNaN(leagueId) || isNaN(weekId)) {
+        return res.status(400).json({ message: "Invalid pick data: all fields must be valid numbers" });
+      }
       
       // Get current week
       const currentWeek = await storage.getCurrentNFLWeek();
@@ -456,7 +458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Make sure the week matches the current week
-      if (pickData.weekId !== currentWeek.id) {
+      if (weekId !== currentWeek.id) {
         return res.status(400).json({ message: "Pick must be for the current week" });
       }
       
@@ -468,25 +470,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get the game
-      const game = await storage.getNFLGame(pickData.gameId);
+      const game = await storage.getNFLGame(gameId);
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
       
+      // Parse spread as number for comparison
+      const spreadValue = parseFloat(game.spread.toString());
+      
       // Determine if the picked team is an underdog
-      const isUnderdog = (game.homeTeamId === pickData.pickedTeamId && game.spread > 0) || 
-                         (game.awayTeamId === pickData.pickedTeamId && game.spread < 0);
+      const isUnderdog = (parseInt(game.homeTeamId.toString()) === pickedTeamId && spreadValue > 0) || 
+                         (parseInt(game.awayTeamId.toString()) === pickedTeamId && spreadValue < 0);
       
       // Check if user already has a pick for this week and league
-      const existingPick = await storage.getUserPick(userId, currentWeek.id, pickData.leagueId);
+      const existingPick = await storage.getUserPick(userId, currentWeek.id, leagueId);
       
       if (existingPick) {
         // Update existing pick
         const updatedPick = await storage.updateUserPick(existingPick.id, {
-          gameId: pickData.gameId,
-          pickedTeamId: pickData.pickedTeamId,
+          gameId,
+          pickedTeamId,
           isUnderdog,
-          spreadAtTimeOfPick: Math.abs(game.spread),
+          spreadAtTimeOfPick: Math.abs(spreadValue),
         });
         
         return res.json(updatedPick);
@@ -494,12 +499,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create new pick
         const newPick = await storage.createUserPick({
           userId,
-          leagueId: pickData.leagueId,
+          leagueId,
           weekId: currentWeek.id,
-          gameId: pickData.gameId,
-          pickedTeamId: pickData.pickedTeamId,
+          gameId,
+          pickedTeamId,
           isUnderdog,
-          spreadAtTimeOfPick: Math.abs(game.spread),
+          spreadAtTimeOfPick: Math.abs(spreadValue),
           won: null,
           pointsEarned: null,
         });
