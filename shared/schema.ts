@@ -36,6 +36,8 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   totalPoints: decimal("total_points", { precision: 10, scale: 1 }).default("0").notNull(),
+  emailVerified: boolean("email_verified").default(false),
+  receiveNotifications: boolean("receive_notifications").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
