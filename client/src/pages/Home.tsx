@@ -7,6 +7,9 @@ import AdminControls from "@/components/AdminControls";
 import ContentTabs from "@/components/ContentTabs";
 import NFLGameCard from "@/components/NFLGameCard";
 import WeekSelector from "@/components/WeekSelector";
+import Leaderboard from "@/components/Leaderboard";
+import WeeklyPicks from "@/components/WeeklyPicks";
+import NFLGamesGrid from "@/components/NFLGamesGrid";
 import { NFLWeek, NFLGame, UserPick, User } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
@@ -25,7 +28,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
 
-type Tab = "spreads" | "messageboard" | "leaderboard";
+type Tab = "spreads" | "messageboard" | "leaderboard" | "weeklypicks";
 type SortOption = "spread" | "homeUnderdog" | "gameTime";
 
 export default function Home() {
@@ -213,9 +216,18 @@ export default function Home() {
       <AdminControls leagueId={leagueId} />
 
       {/* Content Tabs */}
-      <ContentTabs activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab)} />
+      <ContentTabs 
+        activeTab={activeTab} 
+        onTabChange={(tab) => setActiveTab(tab as Tab)} 
+        isPicksLocked={arePicksLocked}
+      />
 
       <div>
+        {/* Weekly Picks - Only visible when picks are locked */}
+        {activeTab === "weeklypicks" && activeWeekId && (
+          <WeeklyPicks leagueId={leagueId} weekId={activeWeekId} />
+        )}
+        
         {/* Pick Selection */}
         {activeTab === "spreads" && (
           <div>

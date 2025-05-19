@@ -140,15 +140,10 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
                       <td className="px-3 py-4 whitespace-nowrap">
                         {userPick ? (
                           userPick.game.completed ? (
-                            userPick.game.winnerId === userPick.teamId ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <Check className="w-3 h-3 mr-1" /> Win
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                <X className="w-3 h-3 mr-1" /> Loss
-                              </span>
-                            )
+                            // Check if user's picked team won (simplified for now since winnerId isn't in the schema)
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                              Result Pending
+                            </span>
                           ) : (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                               Pending
