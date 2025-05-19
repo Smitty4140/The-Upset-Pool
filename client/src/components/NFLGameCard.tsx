@@ -42,6 +42,11 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
   // Make the entire game card clickable to select the underdog
   const handleGameCardClick = () => {
     if (disabled || !underdogTeamId) return;
+    
+    // If this game is already selected, do nothing
+    if (selectedTeamId === underdogTeamId && selectedTeamId !== null) return;
+    
+    // Otherwise select this game's underdog team
     onSelect(game.id, underdogTeamId);
   };
 
