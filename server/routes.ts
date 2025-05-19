@@ -712,7 +712,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Pick submission received:", req.body);
       
       // Parse the incoming data safely
-      const gameId = req.body.gameId; // Keep as string for API ID matching
+      let gameId = req.body.gameId; // Could be string ID from The Odds API or numeric ID from our database
       const pickedTeamId = parseInt(req.body.pickedTeamId);
       const leagueId = parseInt(req.body.leagueId);
       const weekId = parseInt(req.body.weekId);
@@ -740,97 +740,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Picks are locked for this week" });
       }
       
-      // Get data from The Odds API to look up the game
-      const oddsGames = await getOddsGamesData();
+      // Try to get the game from our database first
+      let dbGame = null;
+      let dbGameId = null;
       
-      // Find the game in the odds data by matching the string ID
-      console.log(`Looking for game with ID: ${gameId} among ${oddsGames.length} games`);
-      const game = oddsGames.find(g => g.id === gameId || g.originalId === gameId);
-      
-      // If game not found in odds data, try to find in database (numeric ID conversion)
-      if (!game) {
-        try {
-          // As a fallback, try to get from database with a numeric ID
-          const dbGameId = parseInt(gameId);
-          if (!isNaN(dbGameId)) {
-            const dbGame = await storage.getNFLGame(dbGameId);
-            if (dbGame) {
-              console.log(`Found game in database with ID: ${dbGameId}`);
-              // Continue with the found database game
-              return res.status(400).json({ message: "Please select a game from the current list of games" });
-            }
-          }
-        } catch (error) {
-          console.error("Error looking up game in database:", error);
-        }
-        
-        console.log(`Game not found with ID: ${gameId}`);
-        console.log("Available game IDs:", oddsGames.map(g => g.id || g.originalId).slice(0, 5), "...");
-        return res.status(404).json({ message: "Game not found" });
-      }
-      
-      // Ensure this game exists in our database for foreign key constraints
-      let dbGameId;
+      // First try treating gameId as a numeric ID (it might already be our database ID)
       try {
-        // Get home and away teams from database for this game
-        const homeTeam = await storage.getNFLTeamByName(game.homeTeam.name);
-        const awayTeam = await storage.getNFLTeamByName(game.awayTeam.name);
-        
-        if (!homeTeam || !awayTeam) {
-          console.error("Could not find teams in database:", {
-            homeTeamName: game.homeTeam.name,
-            awayTeamName: game.awayTeam.name
-          });
-          return res.status(400).json({ message: "Teams not found in database. Please make sure all NFL teams are seeded properly." });
-        }
-        
-        // Check if game exists in database
-        const gamesInDb = await storage.getNFLGames(currentWeek.id);
-        const existingGame = gamesInDb.find(g => 
-          (g.homeTeamId === homeTeam.id && g.awayTeamId === awayTeam.id) || 
-          (g.homeTeamId === awayTeam.id && g.awayTeamId === homeTeam.id)
-        );
-        
-        if (existingGame) {
-          // Use existing game
-          dbGameId = existingGame.id;
-          console.log(`Found existing game in database with ID: ${dbGameId}`);
-        } else {
-          // Create new game record
-          const newGame = await storage.createNFLGame({
-            weekId: currentWeek.id,
-            homeTeamId: homeTeam.id,
-            awayTeamId: awayTeam.id,
-            spread: game.spread || 0,
-            homeTeamRecord: "0-0",
-            awayTeamRecord: "0-0",
-            gameTime: game.gameTime || new Date().toISOString(),
-            completed: false
-          });
-          
-          dbGameId = newGame.id;
-          console.log(`Created new game in database with ID: ${dbGameId}`);
+        const numericId = parseInt(gameId);
+        if (!isNaN(numericId)) {
+          dbGame = await storage.getNFLGame(numericId);
+          if (dbGame) {
+            console.log(`Found game directly in database with ID: ${numericId}`);
+            dbGameId = numericId;
+          }
         }
       } catch (error) {
-        console.error("Error ensuring game exists in database:", error);
-        return res.status(500).json({ message: "Failed to ensure game exists in database" });
+        console.log("Game ID is not a valid numeric database ID, will try The Odds API matching");
+      }
+      
+      // If we couldn't find the game by numeric ID, try to find it among The Odds API games
+      if (!dbGame) {
+        // Get data from The Odds API to look up the game
+        const oddsGames = await getOddsGamesData();
+        
+        // Find the game in the odds data by matching the string ID
+        console.log(`Looking for game with API ID: ${gameId} among ${oddsGames.length} games`);
+        const oddsGame = oddsGames.find(g => g.id === gameId || g.originalId === gameId);
+        
+        if (!oddsGame) {
+          console.log(`Game not found with API ID: ${gameId}`);
+          return res.status(404).json({ message: "Game not found. Please select a game from the current list." });
+        }
+        
+        // Now that we found the odds game, ensure it exists in our database
+        try {
+          // Get home and away teams from database for this game
+          const homeTeam = await storage.getNFLTeamByName(oddsGame.homeTeam.name);
+          const awayTeam = await storage.getNFLTeamByName(oddsGame.awayTeam.name);
+          
+          if (!homeTeam || !awayTeam) {
+            console.error("Teams not found in database:", {
+              homeTeamName: oddsGame.homeTeam.name,
+              awayTeamName: oddsGame.awayTeam.name
+            });
+            return res.status(400).json({ message: "Teams not found in database. Please contact an administrator." });
+          }
+          
+          // Check if game exists in database
+          const gamesInDb = await storage.getNFLGames(currentWeek.id);
+          const existingGame = gamesInDb.find(g => 
+            (g.homeTeamId === homeTeam.id && g.awayTeamId === awayTeam.id) || 
+            (g.homeTeamId === awayTeam.id && g.awayTeamId === homeTeam.id)
+          );
+          
+          if (existingGame) {
+            // Use existing game
+            dbGameId = existingGame.id;
+            dbGame = existingGame;
+            console.log(`Found existing game in database with ID: ${dbGameId}`);
+          } else {
+            // Create new game record
+            const newGame = await storage.createNFLGame({
+              weekId: currentWeek.id,
+              homeTeamId: homeTeam.id,
+              awayTeamId: awayTeam.id,
+              spread: oddsGame.spread || 0,
+              homeTeamRecord: "0-0",
+              awayTeamRecord: "0-0",
+              gameTime: oddsGame.gameTime || new Date().toISOString(),
+              completed: false
+            });
+            
+            dbGameId = newGame.id;
+            dbGame = await storage.getNFLGame(dbGameId);
+            console.log(`Created new game in database with ID: ${dbGameId}`);
+          }
+        } catch (error) {
+          console.error("Error ensuring game exists in database:", error);
+          return res.status(500).json({ message: "Failed to ensure game exists in database" });
+        }
+      }
+      
+      // At this point, we should have a dbGame and dbGameId
+      if (!dbGame || !dbGameId) {
+        return res.status(404).json({ message: "Could not find or create the selected game in the database" });
       }
       
       // Check if the picked team is valid for this game
-      if (pickedTeamId !== game.homeTeamId && pickedTeamId !== game.awayTeamId) {
+      if (pickedTeamId !== dbGame.homeTeamId && pickedTeamId !== dbGame.awayTeamId) {
         return res.status(400).json({ 
           message: "Selected team is not part of this game",
-          homeTeamId: game.homeTeamId,
-          awayTeamId: game.awayTeamId
+          homeTeamId: dbGame.homeTeamId,
+          awayTeamId: dbGame.awayTeamId
         });
       }
       
       // Determine if the picked team is the underdog
-      const isHomeUnderdog = Number(game.spread) > 0;
-      const isAwayUnderdog = Number(game.spread) < 0;
-      const underdogTeamId = isHomeUnderdog ? game.homeTeamId : isAwayUnderdog ? game.awayTeamId : null;
+      const isHomeUnderdog = dbGame.spread > 0;
+      const isAwayUnderdog = dbGame.spread < 0;
+      const underdogTeamId = isHomeUnderdog ? dbGame.homeTeamId : isAwayUnderdog ? dbGame.awayTeamId : null;
       const isUnderdog = underdogTeamId !== null && pickedTeamId === underdogTeamId;
-      const spreadValue = Math.abs(Number(game.spread));
+      const spreadValue = Math.abs(dbGame.spread);
       
       // Now check if user already has a pick for this week and league
       const existingPick = await storage.getUserPick(userId, currentWeek.id, leagueId);
