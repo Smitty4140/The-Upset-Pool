@@ -9,9 +9,10 @@ import { Clock, Trophy, Calendar, AlertTriangle, CheckCircle2 } from "lucide-rea
 type LeagueHeaderProps = {
   leagueId: number;
   hasSubmittedPick: boolean;
+  userPick?: any; // User's current pick information
 };
 
-export default function LeagueHeader({ leagueId, hasSubmittedPick }: LeagueHeaderProps) {
+export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: LeagueHeaderProps) {
   // Get current NFL week
   const { data: currentWeek, isLoading: isLoadingWeek } = useQuery<NFLWeek>({
     queryKey: ["/api/nfl-weeks/current"],
@@ -68,17 +69,38 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick }: LeagueHeade
               </div>
             )}
             
-            <div className={`flex items-center ${hasSubmittedPick ? "text-green-600" : "text-red-600"}`}>
-              {hasSubmittedPick ? (
-                <>
-                  <CheckCircle2 className="h-5 w-5 mr-1" />
-                  <p className="font-medium">You have submitted a pick for this week</p>
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="h-5 w-5 mr-1" />
-                  <p className="font-medium">You have not submitted a pick for this week</p>
-                </>
+            <div className={`flex flex-col`}>
+              <div className={`flex items-center ${hasSubmittedPick ? "text-green-600" : "text-red-600"}`}>
+                {hasSubmittedPick ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 mr-1" />
+                    <p className="font-medium">You have submitted a pick for this week</p>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="h-5 w-5 mr-1" />
+                    <p className="font-medium">You have not submitted a pick for this week</p>
+                  </>
+                )}
+              </div>
+              
+              {/* Display current pick if exists (only visible to user) */}
+              {hasSubmittedPick && userPick && userPick.pickedTeam && (
+                <div className="mt-2 bg-green-50 text-green-800 px-4 py-2 rounded-md border border-green-200 flex items-center">
+                  <div className="w-8 h-8 mr-2 flex-shrink-0">
+                    <img 
+                      src={userPick.pickedTeam.logoUrl} 
+                      alt={`${userPick.pickedTeam.name} logo`} 
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Your current pick: <span className="font-bold">{userPick.pickedTeam.name}</span></p>
+                    <p className="text-xs">
+                      <span className="font-semibold">Spread:</span> +{Math.abs(Number(userPick.game?.spread || 0)).toFixed(1)}
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
           </div>

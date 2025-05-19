@@ -185,8 +185,8 @@ export default function Home() {
         <meta name="description" content="Select your underdog team for this week's NFL games. Earn points based on the spread when your team wins outright." />
       </Helmet>
       
-      {/* League Header with countdown */}
-      <LeagueHeader leagueId={leagueId} hasSubmittedPick={hasSubmittedPick} />
+      {/* League Header with countdown and user's current pick */}
+      <LeagueHeader leagueId={leagueId} hasSubmittedPick={hasSubmittedPick} userPick={userPick} />
 
       {/* Content Tabs */}
       <ContentTabs activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab)} />
