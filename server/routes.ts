@@ -619,14 +619,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Pick submission received:", req.body);
       
       // Parse the incoming data safely
-      const gameId = parseInt(req.body.gameId);
+      const gameId = req.body.gameId; // Keep as string for matching against API IDs
       const pickedTeamId = parseInt(req.body.pickedTeamId);
       const leagueId = parseInt(req.body.leagueId);
       const weekId = parseInt(req.body.weekId);
       
       // Validate the basic data
-      if (isNaN(gameId) || isNaN(pickedTeamId) || isNaN(leagueId) || isNaN(weekId)) {
-        return res.status(400).json({ message: "Invalid pick data: all fields must be valid numbers" });
+      if (!gameId || isNaN(pickedTeamId) || isNaN(leagueId) || isNaN(weekId)) {
+        return res.status(400).json({ message: "Invalid pick data: missing or invalid fields" });
       }
       
       // Get current week
@@ -652,13 +652,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const oddsGames = await getOddsGamesData();
       
       console.log(`Looking for game with ID: ${gameId} among ${oddsGames.length} games`);
-      // Compare as strings instead of trying to parse as integers
-      const game = oddsGames.find(g => g.id === gameId);
+      // Looking for either the numeric ID or the original API ID
+      const game = oddsGames.find(g => g.id === gameId || g.originalId === gameId);
       
       if (!game) {
         console.log(`Game not found with ID: ${gameId}`);
         // Print game IDs for debugging
-        console.log("Available game IDs:", oddsGames.map(g => g.id).slice(0, 5), "...");
+        console.log("Available game IDs:", oddsGames.map(g => g.originalId || g.id).slice(0, 5), "...");
         return res.status(404).json({ message: "Game not found" });
       }
       
@@ -736,13 +736,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Failed to create game record" });
       }
       
+      // Create a new record in the database for this game if it doesn't exist
+      let dbGameId;
+      try {
+        const existingGames = await storage.getNFLGames(currentWeek.id);
+        const existingGame = existingGames.find(g => g.id === parseInt(gameId));
+        
+        if (existingGame) {
+          console.log(`Found existing game in database with ID: ${existingGame.id}`);
+          dbGameId = existingGame.id;
+        } else {
+          // Save this game to our database first
+          console.log(`Creating new game record for API ID: ${gameId}`);
+          
+          // Get the home and away team IDs from our NFL teams table
+          const homeTeam = await storage.getNFLTeamByName(game.homeTeam.name);
+          const awayTeam = await storage.getNFLTeamByName(game.awayTeam.name);
+          
+          if (!homeTeam || !awayTeam) {
+            console.error("Could not find teams in database:", {
+              homeTeamName: game.homeTeam.name,
+              awayTeamName: game.awayTeam.name
+            });
+            return res.status(400).json({ message: "Could not find teams in database. Please make sure all NFL teams are seeded properly." });
+          }
+          
+          // Create the game in our database
+          const newGame = await storage.createNFLGame({
+            weekId: currentWeek.id,
+            homeTeamId: homeTeam.id,
+            awayTeamId: awayTeam.id,
+            spread: game.spread || 0,
+            homeTeamRecord: "0-0",
+            awayTeamRecord: "0-0",
+            gameTime: game.gameTime || new Date().toISOString(),
+            completed: false
+          });
+          
+          console.log(`Created new game with database ID: ${newGame.id} for API ID: ${gameId}`);
+          dbGameId = newGame.id;
+        }
+      } catch (error) {
+        console.error("Error creating game in database:", error);
+        return res.status(500).json({ message: "Failed to create or find game in database" });
+      }
+      
       // Now check if user already has a pick for this week and league
       const existingPick = await storage.getUserPick(userId, currentWeek.id, leagueId);
       
       if (existingPick) {
         // Update existing pick
         const updatedPick = await storage.updateUserPick(existingPick.id, {
-          gameId: dbGame.id, // Use the database game ID
+          gameId: dbGameId, // Use the database game ID
           pickedTeamId,
           isUnderdog,
           spreadAtTimeOfPick: underdogValue || 0,
@@ -755,7 +800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId,
           leagueId,
           weekId: currentWeek.id,
-          gameId: dbGame.id, // Use the database game ID
+          gameId: dbGameId, // Use the database game ID
           pickedTeamId,
           isUnderdog,
           spreadAtTimeOfPick: underdogValue || 0,

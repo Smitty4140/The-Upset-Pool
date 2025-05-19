@@ -35,6 +35,7 @@ export interface IStorage {
   // NFL Team operations
   getNFLTeams(): Promise<NFLTeam[]>;
   getNFLTeam(id: number): Promise<NFLTeam | undefined>;
+  getNFLTeamByName(name: string): Promise<NFLTeam | undefined>;
   createNFLTeam(team: InsertNFLTeam): Promise<NFLTeam>;
   updateNFLTeam(id: number, team: Partial<InsertNFLTeam>): Promise<NFLTeam | undefined>;
 
@@ -107,6 +108,11 @@ export class DatabaseStorage implements IStorage {
 
   async getNFLTeam(id: number): Promise<NFLTeam | undefined> {
     const [team] = await db.select().from(nflTeams).where(eq(nflTeams.id, id));
+    return team;
+  }
+  
+  async getNFLTeamByName(name: string): Promise<NFLTeam | undefined> {
+    const [team] = await db.select().from(nflTeams).where(eq(nflTeams.name, name));
     return team;
   }
 
