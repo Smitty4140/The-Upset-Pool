@@ -90,7 +90,36 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
             
           </div>
           
-          <div className="mt-6 md:mt-0">
+          <div className="mt-6 md:mt-0 flex flex-col gap-4">
+            {/* Current selection display - shown if user has submitted a pick */}
+            {hasSubmittedPick && userPick && (
+              <div className="rounded-lg px-5 py-4 shadow-md border border-blue-200 bg-white flex-grow">
+                <div className="text-sm font-medium text-gray-700 mb-2">Current selection:</div>
+                <div className="flex items-center gap-2">
+                  {/* Underdog (Selected) Team */}
+                  <div className="flex items-center">
+                    <img 
+                      src={userPick.pickedTeam?.logoUrl} 
+                      alt={`${userPick.pickedTeam?.name} logo`}
+                      className="w-8 h-8 mr-1"
+                    />
+                    <span className="text-sm font-medium">{userPick.pickedTeam?.name}</span>
+                  </div>
+                  
+                  {/* Spread */}
+                  <div className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-bold">
+                    +{Math.abs(Number(userPick.game?.spread)).toFixed(1)}
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  vs {userPick.pickedTeam?.id === userPick.game?.homeTeamId 
+                      ? userPick.game?.awayTeam?.name 
+                      : userPick.game?.homeTeam?.name}
+                </div>
+              </div>
+            )}
+
+            {/* Picks lock countdown timer */}
             <div className={`rounded-lg px-5 py-4 shadow-md flex items-center 
               ${isExpired 
                 ? "bg-red-100 border border-red-200" 
