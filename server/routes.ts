@@ -712,13 +712,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Pick submission received:", req.body);
       
       // Parse the incoming data safely
-      const gameId = parseInt(req.body.gameId);
+      const gameId = req.body.gameId; // Keep as string for API ID matching
       const pickedTeamId = parseInt(req.body.pickedTeamId);
       const leagueId = parseInt(req.body.leagueId);
       const weekId = parseInt(req.body.weekId);
       
       // Validate the basic data
-      if (isNaN(gameId) || isNaN(pickedTeamId) || isNaN(leagueId) || isNaN(weekId)) {
+      if (!gameId || isNaN(pickedTeamId) || isNaN(leagueId) || isNaN(weekId)) {
         return res.status(400).json({ message: "Invalid pick data: missing or invalid fields" });
       }
       
@@ -740,10 +740,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Picks are locked for this week" });
       }
       
-      // Get the game directly from our database
-      const game = await storage.getNFLGame(gameId);
+      // Get data from The Odds API to look up the game
+      const oddsGames = await getOddsGamesData();
+      
+      // Find the game in the odds data by matching the string ID
+      console.log(`Looking for game with ID: ${gameId} among ${oddsGames.length} games`);
+      const game = oddsGames.find(g => g.id === gameId || g.originalId === gameId);
+      
+      // If game not found in odds data, try to find in database (numeric ID conversion)
       if (!game) {
-        return res.status(404).json({ message: "Game not found in database" });
+        try {
+          // As a fallback, try to get from database with a numeric ID
+          const dbGameId = parseInt(gameId);
+          if (!isNaN(dbGameId)) {
+            const dbGame = await storage.getNFLGame(dbGameId);
+            if (dbGame) {
+              console.log(`Found game in database with ID: ${dbGameId}`);
+              // Continue with the found database game
+              return res.status(400).json({ message: "Please select a game from the current list of games" });
+            }
+          }
+        } catch (error) {
+          console.error("Error looking up game in database:", error);
+        }
+        
+        console.log(`Game not found with ID: ${gameId}`);
+        console.log("Available game IDs:", oddsGames.map(g => g.id || g.originalId).slice(0, 5), "...");
+        return res.status(404).json({ message: "Game not found" });
+      }
+      
+      // Ensure this game exists in our database for foreign key constraints
+      let dbGameId;
+      try {
+        // Get home and away teams from database for this game
+        const homeTeam = await storage.getNFLTeamByName(game.homeTeam.name);
+        const awayTeam = await storage.getNFLTeamByName(game.awayTeam.name);
+        
+        if (!homeTeam || !awayTeam) {
+          console.error("Could not find teams in database:", {
+            homeTeamName: game.homeTeam.name,
+            awayTeamName: game.awayTeam.name
+          });
+          return res.status(400).json({ message: "Teams not found in database. Please make sure all NFL teams are seeded properly." });
+        }
+        
+        // Check if game exists in database
+        const gamesInDb = await storage.getNFLGames(currentWeek.id);
+        const existingGame = gamesInDb.find(g => 
+          (g.homeTeamId === homeTeam.id && g.awayTeamId === awayTeam.id) || 
+          (g.homeTeamId === awayTeam.id && g.awayTeamId === homeTeam.id)
+        );
+        
+        if (existingGame) {
+          // Use existing game
+          dbGameId = existingGame.id;
+          console.log(`Found existing game in database with ID: ${dbGameId}`);
+        } else {
+          // Create new game record
+          const newGame = await storage.createNFLGame({
+            weekId: currentWeek.id,
+            homeTeamId: homeTeam.id,
+            awayTeamId: awayTeam.id,
+            spread: game.spread || 0,
+            homeTeamRecord: "0-0",
+            awayTeamRecord: "0-0",
+            gameTime: game.gameTime || new Date().toISOString(),
+            completed: false
+          });
+          
+          dbGameId = newGame.id;
+          console.log(`Created new game in database with ID: ${dbGameId}`);
+        }
+      } catch (error) {
+        console.error("Error ensuring game exists in database:", error);
+        return res.status(500).json({ message: "Failed to ensure game exists in database" });
       }
       
       // Check if the picked team is valid for this game
@@ -756,11 +826,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Determine if the picked team is the underdog
-      const isHomeUnderdog = game.spread > 0;
-      const isAwayUnderdog = game.spread < 0;
+      const isHomeUnderdog = Number(game.spread) > 0;
+      const isAwayUnderdog = Number(game.spread) < 0;
       const underdogTeamId = isHomeUnderdog ? game.homeTeamId : isAwayUnderdog ? game.awayTeamId : null;
       const isUnderdog = underdogTeamId !== null && pickedTeamId === underdogTeamId;
-      const spreadValue = Math.abs(game.spread);
+      const spreadValue = Math.abs(Number(game.spread));
       
       // Now check if user already has a pick for this week and league
       const existingPick = await storage.getUserPick(userId, currentWeek.id, leagueId);
@@ -768,10 +838,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existingPick) {
         // Update existing pick
         const updatedPick = await storage.updateUserPick(existingPick.id, {
-          gameId,
+          gameId: dbGameId,
           pickedTeamId,
           isUnderdog,
-          spreadAtTimeOfPick: isUnderdog ? spreadValue : 0,
+          spreadAtTimeOfPick: String(isUnderdog ? spreadValue : 0),
         });
         
         return res.json(updatedPick);
@@ -781,10 +851,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId,
           leagueId,
           weekId: currentWeek.id,
-          gameId,
+          gameId: dbGameId,
           pickedTeamId,
           isUnderdog,
-          spreadAtTimeOfPick: isUnderdog ? spreadValue : 0,
+          spreadAtTimeOfPick: String(isUnderdog ? spreadValue : 0),
           won: null,
           pointsEarned: null,
         });
