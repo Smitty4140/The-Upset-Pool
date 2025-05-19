@@ -552,43 +552,69 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserPicksForWeek(weekId: number, leagueId: number): Promise<(UserPick & { user: User, pickedTeam: NFLTeam, game: NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam } })[]> {
-    return await db
-      .select({
-        ...userPicks,
-        user: users,
-        pickedTeam: nflTeams,
-        game: {
-          ...nflGames,
-          homeTeam: {
-            id: sql`home_team.id`,
-            name: sql`home_team.name`,
-            abbreviation: sql`home_team.abbreviation`,
-            logoUrl: sql`home_team.logo_url`,
-            primaryColor: sql`home_team.primary_color`,
-            secondaryColor: sql`home_team.secondary_color`,
-          },
-          awayTeam: {
-            id: sql`away_team.id`,
-            name: sql`away_team.name`,
-            abbreviation: sql`away_team.abbreviation`,
-            logoUrl: sql`away_team.logo_url`,
-            primaryColor: sql`away_team.primary_color`,
-            secondaryColor: sql`away_team.secondary_color`,
-          },
-        },
-      })
-      .from(userPicks)
-      .innerJoin(users, eq(userPicks.userId, users.id))
-      .innerJoin(nflTeams, eq(userPicks.pickedTeamId, nflTeams.id))
-      .innerJoin(nflGames, eq(userPicks.gameId, nflGames.id))
-      .innerJoin(nflTeams.as('home_team'), eq(nflGames.homeTeamId, sql`home_team.id`))
-      .innerJoin(nflTeams.as('away_team'), eq(nflGames.awayTeamId, sql`away_team.id`))
-      .where(
-        and(
-          eq(userPicks.weekId, weekId),
-          eq(userPicks.leagueId, leagueId)
-        )
-      );
+    try {
+      // First get all user picks for this week and league
+      const picks = await db
+        .select()
+        .from(userPicks)
+        .where(
+          and(
+            eq(userPicks.weekId, weekId),
+            eq(userPicks.leagueId, leagueId)
+          )
+        );
+      
+      // Now build the full objects with related data
+      const fullPicks = [];
+      
+      for (const pick of picks) {
+        // Get user
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, pick.userId));
+        
+        // Get picked team
+        const [pickedTeam] = await db
+          .select()
+          .from(nflTeams)
+          .where(eq(nflTeams.id, pick.pickedTeamId));
+        
+        // Get game
+        const [game] = await db
+          .select()
+          .from(nflGames)
+          .where(eq(nflGames.id, pick.gameId));
+        
+        // Get home team
+        const [homeTeam] = await db
+          .select()
+          .from(nflTeams)
+          .where(eq(nflTeams.id, game.homeTeamId));
+        
+        // Get away team
+        const [awayTeam] = await db
+          .select()
+          .from(nflTeams)
+          .where(eq(nflTeams.id, game.awayTeamId));
+        
+        fullPicks.push({
+          ...pick,
+          user,
+          pickedTeam,
+          game: {
+            ...game,
+            homeTeam,
+            awayTeam
+          }
+        });
+      }
+      
+      return fullPicks;
+    } catch (error) {
+      console.error("Error fetching user picks for week:", error);
+      return [];
+    }
   }
 
   async createUserPick(pick: InsertUserPick): Promise<UserPick> {
