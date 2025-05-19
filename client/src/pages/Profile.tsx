@@ -30,7 +30,7 @@ import {
   DialogDescription 
 } from "@/components/ui/dialog";
 import { Pencil, Upload, Camera, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // Define the form validation schema
 const profileFormSchema = z.object({
@@ -104,7 +104,7 @@ export default function Profile() {
   });
   
   // Update form values when user data loads
-  React.useEffect(() => {
+  useEffect(() => {
     if (user) {
       form.reset({
         username: user.username,
