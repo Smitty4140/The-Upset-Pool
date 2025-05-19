@@ -5,7 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 import { userPickFormSchema } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { userPicks, nflGames, nflWeeks, users } from "@shared/schema";
 import emailRoutes from "./routes/email";
 import { sendWelcomeEmail } from "./email";
