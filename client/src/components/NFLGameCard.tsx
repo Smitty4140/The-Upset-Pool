@@ -18,30 +18,22 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   
   // Determine the absolute spread value for display
   const spreadValue = Math.abs(Number(game.spread));
-  const spreadText = spreadValue === 0 ? "EVEN" : `+${spreadValue}`;
+  const spreadText = spreadValue === 0 ? "EVEN" : `+${spreadValue.toFixed(1)}`;
 
-  // Set up underdog and favorite teams for display
-  // We want to show the underdog first, followed by the favorite
-  const underdogTeam = isHomeUnderdog ? game.homeTeam : isAwayUnderdog ? game.awayTeam : null;
-  const favoriteTeam = isHomeUnderdog ? game.awayTeam : isAwayUnderdog ? game.homeTeam : null;
+  // Get the away and home teams (always show away team first, home team second)
+  const awayTeam = game.awayTeam;
+  const homeTeam = game.homeTeam;
   
-  // If there's no clear underdog (spread is 0), use home/away
-  const firstTeam = underdogTeam || game.awayTeam;
-  const secondTeam = favoriteTeam || game.homeTeam;
-  
-  // Is the first team displayed the actual underdog?
-  const isFirstTeamUnderdog = !!underdogTeam;
-  
-  // Is the first team the home team?
-  const isFirstTeamHome = firstTeam.id === game.homeTeam.id;
-  const isSecondTeamHome = secondTeam.id === game.homeTeam.id;
+  // Determine which team is the underdog
+  const underdogTeam = isHomeUnderdog ? homeTeam : isAwayUnderdog ? awayTeam : null;
   
   // Get the underdog team ID for selection
   const underdogTeamId = underdogTeam?.id || null;
-  // Only consider a game selected if both the game ID and team ID match
+  
+  // Only consider a game selected if both the game ID and team ID match and the selected team is the underdog
   const isGameSelected = selectedTeamId !== null && 
-                        selectedGameId === game.id &&
-                        (selectedTeamId === firstTeam.id || selectedTeamId === secondTeam.id);
+                        selectedGameId === game.id && 
+                        selectedTeamId === underdogTeamId;
   
   // Make the entire game card clickable to select the underdog
   const handleGameCardClick = () => {
@@ -63,98 +55,67 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       onClick={handleGameCardClick}
     >
       {/* Game time header */}
-      <div className="bg-blue-50 border-b border-blue-100 px-4 py-2 flex items-center justify-between text-xs text-blue-800">
+      <div className="bg-white px-4 py-2 flex items-center text-sm text-blue-800 border-b border-gray-100">
         <div className="flex items-center">
-          <Clock className="h-3 w-3 mr-1" />
+          <Clock className="h-4 w-4 mr-1 text-blue-700" />
           <span>{formatGameTime(game.gameTime)}</span>
         </div>
-        
-        {/* Selected indicator */}
-        {isGameSelected && (
-          <div className="bg-primary text-white px-2 py-1 rounded-sm text-xs font-medium">
-            Selected Game
-          </div>
-        )}
       </div>
       
-      <div className="p-4 bg-gradient-to-b from-white to-gray-50">
-        <div className="flex flex-col sm:flex-row sm:items-center">
-          {/* First Team (Underdog or Away) */}
-          <div className={`flex items-center flex-1 bg-white p-3 rounded-lg border shadow-sm
-            ${selectedTeamId === firstTeam.id ? 'border-primary' : 'border-gray-100'}`}>
-            <div className="flex items-center">
-              <div className="w-12 h-12 flex-shrink-0 mr-3 bg-gray-50 rounded-full p-1 border border-gray-200">
-                <img 
-                  src={firstTeam.logoUrl || getTeamLogo(firstTeam.abbreviation)} 
-                  alt={`${firstTeam.name} logo`} 
-                  className="w-full h-full object-contain" 
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = 'https://placehold.co/100x100?text=' + firstTeam.abbreviation;
-                  }}
-                />
-              </div>
-              <div>
-                <div className="font-medium text-gray-900">{firstTeam.name}</div>
-                <div className="text-xs text-gray-500">
-                  {isFirstTeamHome ? game.homeTeamRecord || "(0-0)" : game.awayTeamRecord || "(0-0)"}
-                </div>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {isFirstTeamHome && (
-                    <div className="text-xs inline-block bg-blue-100 text-blue-800 font-medium px-2 py-0.5 rounded-full">
-                      HOME
-                    </div>
-                  )}
-                  {isFirstTeamUnderdog && (
-                    <div className="text-xs inline-block bg-green-100 text-green-800 font-medium px-2 py-0.5 rounded-full">
-                      UNDERDOG {spreadText}
-                    </div>
-                  )}
-                </div>
-              </div>
+      <div className="bg-white">
+        {/* Away Team Row */}
+        <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
+          <div className="flex items-center">
+            <div className="w-8 h-8 flex-shrink-0 mr-3">
+              <img 
+                src={awayTeam.logoUrl || getTeamLogo(awayTeam.abbreviation)} 
+                alt={`${awayTeam.name} logo`} 
+                className="w-full h-full object-contain" 
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = 'https://placehold.co/100x100?text=' + awayTeam.abbreviation;
+                }}
+              />
             </div>
+            <div className="font-semibold text-gray-800 text-base">{awayTeam.name}</div>
           </div>
           
-          {/* Middle Versus Section */}
-          <div className="my-4 sm:my-0 px-6 py-3 rounded-full bg-gradient-to-r from-blue-500 to-secondary text-white text-center sm:mx-4 font-bold shadow-sm">
-            <span>VS</span>
+          {/* Away Team spread if they're the underdog */}
+          {isAwayUnderdog && (
+            <div className="ml-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold text-sm">
+              {spreadText}
+            </div>
+          )}
+        </div>
+        
+        {/* Divider with "AT" text */}
+        <div className="px-4 py-1 text-xs text-gray-500 text-center bg-gray-50">
+          AT
+        </div>
+        
+        {/* Home Team Row */}
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="w-8 h-8 flex-shrink-0 mr-3">
+              <img 
+                src={homeTeam.logoUrl || getTeamLogo(homeTeam.abbreviation)} 
+                alt={`${homeTeam.name} logo`}
+                className="w-full h-full object-contain" 
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = 'https://placehold.co/100x100?text=' + homeTeam.abbreviation;
+                }}
+              />
+            </div>
+            <div className="font-semibold text-gray-800 text-base">{homeTeam.name}</div>
           </div>
           
-          {/* Second Team (Favorite or Home) */}
-          <div className={`flex items-center flex-1 bg-white p-3 rounded-lg border shadow-sm
-            ${selectedTeamId === secondTeam.id ? 'border-primary' : 'border-gray-100'}`}>
-            <div className="flex items-center">
-              <div className="w-12 h-12 flex-shrink-0 mr-3 bg-gray-50 rounded-full p-1 border border-gray-200">
-                <img 
-                  src={secondTeam.logoUrl || getTeamLogo(secondTeam.abbreviation)} 
-                  alt={`${secondTeam.name} logo`} 
-                  className="w-full h-full object-contain" 
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = 'https://placehold.co/100x100?text=' + secondTeam.abbreviation;
-                  }}
-                />
-              </div>
-              <div>
-                <div className="font-medium text-gray-900">{secondTeam.name}</div>
-                <div className="text-xs text-gray-500">
-                  {isSecondTeamHome ? game.homeTeamRecord || "(0-0)" : game.awayTeamRecord || "(0-0)"}
-                </div>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {isSecondTeamHome && (
-                    <div className="text-xs inline-block bg-blue-100 text-blue-800 font-medium px-2 py-0.5 rounded-full">
-                      HOME
-                    </div>
-                  )}
-                  {!isFirstTeamUnderdog && (
-                    <div className="text-xs inline-block bg-green-100 text-green-800 font-medium px-2 py-0.5 rounded-full">
-                      UNDERDOG {spreadText}
-                    </div>
-                  )}
-                </div>
-              </div>
+          {/* Home Team spread if they're the underdog */}
+          {isHomeUnderdog && (
+            <div className="ml-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold text-sm">
+              {spreadText}
             </div>
-          </div>
+          )}
         </div>
       </div>
       
