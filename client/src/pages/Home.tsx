@@ -265,6 +265,7 @@ export default function Home() {
                               key={game.id}
                               game={game}
                               selectedTeamId={selectedTeamId}
+                              selectedGameId={selectedGameId}
                               onSelect={handleTeamSelection}
                               disabled={arePicksLocked || !isAuthenticated}
                             />

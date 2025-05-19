@@ -6,11 +6,12 @@ import { Clock } from "lucide-react";
 type NFLGameCardProps = {
   game: NFLGame;
   selectedTeamId: number | null;
+  selectedGameId: number | null;
   onSelect: (gameId: number, teamId: number) => void;
   disabled?: boolean;
 };
 
-export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled = false }: NFLGameCardProps) {
+export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, disabled = false }: NFLGameCardProps) {
   // Determine which teams are underdogs based on the spread
   const isHomeUnderdog = Number(game.spread) > 0;
   const isAwayUnderdog = Number(game.spread) < 0;
@@ -37,7 +38,10 @@ export default function NFLGameCard({ game, selectedTeamId, onSelect, disabled =
   
   // Get the underdog team ID for selection
   const underdogTeamId = underdogTeam?.id || null;
-  const isGameSelected = selectedTeamId !== null && (selectedTeamId === firstTeam.id || selectedTeamId === secondTeam.id);
+  // Only consider a game selected if both the game ID and team ID match
+  const isGameSelected = selectedTeamId !== null && 
+                        selectedGameId === game.id &&
+                        (selectedTeamId === firstTeam.id || selectedTeamId === secondTeam.id);
   
   // Make the entire game card clickable to select the underdog
   const handleGameCardClick = () => {
