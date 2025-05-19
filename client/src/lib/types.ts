@@ -76,7 +76,7 @@ export interface UserPick {
   userId: string;
   leagueId: number;
   weekId: number;
-  gameId: number;
+  gameId: string; // Changed to string to match API response format
   pickedTeamId: number;
   isUnderdog: boolean;
   spreadAtTimeOfPick: number;
@@ -90,7 +90,7 @@ export interface UserPick {
 }
 
 export interface UserPickFormValues {
-  gameId: number;
+  gameId: string; // Changed to string to match API response format
   pickedTeamId: number;
   leagueId: number;
   weekId: number;

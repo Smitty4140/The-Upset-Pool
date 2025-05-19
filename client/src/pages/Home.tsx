@@ -98,7 +98,7 @@ export default function Home() {
 
   // Mutation for submitting a pick
   const { mutate: submitPick, isPending: isSubmittingPick } = useMutation({
-    mutationFn: async (data: { gameId: number; pickedTeamId: number; leagueId: number; weekId: number }) => {
+    mutationFn: async (data: { gameId: string; pickedTeamId: number; leagueId: number; weekId: number }) => {
       return apiRequest("POST", "/api/user/pick", data);
     },
     onSuccess: (data) => {
@@ -304,6 +304,7 @@ export default function Home() {
                               type="submit" 
                               className="px-8 py-6 text-lg font-bold" 
                               disabled={isSubmittingPick || !selectedTeamId}
+                              onClick={handleSubmitPick}
                             >
                               {isSubmittingPick ? (
                                 <span className="flex items-center">

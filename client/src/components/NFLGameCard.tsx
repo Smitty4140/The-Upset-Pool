@@ -6,8 +6,8 @@ import { Clock, Check } from "lucide-react";
 type NFLGameCardProps = {
   game: NFLGame;
   selectedTeamId: number | null;
-  selectedGameId: number | null;
-  onSelect: (gameId: number, teamId: number) => void;
+  selectedGameId: string | null;
+  onSelect: (gameId: string, teamId: number) => void;
   disabled?: boolean;
 };
 
@@ -34,15 +34,17 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   const isGameSelected = selectedTeamId !== null && 
                         selectedGameId === game.id;
   
-  // Make the entire game card clickable to select the underdog
-  const handleGameCardClick = () => {
-    if (disabled || !underdogTeamId) return;
-    
-    // If this game is already selected, do nothing
-    if (selectedTeamId === underdogTeamId && selectedTeamId !== null) return;
-    
-    // Otherwise select this game's underdog team
-    onSelect(game.id, underdogTeamId);
+  // Make the entire game card clickable to select either team
+  const handleHomeTeamClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (disabled) return;
+    onSelect(game.id, homeTeam.id);
+  };
+  
+  const handleAwayTeamClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (disabled) return;
+    onSelect(game.id, awayTeam.id);
   };
 
   return (
