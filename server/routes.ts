@@ -6,7 +6,9 @@ import { z } from "zod";
 import { userPickFormSchema } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { db } from "./db";
-import { userPicks, nflGames, nflWeeks } from "@shared/schema";
+import { userPicks, nflGames, nflWeeks, users } from "@shared/schema";
+import emailRoutes from "./routes/email";
+import { sendWelcomeEmail } from "./email";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware

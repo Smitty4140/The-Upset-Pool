@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,7 +36,9 @@ import { useState, useEffect } from "react";
 // Define the form validation schema
 const profileFormSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters").max(50),
+  email: z.string().email("Please enter a valid email address").optional().or(z.literal('')),
   profileImageUrl: z.string().url("Please enter a valid URL").optional().or(z.literal('')),
+  receiveNotifications: z.boolean().default(true),
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -99,7 +102,9 @@ export default function Profile() {
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
       username: user?.username || "",
+      email: user?.email || "",
       profileImageUrl: user?.profileImageUrl || "",
+      receiveNotifications: user?.receiveNotifications !== false, // Default to true if undefined
     },
   });
   
@@ -108,7 +113,9 @@ export default function Profile() {
     if (user) {
       form.reset({
         username: user.username,
+        email: user.email || "",
         profileImageUrl: user.profileImageUrl || "",
+        receiveNotifications: user.receiveNotifications !== false, // Default to true if undefined
       });
     }
   }, [user, form]);
@@ -257,6 +264,48 @@ export default function Profile() {
                     </div>
                   </div>
                   
+                  {/* Add email field */}
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="email" 
+                            placeholder="you@example.com" 
+                            {...field} 
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {/* Add notifications toggle */}
+                  <FormField
+                    control={form.control}
+                    name="receiveNotifications"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                          <FormLabel>Email Notifications</FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            Receive game reminders and weekly results
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
                   <div className="space-y-4">
                     <div>
                       <h4 className="font-medium text-sm text-gray-500 uppercase tracking-wider mb-1">Total Points</h4>
@@ -274,7 +323,9 @@ export default function Profile() {
                           setIsEditing(false);
                           form.reset({
                             username: user?.username || "",
+                            email: user?.email || "",
                             profileImageUrl: user?.profileImageUrl || "",
+                            receiveNotifications: user?.receiveNotifications !== false,
                           });
                         }}
                       >
