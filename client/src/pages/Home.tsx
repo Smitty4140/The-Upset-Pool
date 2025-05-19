@@ -101,12 +101,20 @@ export default function Home() {
       return apiRequest("POST", "/api/user-pick", data);
     },
     onSuccess: () => {
+      // Completely refresh the page to ensure the header displays the pick
       toast({
         title: "Pick submitted",
-        description: "Your pick has been saved",
+        description: "Your pick has been saved. Refreshing page to show your selection...",
         variant: "default",
       });
+      
+      // Invalidate the query cache and force a page refresh
       queryClient.invalidateQueries({ queryKey: ["/api/user-pick"] });
+      
+      // Force reload the page after a short delay to ensure the header updates
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     },
     onError: (error) => {
       toast({
