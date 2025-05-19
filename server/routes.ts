@@ -311,6 +311,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch underdog games" });
     }
   });
+  
+  // Get NFL games for a specific week with formatted response for frontend
+  app.get('/api/nfl-games/week/:weekId', async (req, res) => {
+    try {
+      const weekId = parseInt(req.params.weekId);
+      
+      if (isNaN(weekId)) {
+        return res.status(400).json({ message: "Invalid week ID" });
+      }
+      
+      // Get games from database via storage
+      const games = await storage.getNFLGames(weekId);
+      
+      // Format the games to ensure compatibility with the frontend
+      const formattedGames = games.map(game => {
+        // Determine which team is the underdog based on the spread
+        const isHomeUnderdog = Number(game.spread) > 0;
+        const isAwayUnderdog = Number(game.spread) < 0;
+        
+        return {
+          ...game,
+          id: game.id.toString(), // Convert ID to string for frontend compatibility
+          underdogTeamId: isHomeUnderdog ? game.homeTeamId : isAwayUnderdog ? game.awayTeamId : null,
+          underdogName: isHomeUnderdog ? game.homeTeam.name : isAwayUnderdog ? game.awayTeam.name : null,
+          underdogValue: Math.abs(Number(game.spread))
+        };
+      });
+      
+      res.json(formattedGames);
+    } catch (error) {
+      console.error("Error getting NFL games for week:", error);
+      res.status(500).json({ message: "Failed to fetch NFL games for week" });
+    }
+  });
 
   // Get all leagues
   app.get('/api/leagues', async (_req, res) => {
