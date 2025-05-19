@@ -279,21 +279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get NFL games for a specific week
-  app.get('/api/nfl-games/:weekId', async (req, res) => {
-    try {
-      const weekId = parseInt(req.params.weekId);
-      if (isNaN(weekId)) {
-        return res.status(400).json({ message: "Invalid week ID" });
-      }
-
-      const games = await storage.getNFLGames(weekId);
-      res.json(games);
-    } catch (error) {
-      console.error("Error fetching NFL games:", error);
-      res.status(500).json({ message: "Failed to fetch NFL games" });
-    }
-  });
+  // This route has been moved after the more specific /api/nfl-games/week/:weekId route below
 
   // Get underdog NFL games for a specific week
   app.get('/api/nfl-games/underdog', async (req, res) => {
@@ -313,6 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get NFL games for a specific week with formatted response for frontend
+  // Get NFL games for a specific week - important: must be before the generic /:weekId route
   app.get('/api/nfl-games/week/:weekId', async (req, res) => {
     try {
       const weekId = parseInt(req.params.weekId);
@@ -323,6 +310,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get games from database via storage
       const games = await storage.getNFLGames(weekId);
+      
+      console.log(`Found ${games.length} games for week ${weekId}`);
       
       // Format the games to ensure compatibility with the frontend
       const formattedGames = games.map(game => {
@@ -343,6 +332,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting NFL games for week:", error);
       res.status(500).json({ message: "Failed to fetch NFL games for week" });
+    }
+  });
+  
+  // Get NFL games for a specific week (generic route - must be after more specific routes)
+  app.get('/api/nfl-games/:weekId', async (req, res) => {
+    try {
+      const weekId = parseInt(req.params.weekId);
+      if (isNaN(weekId)) {
+        return res.status(400).json({ message: "Invalid week ID" });
+      }
+
+      const games = await storage.getNFLGames(weekId);
+      res.json(games);
+    } catch (error) {
+      console.error("Error fetching NFL games:", error);
+      res.status(500).json({ message: "Failed to fetch NFL games" });
     }
   });
 
