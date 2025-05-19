@@ -121,7 +121,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       
       {/* Selection indicator */}
       {isGameSelected && (
-        <div className="bg-primary text-white text-xs font-medium text-center py-1">
+        <div className="bg-primary text-white text-sm font-medium text-center py-2">
           Selected Game
         </div>
       )}
