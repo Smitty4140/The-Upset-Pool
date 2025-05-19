@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Shield, MessageSquare, Trophy, LineChart } from "lucide-react";
+import { Shield, MessageSquare, Trophy } from "lucide-react";
 import { Link } from "wouter";
 
-type Tab = "spreads" | "messageboard" | "leaderboard" | "odds";
+type Tab = "spreads" | "messageboard" | "leaderboard";
 
 type ContentTabsProps = {
   activeTab: Tab;
@@ -25,17 +25,7 @@ export default function ContentTabs({ activeTab, onTabChange }: ContentTabsProps
             <Shield className={`h-4 w-4 mr-2 ${activeTab === "spreads" ? "text-primary" : "text-gray-500"}`} />
             Game Spreads
           </button>
-          <button
-            onClick={() => onTabChange("odds")}
-            className={`${
-              activeTab === "odds"
-                ? "bg-white border-primary text-primary"
-                : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300 hover:bg-white/50"
-            } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm flex items-center transition-all duration-200`}
-          >
-            <LineChart className={`h-4 w-4 mr-2 ${activeTab === "odds" ? "text-blue-500" : "text-gray-500"}`} />
-            Betting Odds
-          </button>
+
           <button
             onClick={() => onTabChange("leaderboard")}
             className={`${
