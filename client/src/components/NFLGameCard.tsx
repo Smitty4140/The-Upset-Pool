@@ -50,10 +50,9 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   return (
     <div 
       className={`game-card transition-all duration-150 ease-in-out border rounded-lg mb-4 last:mb-0 overflow-hidden shadow-sm 
-        ${!disabled && underdogTeamId ? 'cursor-pointer hover:shadow-md' : ''} 
+        ${!disabled ? 'hover:shadow-md' : ''} 
         ${isGameSelected ? 'border-primary border-2 shadow-md relative' : 'border-gray-200'}
         ${disabled ? 'opacity-75' : ''}`}
-      onClick={handleGameCardClick}
     >
       {/* Game time header */}
       <div className="bg-white px-4 py-3 flex items-center text-sm text-blue-800 border-b border-gray-100">
@@ -65,7 +64,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       
       <div className="bg-white">
         {/* Away Team Row */}
-        <div className="px-4 py-4 flex items-center justify-between">
+        <div className="px-4 py-4 flex items-center justify-between cursor-pointer" onClick={handleAwayTeamClick}>
           <div className="flex items-center">
             <div className="w-12 h-12 flex-shrink-0 mr-3">
               <img 
@@ -95,7 +94,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         </div>
         
         {/* Home Team Row */}
-        <div className="px-4 py-4 flex items-center justify-between">
+        <div className="px-4 py-4 flex items-center justify-between cursor-pointer" onClick={handleHomeTeamClick}>
           <div className="flex items-center">
             <div className="w-12 h-12 flex-shrink-0 mr-3">
               <img 
