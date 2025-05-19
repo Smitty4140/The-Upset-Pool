@@ -824,13 +824,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Pick submission received:", req.body);
       
       // Parse the incoming data safely
-      let gameId = req.body.gameId; // Could be string ID from The Odds API or numeric ID from our database
+      const gameId = parseInt(req.body.gameId);
       const pickedTeamId = parseInt(req.body.pickedTeamId);
       const leagueId = parseInt(req.body.leagueId);
       const weekId = parseInt(req.body.weekId);
       
+      console.log(`Parsed pick data - Game ID: ${gameId}, Team ID: ${pickedTeamId}, League ID: ${leagueId}, Week ID: ${weekId}`);
+      
       // Validate the basic data
-      if (!gameId || isNaN(pickedTeamId) || isNaN(leagueId) || isNaN(weekId)) {
+      if (isNaN(gameId) || isNaN(pickedTeamId) || isNaN(leagueId) || isNaN(weekId)) {
         return res.status(400).json({ message: "Invalid pick data: missing or invalid fields" });
       }
       
@@ -852,138 +854,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Picks are locked for this week" });
       }
       
-      // Try to get the game from our database first
-      let dbGame = null;
-      let dbGameId = null;
+      // Try to find the game in the database
+      const dbGame = await storage.getNFLGame(gameId);
       
-      // First try treating gameId as a numeric ID (it might already be our database ID)
-      try {
-        const numericId = parseInt(gameId);
-        if (!isNaN(numericId)) {
-          dbGame = await storage.getNFLGame(numericId);
-          if (dbGame) {
-            console.log(`Found game directly in database with ID: ${numericId}`);
-            dbGameId = numericId;
-          }
-        }
-      } catch (error) {
-        console.log("Game ID is not a valid numeric database ID, will try The Odds API matching");
-      }
-      
-      // If we couldn't find the game by numeric ID, try to find it in the database by searching all games
       if (!dbGame) {
-        try {
-          // Get all games for the current week
-          const weekGames = await storage.getNFLGames(weekId);
-          
-          if (weekGames && weekGames.length > 0) {
-            console.log(`Looking for game ID ${gameId} among ${weekGames.length} games for week ${weekId}`);
-            
-            // Try to find by string ID match
-            const foundGame = weekGames.find(g => g.id.toString() === gameId.toString());
-            
-            if (foundGame) {
-              console.log(`Found game in database: ${foundGame.id} (${foundGame.homeTeam.name} vs ${foundGame.awayTeam.name})`);
-              dbGame = foundGame;
-              dbGameId = foundGame.id;
-            } else {
-              console.log(`No matching game found with ID ${gameId}`);
-            }
-          } else {
-            console.log(`No games found for week ${weekId}`);
-          }
-        } catch (error) {
-          console.error(`Error searching for game: ${error.message}`);
-        }
-        
-        // If still no game found, return error
-        if (!dbGame) {
-          console.log(`Game not found with ID: ${gameId}`);
-          return res.status(404).json({ message: "Game not found. Please select a game from the current list." });
-        }
-      }
-          
-          if (existingGame) {
-            // Use existing game
-            dbGameId = existingGame.id;
-            dbGame = existingGame;
-            console.log(`Found existing game in database with ID: ${dbGameId}`);
-          } else {
-            // Create new game record
-            const newGame = await storage.createNFLGame({
-              weekId: currentWeek.id,
-              homeTeamId: homeTeam.id,
-              awayTeamId: awayTeam.id,
-              spread: oddsGame.spread || 0,
-              homeTeamRecord: "0-0",
-              awayTeamRecord: "0-0",
-              gameTime: oddsGame.gameTime || new Date().toISOString(),
-              completed: false
-            });
-            
-            dbGameId = newGame.id;
-            dbGame = await storage.getNFLGame(dbGameId);
-            console.log(`Created new game in database with ID: ${dbGameId}`);
-          }
-        } catch (error) {
-          console.error("Error ensuring game exists in database:", error);
-          return res.status(500).json({ message: "Failed to ensure game exists in database" });
-        }
-      }
-      
-      // At this point, we should have a dbGame and dbGameId
-      if (!dbGame || !dbGameId) {
-        return res.status(404).json({ message: "Could not find or create the selected game in the database" });
-      }
-      
-      // Check if the picked team is valid for this game
-      if (pickedTeamId !== dbGame.homeTeamId && pickedTeamId !== dbGame.awayTeamId) {
-        return res.status(400).json({ 
-          message: "Selected team is not part of this game",
-          homeTeamId: dbGame.homeTeamId,
-          awayTeamId: dbGame.awayTeamId
+        console.log(`Game not found with ID: ${gameId}`);
+        return res.status(404).json({ 
+          message: "Game not found. Please select a valid game.",
+          details: { requestedGameId: gameId, weekId }
         });
       }
       
-      // Determine if the picked team is the underdog
-      const isHomeUnderdog = dbGame.spread > 0;
-      const isAwayUnderdog = dbGame.spread < 0;
-      const underdogTeamId = isHomeUnderdog ? dbGame.homeTeamId : isAwayUnderdog ? dbGame.awayTeamId : null;
-      const isUnderdog = underdogTeamId !== null && pickedTeamId === underdogTeamId;
-      const spreadValue = Math.abs(dbGame.spread);
+      console.log(`Found game: ${dbGame.id} - ${dbGame.homeTeam.name} vs ${dbGame.awayTeam.name}`);
       
-      // Now check if user already has a pick for this week and league
-      const existingPick = await storage.getUserPick(userId, currentWeek.id, leagueId);
+      // Validate that picked team is part of the game
+      if (dbGame.homeTeamId !== pickedTeamId && dbGame.awayTeamId !== pickedTeamId) {
+        return res.status(400).json({ 
+          message: "Selected team is not part of the chosen game",
+          details: {
+            pickedTeamId,
+            homeTeamId: dbGame.homeTeamId,
+            homeTeamName: dbGame.homeTeam.name,
+            awayTeamId: dbGame.awayTeamId,
+            awayTeamName: dbGame.awayTeam.name
+          }
+        });
+      }
+      
+      // Determine values of the pick
+      const isHomeTeam = dbGame.homeTeamId === pickedTeamId;
+      const isAwayTeam = dbGame.awayTeamId === pickedTeamId;
+      const teamName = isHomeTeam ? dbGame.homeTeam.name : dbGame.awayTeam.name;
+      
+      // Figure out if picked team is underdog and what the spread value is
+      const isHomeUnderdog = Number(dbGame.spread) > 0;
+      const isAwayUnderdog = Number(dbGame.spread) < 0;
+      const pickedTeamIsUnderdog = (isHomeTeam && isHomeUnderdog) || (isAwayTeam && isAwayUnderdog);
+      const spreadValue = Math.abs(Number(dbGame.spread));
+      
+      console.log(`Team picked: ${teamName}, Underdog: ${pickedTeamIsUnderdog}, Spread: ${spreadValue}`);
+      
+      // Check for existing pick
+      const existingPick = await storage.getUserPick(userId, weekId, leagueId);
       
       if (existingPick) {
+        console.log(`Updating existing pick for user ${userId}`);
         // Update existing pick
         const updatedPick = await storage.updateUserPick(existingPick.id, {
-          gameId: dbGameId,
-          pickedTeamId,
-          isUnderdog,
-          spreadAtTimeOfPick: String(isUnderdog ? spreadValue : 0),
+          gameId: dbGame.id,
+          pickedTeamId: pickedTeamId
         });
         
-        return res.json(updatedPick);
+        if (!updatedPick) {
+          return res.status(500).json({ message: "Failed to update pick" });
+        }
+        
+        return res.json({
+          message: "Pick updated successfully",
+          pick: updatedPick
+        });
       } else {
+        console.log(`Creating new pick for user ${userId}`);
         // Create new pick
         const newPick = await storage.createUserPick({
           userId,
+          weekId,
           leagueId,
-          weekId: currentWeek.id,
-          gameId: dbGameId,
+          gameId: dbGame.id,
           pickedTeamId,
-          isUnderdog,
-          spreadAtTimeOfPick: String(isUnderdog ? spreadValue : 0),
-          won: null,
-          pointsEarned: null,
+          points: null,
+          correct: null
         });
         
-        return res.status(201).json(newPick);
+        return res.json({
+          message: "Pick submitted successfully",
+          pick: newPick
+        });
       }
     } catch (error) {
       console.error("Error submitting pick:", error);
-      res.status(500).json({ message: "Failed to submit pick" });
+      return res.status(500).json({ message: "An error occurred while submitting your pick" });
     }
   });
 
