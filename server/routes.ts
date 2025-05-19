@@ -611,7 +611,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Sync NFL games from The Odds API to our database
+  // Sync NFL games from The Odds API to our database - improved version
   app.get('/api/sync-nfl-games', async (req, res) => {
     try {
       // Get current week
@@ -620,8 +620,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No active NFL week found" });
       }
       
+      console.log(`Current week: ${currentWeek.weekNumber} (ID: ${currentWeek.id})`);
+      
       // Get the odds data from the API
       const apiKey = process.env.THE_ODDS_API_KEY;
+      if (!apiKey) {
+        return res.status(400).json({ message: "THE_ODDS_API_KEY not found in environment" });
+      }
+      
+      console.log("Fetching data from The Odds API...");
       const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?regions=us&markets=spreads&apiKey=${apiKey}&bookmakers=draftkings`);
       
       if (!response.ok) {
@@ -631,6 +638,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const oddsData = await response.json();
       console.log(`Successfully fetched ${oddsData.length} NFL games from The Odds API`);
       
+      // Ensure all NFL teams exist in the database
+      const teams = await storage.getNFLTeams();
+      console.log(`Found ${teams.length} NFL teams in database`);
+      
+      if (teams.length < 32) {
+        // Not all teams exist, we need to seed them
+        console.log("Not all NFL teams exist in database, please seed them first");
+        return res.status(400).json({ message: "Not all NFL teams exist in database, please seed them first" });
+      }
+      
       // Track results
       const results = {
         gamesFound: oddsData.length,
@@ -639,61 +656,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
         errors: 0
       };
       
+      // Create team name lookup for faster access
+      const teamNameMap = new Map();
+      teams.forEach(team => {
+        teamNameMap.set(team.name.toLowerCase(), team);
+      });
+      
+      console.log("Processing games from The Odds API...");
       // Process each game from the API
       for (const game of oddsData) {
         try {
-          // Get the spread information
-          const market = game.bookmakers[0]?.markets?.find(m => m.key === "spreads");
-          const homeSpreadData = market?.outcomes?.find(o => o.name === game.home_team);
-          const homeSpread = homeSpreadData?.point ?? 0;
+          // Get the spread information - search through all bookmakers to find DraftKings
+          const draftKings = game.bookmakers.find(b => b.key === 'draftkings');
+          const bookmaker = draftKings || game.bookmakers[0]; // Fallback to first bookmaker if DraftKings not found
           
-          // Get team records from our database
-          const homeTeam = await storage.getNFLTeamByName(game.home_team);
-          const awayTeam = await storage.getNFLTeamByName(game.away_team);
-          
-          if (!homeTeam || !awayTeam) {
-            console.error("Teams not found in database:", {
-              homeTeam: game.home_team,
-              awayTeam: game.away_team
-            });
+          if (!bookmaker) {
+            console.log(`No bookmaker data for game: ${game.home_team} vs ${game.away_team}`);
             results.errors++;
             continue;
           }
           
-          // Check if the game already exists in our database
-          const existingGames = await storage.getNFLGames(currentWeek.id);
-          const existingGame = existingGames.find(g => 
-            (g.homeTeam.name === game.home_team && g.awayTeam.name === game.away_team) ||
-            (g.homeTeam.name === game.away_team && g.awayTeam.name === game.home_team)
-          );
+          const spreadsMarket = bookmaker.markets.find(m => m.key === 'spreads');
+          if (!spreadsMarket) {
+            console.log(`No spreads market for game: ${game.home_team} vs ${game.away_team}`);
+            results.errors++;
+            continue;
+          }
           
-          if (existingGame) {
-            // Update the existing game
-            await storage.updateNFLGame(existingGame.id, {
-              spread: homeSpread,
-              gameTime: game.commence_time
-            });
-            results.gamesUpdated++;
-          } else {
-            // Create a new game in our database
-            await storage.createNFLGame({
-              weekId: currentWeek.id,
-              homeTeamId: homeTeam.id,
-              awayTeamId: awayTeam.id,
-              spread: homeSpread,
-              homeTeamRecord: "0-0",
-              awayTeamRecord: "0-0",
-              gameTime: game.commence_time,
-              completed: false
-            });
-            results.gamesCreated++;
+          const homeOutcome = spreadsMarket.outcomes.find(o => o.name === game.home_team);
+          if (!homeOutcome) {
+            console.log(`No home team outcome for game: ${game.home_team} vs ${game.away_team}`);
+            results.errors++;
+            continue;
+          }
+          
+          const homeSpread = parseFloat(homeOutcome.point) || 0;
+          console.log(`Game: ${game.home_team} vs ${game.away_team}, Spread: ${homeSpread}`);
+          
+          // Get team records from our database using the map for faster lookup
+          const homeTeam = teamNameMap.get(game.home_team.toLowerCase());
+          const awayTeam = teamNameMap.get(game.away_team.toLowerCase());
+          
+          if (!homeTeam) {
+            console.log(`Home team not found: ${game.home_team}`);
+            results.errors++;
+            continue;
+          }
+          
+          if (!awayTeam) {
+            console.log(`Away team not found: ${game.away_team}`);
+            results.errors++;
+            continue;
+          }
+          
+          // Insert directly using SQL for more reliable operation
+          try {
+            // Check if game exists using a direct SQL query
+            const { rows: existingGames } = await pool.query(`
+              SELECT id 
+              FROM nfl_games 
+              WHERE week_id = $1 AND home_team_id = $2 AND away_team_id = $3
+            `, [currentWeek.id, homeTeam.id, awayTeam.id]);
+            
+            if (existingGames.length > 0) {
+              // Update existing game
+              const gameId = existingGames[0].id;
+              await pool.query(`
+                UPDATE nfl_games 
+                SET spread = $1, game_time = $2, updated_at = NOW()
+                WHERE id = $3
+              `, [homeSpread, game.commence_time, gameId]);
+              
+              console.log(`Updated game ID ${gameId}: ${homeTeam.name} vs ${awayTeam.name}`);
+              results.gamesUpdated++;
+            } else {
+              // Create new game
+              const { rows } = await pool.query(`
+                INSERT INTO nfl_games 
+                  (week_id, home_team_id, away_team_id, spread, home_team_record, away_team_record, game_time, completed, created_at, updated_at)
+                VALUES 
+                  ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+                RETURNING id
+              `, [
+                currentWeek.id,
+                homeTeam.id,
+                awayTeam.id,
+                homeSpread,
+                "0-0",
+                "0-0",
+                game.commence_time,
+                false
+              ]);
+              
+              if (rows.length > 0) {
+                console.log(`Created game ID ${rows[0].id}: ${homeTeam.name} vs ${awayTeam.name}`);
+                results.gamesCreated++;
+              } else {
+                console.log(`Failed to create game: ${homeTeam.name} vs ${awayTeam.name}`);
+                results.errors++;
+              }
+            }
+          } catch (sqlError) {
+            console.error(`SQL error processing game ${game.home_team} vs ${game.away_team}:`, sqlError);
+            results.errors++;
           }
         } catch (error) {
-          console.error("Error processing game:", error);
+          console.error(`Error processing game ${game.home_team} vs ${game.away_team}:`, error);
           results.errors++;
         }
       }
       
+      // Return overall results
       return res.json({
         message: "NFL games sync completed",
         results
