@@ -586,7 +586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             spread: game.spread,
             homeTeamRecord: "0-0", 
             awayTeamRecord: "0-0",
-            gameTime: game.gameTime || new Date().toISOString(),
+            gameTime: typeof game.gameTime === 'string' ? game.gameTime : new Date().toISOString(),
             completed: false
           });
           console.log("Created new game with ID:", dbGame.id);

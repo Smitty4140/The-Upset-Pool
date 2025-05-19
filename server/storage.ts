@@ -282,7 +282,8 @@ export class DatabaseStorage implements IStorage {
       `);
       
       // Transform the raw results into properly structured objects
-      return result.map((game: any) => ({
+      const games = Array.isArray(result) ? result : (result?.rows || []);
+      return games.map((game: any) => ({
         id: game.id,
         weekId: game.week_id,
         homeTeamId: game.home_team_id,
