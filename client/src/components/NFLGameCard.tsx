@@ -1,7 +1,7 @@
 import { NFLGame } from "@/lib/types";
 import { getTeamLogo } from "@/lib/teamLogos";
 import { formatGameTime } from "@/lib/formatDate";
-import { Clock } from "lucide-react";
+import { Clock, Check } from "lucide-react";
 
 type NFLGameCardProps = {
   game: NFLGame;

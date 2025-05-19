@@ -85,8 +85,8 @@ export default function Home() {
 
   // Get the user's pick for this week
   const { data: userPick, isLoading: isLoadingPick, refetch: refetchUserPick } = useQuery<UserPick | null>({
-    queryKey: ["/api/user-pick", { weekId: currentWeek?.id, leagueId }],
-    enabled: !!currentWeek?.id && isAuthenticated,
+    queryKey: ["/api/user-pick", { weekId: activeWeekId, leagueId }],
+    enabled: !!activeWeekId && isAuthenticated,
   });
   
   // Get the leaderboard data
