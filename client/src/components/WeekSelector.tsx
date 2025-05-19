@@ -34,9 +34,20 @@ export default function WeekSelector({ currentWeekId, onWeekChange, className }:
     if (nextWeekId) onWeekChange(nextWeekId);
   };
 
-  // Handle week selection
+  // Get the active week (from the current week in the database)
+  const { data: activeWeek } = useQuery<NFLWeek>({
+    queryKey: ["/api/nfl-weeks/current"],
+  });
+  
+  // Handle week selection - only allow selecting the current week
   const handleSelectWeek = (weekId: number) => {
-    onWeekChange(weekId);
+    // If we have an active week, only allow selecting that week
+    if (activeWeek && weekId === activeWeek.id) {
+      onWeekChange(weekId);
+    } else if (!activeWeek) {
+      // If no active week is defined, allow any selection
+      onWeekChange(weekId);
+    }
   };
 
   if (isLoading) {
@@ -84,8 +95,11 @@ export default function WeekSelector({ currentWeekId, onWeekChange, className }:
                 "w-9 h-9 p-0 text-xs",
                 week.id === currentWeekId 
                   ? "bg-primary text-white" 
-                  : "text-gray-600 hover:bg-gray-100"
+                  : activeWeek && week.id !== activeWeek.id
+                    ? "text-gray-400 cursor-not-allowed" 
+                    : "text-gray-600 hover:bg-gray-100"
               )}
+              disabled={activeWeek && week.id !== activeWeek.id}
               onClick={() => handleSelectWeek(week.id)}
             >
               {week.weekNumber}

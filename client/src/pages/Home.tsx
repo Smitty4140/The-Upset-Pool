@@ -56,7 +56,8 @@ export default function Home() {
   });
 
   // The active week is either the selected week or the current week
-  const activeWeekId = selectedWeekId || currentWeek?.id;
+  // BUT we will force it to be the current week for game selection
+  const activeWeekId = currentWeek?.id;
 
   // Get NFL games from odds API in our app's format
   const { data: oddsGames, isLoading: isLoadingOddsGames } = useQuery<NFLGame[]>({
