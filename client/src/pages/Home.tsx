@@ -60,7 +60,7 @@ export default function Home() {
   // BUT we will force it to be the current week for game selection
   const activeWeekId = currentWeek?.id;
 
-  // Get NFL games directly from the database for now to ensure numeric IDs work properly
+  // Get NFL games from the database for the selected week
   const { data: databaseGames, isLoading: isLoadingDatabaseGames } = useQuery<NFLGame[]>({
     queryKey: [`/api/nfl-games/week/${currentWeek?.id}`],
     enabled: !!currentWeek,
