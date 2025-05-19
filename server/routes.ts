@@ -88,7 +88,9 @@ async function getOddsGamesData() {
       
       // Format the data to match our expected game structure
       return oddsData.map((game: any, index: number) => {
-        const gameId = index + 1; // Start at 1 instead of 0 for consistency
+        // Instead of making an arbitrary ID, use the original game's API ID
+        // This ensures the game ID from frontend to backend is consistent
+        const gameId = game.id; 
         const homeTeam = game.home_team;
         const awayTeam = game.away_team;
         const bookmaker = game.bookmakers?.find(b => b.key === 'draftkings') || game.bookmakers?.[0];
