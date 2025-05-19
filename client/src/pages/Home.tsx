@@ -85,7 +85,7 @@ export default function Home() {
   const isLoadingGames = isLoadingOddsGames || (isLoadingFallbackGames && (!oddsGames || oddsGames.length === 0));
 
   // Get the user's pick for this week
-  const { data: userPick, isLoading: isLoadingPick } = useQuery<UserPick | null>({
+  const { data: userPick, isLoading: isLoadingPick, refetch: refetchUserPick } = useQuery<UserPick | null>({
     queryKey: ["/api/user-pick", { weekId: currentWeek?.id, leagueId }],
     enabled: !!currentWeek?.id && isAuthenticated,
   });
@@ -100,21 +100,23 @@ export default function Home() {
     mutationFn: async (data: { gameId: number; pickedTeamId: number; leagueId: number; weekId: number }) => {
       return apiRequest("POST", "/api/user-pick", data);
     },
-    onSuccess: () => {
-      // Completely refresh the page to ensure the header displays the pick
-      toast({
-        title: "Pick submitted",
-        description: "Your pick has been saved. Refreshing page to show your selection...",
-        variant: "default",
+    onSuccess: (data) => {
+      // First fetch the updated pick to ensure we have the latest data
+      refetchUserPick().then(() => {
+        // Find the selected team info for better UI feedback
+        const selectedGame = games?.find(game => game.id === selectedGameId);
+        const selectedTeam = selectedGame ? 
+          (selectedGame.homeTeamId === selectedTeamId ? selectedGame.homeTeam : selectedGame.awayTeam) : 
+          null;
+
+        toast({
+          title: "Pick Submitted!",
+          description: selectedTeam ? 
+            `You've selected ${selectedTeam.name} as your pick for this week` : 
+            "Your pick has been saved",
+          variant: "default",
+        });
       });
-      
-      // Invalidate the query cache and force a page refresh
-      queryClient.invalidateQueries({ queryKey: ["/api/user-pick"] });
-      
-      // Force reload the page after a short delay to ensure the header updates
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
     },
     onError: (error) => {
       toast({
