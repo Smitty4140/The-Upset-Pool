@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 import { userPickFormSchema } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db, pool } from "./db";
 import { userPicks, nflGames, nflWeeks, users, nflTeams } from "@shared/schema";
 import emailRoutes from "./routes/email";
