@@ -30,10 +30,9 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   // Get the underdog team ID for selection
   const underdogTeamId = underdogTeam?.id || null;
   
-  // Only consider a game selected if both the game ID and team ID match and the selected team is the underdog
+  // Only consider a game selected if both the game ID and team ID match
   const isGameSelected = selectedTeamId !== null && 
-                        selectedGameId === game.id && 
-                        selectedTeamId === underdogTeamId;
+                        selectedGameId === game.id;
   
   // Make the entire game card clickable to select the underdog
   const handleGameCardClick = () => {
@@ -121,8 +120,9 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       
       {/* Selection indicator */}
       {isGameSelected && (
-        <div className="bg-primary text-white text-sm font-medium text-center py-2">
-          Selected Game
+        <div className="bg-green-600 text-white text-sm font-bold text-center py-2 flex items-center justify-center space-x-1">
+          <Check size={16} />
+          <span>Selected Game</span>
         </div>
       )}
     </div>
