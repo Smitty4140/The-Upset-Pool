@@ -562,13 +562,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log("User picked the underdog team correctly!");
       
-      // Check if user already has a pick for this week and league
+      // First, we need to make sure the game exists in our database
+      // Otherwise we'll get a foreign key constraint error
+      console.log("Creating or finding game in database...");
+      let dbGame;
+      
+      try {
+        // First, try to find the game in our database
+        const gamesInDb = await storage.getNFLGames(currentWeek.id);
+        
+        // Check if we already have this game
+        dbGame = gamesInDb.find(g => g.homeTeamId === game.homeTeamId && g.awayTeamId === game.awayTeamId);
+        
+        if (!dbGame) {
+          // We need to create the game in our database
+          console.log("Game not found in database, creating new game record...");
+          dbGame = await storage.createNFLGame({
+            weekId: currentWeek.id,
+            homeTeamId: game.homeTeamId,
+            awayTeamId: game.awayTeamId,
+            homeTeamScore: null,
+            awayTeamScore: null,
+            spread: game.spread,
+            homeTeamRecord: "0-0", 
+            awayTeamRecord: "0-0",
+            gameTime: game.gameTime || new Date().toISOString(),
+            completed: false
+          });
+          console.log("Created new game with ID:", dbGame.id);
+        } else {
+          console.log("Found existing game in database with ID:", dbGame.id);
+        }
+      } catch (error) {
+        console.error("Error creating/finding game:", error);
+        return res.status(500).json({ message: "Failed to create game record" });
+      }
+      
+      // Now check if user already has a pick for this week and league
       const existingPick = await storage.getUserPick(userId, currentWeek.id, leagueId);
       
       if (existingPick) {
         // Update existing pick
         const updatedPick = await storage.updateUserPick(existingPick.id, {
-          gameId,
+          gameId: dbGame.id, // Use the database game ID
           pickedTeamId,
           isUnderdog,
           spreadAtTimeOfPick: underdogValue || 0,
@@ -581,7 +617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId,
           leagueId,
           weekId: currentWeek.id,
-          gameId,
+          gameId: dbGame.id, // Use the database game ID
           pickedTeamId,
           isUnderdog,
           spreadAtTimeOfPick: underdogValue || 0,
