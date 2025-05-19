@@ -13,7 +13,7 @@ export default function SubmittedPickDisplay({ userPick }: SubmittedPickDisplayP
 
   const isHomeTeam = userPick.game.homeTeamId === userPick.pickedTeamId;
   const opponent = isHomeTeam ? userPick.game.awayTeam : userPick.game.homeTeam;
-  const spreadValue = Math.abs(Number(userPick.spreadAtTimeOfPick)).toFixed(1);
+  const spreadValue = Math.abs(Number(userPick.game.spread)).toFixed(1);
 
   return (
     <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-md border border-green-200 shadow-sm mt-3">
@@ -40,10 +40,17 @@ export default function SubmittedPickDisplay({ userPick }: SubmittedPickDisplayP
           </div>
           
           <div className="flex flex-wrap items-center gap-2 mt-1">
-            <span className="bg-lime-100 text-lime-800 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center">
-              <Award className="w-3 h-3 mr-1" />
-              UNDERDOG +{spreadValue}
-            </span>
+            {userPick.isUnderdog ? (
+              <span className="bg-lime-100 text-lime-800 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center">
+                <Award className="w-3 h-3 mr-1" />
+                UNDERDOG +{spreadValue}
+              </span>
+            ) : (
+              <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center">
+                <Award className="w-3 h-3 mr-1" />
+                FAVORITE -{spreadValue}
+              </span>
+            )}
             
             <span className="text-gray-500 text-xs">
               vs. {opponent.name} ({isHomeTeam ? 'HOME' : 'AWAY'})
