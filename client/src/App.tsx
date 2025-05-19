@@ -8,6 +8,7 @@ import Home from "@/pages/Home";
 import Profile from "@/pages/Profile";
 import Rules from "@/pages/Rules";
 import LeaderboardPage from "@/pages/Leaderboard";
+import AdminDashboard from "@/pages/Admin";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -21,6 +22,7 @@ function Router() {
           <Route path="/leaderboard" component={LeaderboardPage} />
           <Route path="/profile" component={Profile} />
           <Route path="/rules" component={Rules} />
+          <Route path="/admin" component={AdminDashboard} />
           <Route component={NotFound} />
         </Switch>
       </main>

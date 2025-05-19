@@ -44,6 +44,11 @@ export default function Header() {
               <NavLink href="/rules" active={location === "/rules"}>
                 Rules
               </NavLink>
+              {user?.id === "42820911" && (
+                <NavLink href="/admin" active={location === "/admin"}>
+                  Admin
+                </NavLink>
+              )}
             </nav>
           </div>
           <div className="flex items-center">

@@ -57,7 +57,8 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
-  await storage.upsertUser({
+  // First, upsert the user in the database
+  const user = await storage.upsertUser({
     id: claims["sub"],
     // Generate a username from email or sub if not available
     username: claims["email"] ? claims["email"].split('@')[0] : `user_${claims["sub"]}`,
@@ -66,6 +67,27 @@ async function upsertUser(
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
   });
+
+  try {
+    // Check if user is already in the default league (NFL Upset Pool - ID 1)
+    const userLeagues = await storage.getUserLeagues(user.id);
+    const isAlreadyInLeague = userLeagues.some(ul => ul.leagueId === 1);
+    
+    // If not in the league yet, automatically add them
+    if (!isAlreadyInLeague) {
+      console.log(`Auto-adding new user ${user.username} (${user.id}) to the NFL Upset Pool league`);
+      await storage.addLeagueMember({
+        leagueId: 1, // Default league - NFL Upset Pool
+        userId: user.id,
+        isAdmin: false,
+      });
+    }
+  } catch (error) {
+    console.error("Error adding user to default league:", error);
+    // Continue with auth flow even if league joining fails
+  }
+  
+  return user;
 }
 
 export async function setupAuth(app: Express) {
