@@ -31,7 +31,7 @@ export default function Home() {
   const { user, isAuthenticated, isLoading: isLoadingAuth } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("spreads");
-  const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>("spread");
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
@@ -129,7 +129,7 @@ export default function Home() {
   });
 
   // Handle team selection
-  const handleTeamSelection = (gameId: number, teamId: number) => {
+  const handleTeamSelection = (gameId: string, teamId: number) => {
     setSelectedGameId(gameId);
     setSelectedTeamId(teamId);
   };

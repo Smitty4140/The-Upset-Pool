@@ -54,7 +54,7 @@ export interface NFLWeek {
 }
 
 export interface NFLGame {
-  id: number;
+  id: string;  // Changed to string to match API response format
   weekId: number;
   homeTeamId: number;
   awayTeamId: number;
