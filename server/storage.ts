@@ -328,60 +328,77 @@ export class DatabaseStorage implements IStorage {
 
   async getNFLGame(id: number): Promise<(NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam }) | undefined> {
     try {
-      const result = await db.execute(sql`
-        SELECT 
-          g.*,
-          ht.id as "homeTeam_id", 
-          ht.name as "homeTeam_name",
-          ht.abbreviation as "homeTeam_abbreviation",
-          ht.logo_url as "homeTeam_logoUrl",
-          ht.primary_color as "homeTeam_primaryColor",
-          ht.secondary_color as "homeTeam_secondaryColor",
-          at.id as "awayTeam_id", 
-          at.name as "awayTeam_name",
-          at.abbreviation as "awayTeam_abbreviation",
-          at.logo_url as "awayTeam_logoUrl",
-          at.primary_color as "awayTeam_primaryColor",
-          at.secondary_color as "awayTeam_secondaryColor"
-        FROM nfl_games g
-        JOIN nfl_teams ht ON g.home_team_id = ht.id
-        JOIN nfl_teams at ON g.away_team_id = at.id
-        WHERE g.id = ${id}
+      console.log(`Looking up game with ID: ${id}`);
+      
+      // First, get the basic game information
+      const gameResult = await db.execute(sql`
+        SELECT * FROM nfl_games WHERE id = ${id}
       `);
       
-      if (result.length === 0) return undefined;
+      if (!gameResult.rows || gameResult.rows.length === 0) {
+        console.log(`No game found with ID: ${id}`);
+        return undefined;
+      }
       
-      const game: any = result[0];
+      const gameData: any = gameResult.rows[0];
+      console.log(`Found game with ID ${id}, home team: ${gameData.home_team_id}, away team: ${gameData.away_team_id}`);
       
+      // Get home team data
+      const homeTeamResult = await db.execute(sql`
+        SELECT * FROM nfl_teams WHERE id = ${gameData.home_team_id}
+      `);
+      
+      if (!homeTeamResult.rows || homeTeamResult.rows.length === 0) {
+        console.log(`Home team not found for game ${id}, team ID: ${gameData.home_team_id}`);
+        return undefined;
+      }
+      
+      const homeTeamData: any = homeTeamResult.rows[0];
+      
+      // Get away team data
+      const awayTeamResult = await db.execute(sql`
+        SELECT * FROM nfl_teams WHERE id = ${gameData.away_team_id}
+      `);
+      
+      if (!awayTeamResult.rows || awayTeamResult.rows.length === 0) {
+        console.log(`Away team not found for game ${id}, team ID: ${gameData.away_team_id}`);
+        return undefined;
+      }
+      
+      const awayTeamData: any = awayTeamResult.rows[0];
+      
+      console.log(`Teams found: ${homeTeamData.name} vs ${awayTeamData.name}`);
+      
+      // Construct and return the full game object
       return {
-        id: game.id,
-        weekId: game.week_id,
-        homeTeamId: game.home_team_id,
-        awayTeamId: game.away_team_id,
-        homeTeamScore: game.home_team_score,
-        awayTeamScore: game.away_team_score,
-        spread: game.spread,
-        homeTeamRecord: game.home_team_record,
-        awayTeamRecord: game.away_team_record,
-        gameTime: game.game_time,
-        completed: game.completed,
-        createdAt: game.created_at,
-        updatedAt: game.updated_at,
+        id: gameData.id,
+        weekId: gameData.week_id,
+        homeTeamId: gameData.home_team_id,
+        awayTeamId: gameData.away_team_id,
+        homeTeamScore: gameData.home_team_score,
+        awayTeamScore: gameData.away_team_score,
+        spread: gameData.spread,
+        homeTeamRecord: gameData.home_team_record,
+        awayTeamRecord: gameData.away_team_record,
+        gameTime: gameData.game_time,
+        completed: gameData.completed,
+        createdAt: gameData.created_at,
+        updatedAt: gameData.updated_at,
         homeTeam: {
-          id: game.homeTeam_id,
-          name: game.homeTeam_name,
-          abbreviation: game.homeTeam_abbreviation,
-          logoUrl: game.homeTeam_logoUrl,
-          primaryColor: game.homeTeam_primaryColor,
-          secondaryColor: game.homeTeam_secondaryColor
+          id: homeTeamData.id,
+          name: homeTeamData.name,
+          abbreviation: homeTeamData.abbreviation,
+          logoUrl: homeTeamData.logo_url,
+          primaryColor: homeTeamData.primary_color,
+          secondaryColor: homeTeamData.secondary_color
         },
         awayTeam: {
-          id: game.awayTeam_id,
-          name: game.awayTeam_name,
-          abbreviation: game.awayTeam_abbreviation,
-          logoUrl: game.awayTeam_logoUrl,
-          primaryColor: game.awayTeam_primaryColor,
-          secondaryColor: game.awayTeam_secondaryColor
+          id: awayTeamData.id,
+          name: awayTeamData.name,
+          abbreviation: awayTeamData.abbreviation,
+          logoUrl: awayTeamData.logo_url,
+          primaryColor: awayTeamData.primary_color,
+          secondaryColor: awayTeamData.secondary_color
         }
       };
     } catch (error) {
