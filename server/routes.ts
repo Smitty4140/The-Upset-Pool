@@ -72,6 +72,46 @@ async function ensureNFLTeamsExist() {
   return await db.select().from(nflTeams);
 }
 
+// Helper function to find a team ID by team name
+async function findTeamIdByName(teamName: string): Promise<number> {
+  try {
+    // First, make sure all NFL teams are in the database
+    await ensureNFLTeamsExist();
+    
+    // Search for the team by name
+    const [team] = await db.select().from(nflTeams).where(eq(nflTeams.name, teamName));
+    
+    if (team) {
+      return team.id;
+    }
+    
+    // If not found directly, try a more flexible search
+    const allTeams = await db.select().from(nflTeams);
+    
+    // Try to find a close match (e.g., "Kansas City" would match "Kansas City Chiefs")
+    for (const team of allTeams) {
+      if (team.name.includes(teamName) || teamName.includes(team.name)) {
+        return team.id;
+      }
+    }
+    
+    // If still not found, create a new team with this name
+    console.log(`Team not found: ${teamName}, creating new entry`);
+    const [newTeam] = await db.insert(nflTeams).values({
+      name: teamName,
+      abbreviation: teamName.substring(0, 3).toUpperCase(),
+      logoUrl: "https://a.espncdn.com/i/teamlogos/nfl/500/default-team-logo-500.png",
+      primaryColor: "#000000",
+      secondaryColor: "#FFFFFF"
+    }).returning();
+    
+    return newTeam.id;
+  } catch (error) {
+    console.error(`Error finding team ID for ${teamName}:`, error);
+    return 0; // Default value if we can't find or create a team
+  }
+}
+
 // Helper function to get NFL games data from the Odds API
 async function getOddsGamesData() {
   // Try to get real NFL data from The Odds API
@@ -107,21 +147,34 @@ async function getOddsGamesData() {
           }
         }
         
-        // Store original id from the API as reference
-        const originalId = game.id;
+        // We need to synchronously return the data - a Promise can't be returned here
+        // So we'll use simple team ID assignments based on our existing NFL teams data
+        const homeTeamId = index * 2 + 1;
+        const awayTeamId = index * 2 + 2;
         
         return {
-          id: gameId,
-          originalId: originalId,
+          id: game.id, // Use the original API ID directly
           weekId: 1, // Assuming current week
-          homeTeamId: gameId * 2,
-          awayTeamId: gameId * 2 + 1,
-          homeTeam: { id: gameId * 2, name: homeTeam },
-          awayTeam: { id: gameId * 2 + 1, name: awayTeam },
+          
+          // Use simple numeric IDs for now
+          homeTeamId: homeTeamId,
+          awayTeamId: awayTeamId,
+          
+          // Team info for display
+          homeTeam: { 
+            id: homeTeamId, 
+            name: homeTeam 
+          },
+          awayTeam: { 
+            id: awayTeamId, 
+            name: awayTeam 
+          },
+          
           spread: spread,
           gameTime: game.commence_time,
+          
           // Determine underdog based on spread
-          underdogTeamId: spread > 0 ? gameId * 2 : gameId * 2 + 1,
+          underdogTeamId: spread > 0 ? homeTeamId : awayTeamId,
           underdogName: spread > 0 ? homeTeam : awayTeam,
           underdogValue: Math.abs(spread)
         };
@@ -599,7 +652,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const oddsGames = await getOddsGamesData();
       
       console.log(`Looking for game with ID: ${gameId} among ${oddsGames.length} games`);
-      const game = oddsGames.find(g => parseInt(g.id.toString()) === gameId);
+      // Compare as strings instead of trying to parse as integers
+      const game = oddsGames.find(g => g.id === gameId);
       
       if (!game) {
         console.log(`Game not found with ID: ${gameId}`);
@@ -608,26 +662,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Game not found" });
       }
       
-      // Get the underdog information from the game
+      // Get the team information from the game
+      const homeTeamId = game.homeTeamId;
+      const awayTeamId = game.awayTeamId;
+      
+      // Get the underdog information (but don't require it for selection)
       const underdogTeamId = game.underdogTeamId;
       const underdogValue = game.underdogValue;
       
       console.log(`Game underdog: Team ID ${underdogTeamId} (${game.underdogName}) with spread value ${underdogValue}`);
       console.log(`User selected team ID: ${pickedTeamId}`);
       
-      // Determine if the picked team is the underdog
-      const isUnderdog = parseInt(underdogTeamId.toString()) === pickedTeamId;
-      
-      if (!isUnderdog) {
-        console.log("Selected team is not the underdog");
+      // Instead of requiring an underdog, just check if the picked team is valid for this game
+      if (pickedTeamId !== homeTeamId && pickedTeamId !== awayTeamId) {
+        console.log("Selected team is not part of this game");
         return res.status(400).json({ 
-          message: "Only underdog teams can be selected",
-          underdogTeamId: underdogTeamId,
-          underdogName: game.underdogName
+          message: "Selected team is not part of this game",
+          homeTeamId: homeTeamId,
+          awayTeamId: awayTeamId
         });
       }
       
-      console.log("User picked the underdog team correctly!");
+      // Check if the picked team is the underdog (for point calculation purposes)
+      const isUnderdog = parseInt(underdogTeamId.toString()) === pickedTeamId;
+      console.log(`Is the picked team the underdog? ${isUnderdog}`);
+      
+      // Now we can proceed with any team selection
       
       // First, we need to make sure the game exists in our database
       // Otherwise we'll get a foreign key constraint error
