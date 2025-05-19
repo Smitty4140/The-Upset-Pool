@@ -98,7 +98,7 @@ export default function Home() {
   // Mutation for submitting a pick
   const { mutate: submitPick, isPending: isSubmittingPick } = useMutation({
     mutationFn: async (data: { gameId: number; pickedTeamId: number; leagueId: number; weekId: number }) => {
-      return apiRequest("POST", "/api/user-pick", data);
+      return apiRequest("POST", "/api/user/pick", data);
     },
     onSuccess: (data) => {
       // First fetch the updated pick to ensure we have the latest data
