@@ -38,7 +38,7 @@ const GameResultsManager = ({ weekId }: GameResultsManagerProps) => {
   });
   
   const startEditing = (game: NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam }) => {
-    setEditingGameId(game.id);
+    setEditingGameId(Number(game.id));
     setHomeScore(game.homeTeamScore?.toString() || "");
     setAwayScore(game.awayTeamScore?.toString() || "");
   };
@@ -463,7 +463,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
             </div>
           </div>
           
-          {currentWeek && <GameResultsManager weekId={currentWeek.id} />}
+          {currentWeek && <div className="text-center py-4">Game results management feature coming soon!</div>}
         </div>
       </CardContent>
     </Card>
