@@ -2,8 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { User, NFLGame, NFLTeam } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Check, X } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Check, X, BarChart3, PieChart } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart as RechartsPieChart, Pie, Cell
+} from 'recharts';
 
 type UserPick = {
   id: number;
@@ -11,7 +15,7 @@ type UserPick = {
   leagueId: number;
   weekId: number;
   gameId: number;
-  teamId: number;
+  pickedTeamId: number;
   isUnderdog: boolean;
   spreadAtTimeOfPick: number;
   createdAt: string;
@@ -60,6 +64,58 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
     return acc;
   }, {}) || {};
 
+  // Prepare data for charts
+  const picksByTeam = weeklyPicks?.reduce((acc: Record<string, number>, pick) => {
+    const teamName = pick.pickedTeam.name;
+    acc[teamName] = (acc[teamName] || 0) + 1;
+    return acc;
+  }, {}) || {};
+  
+  const teamPicksData = Object.entries(picksByTeam).map(([name, count]) => ({
+    name,
+    count
+  }));
+  
+  // Get spread distribution data
+  const spreadRanges = {
+    'Less than 3': 0,
+    '3 to 6': 0,
+    'More than 6': 0
+  };
+  
+  weeklyPicks?.forEach(pick => {
+    const spread = Math.abs(Number(pick.spreadAtTimeOfPick));
+    if (spread < 3) {
+      spreadRanges['Less than 3']++;
+    } else if (spread >= 3 && spread <= 6) {
+      spreadRanges['3 to 6']++;
+    } else {
+      spreadRanges['More than 6']++;
+    }
+  });
+  
+  const spreadData = Object.entries(spreadRanges).map(([range, count]) => ({
+    name: range,
+    value: count
+  }));
+  
+  // Count underdog vs favorite picks
+  const pickTypeData = [
+    { name: 'Underdog', value: 0 },
+    { name: 'Favorite', value: 0 }
+  ];
+  
+  weeklyPicks?.forEach(pick => {
+    if (pick.isUnderdog) {
+      pickTypeData[0].value++;
+    } else {
+      pickTypeData[1].value++;
+    }
+  });
+  
+  // Colors for charts
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+  
   return (
     <div className="space-y-6">
       <Card className="bg-white shadow-md">
@@ -85,12 +141,7 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Spread
                   </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Pick Type
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Game Time
-                  </th>
+
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
@@ -184,35 +235,7 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
                           <span>-</span>
                         )}
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        {userPick?.isUnderdog ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-lime-100 text-lime-800">
-                            Underdog
-                          </span>
-                        ) : userPick ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                            Favorite
-                          </span>
-                        ) : (
-                          <span>-</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        {userPick ? (
-                          <span className="text-xs text-gray-600">
-                            {new Date(userPick.game.gameTime).toLocaleString('en-US', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true
-                            })}
-                          </span>
-                        ) : (
-                          <span>-</span>
-                        )}
-                      </td>
+
                       <td className="px-3 py-4 whitespace-nowrap">
                         {userPick ? (
                           userPick.game.completed ? (
@@ -237,6 +260,112 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        {/* Most Popular Picks Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <BarChart3 className="mr-2 h-5 w-5" />
+              Most Popular Picks
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={teamPicksData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="name" 
+                    angle={-45} 
+                    textAnchor="end" 
+                    height={60}
+                  />
+                  <YAxis />
+                  <Tooltip 
+                    formatter={(value) => [`${value} picks`, 'Count']} 
+                  />
+                  <Bar dataKey="count" fill="#8884d8" name="Number of Picks">
+                    {teamPicksData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Spread Distribution Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <PieChart className="mr-2 h-5 w-5" />
+              Spread Distribution
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsPieChart>
+                  <Pie
+                    data={spreadData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={true}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {spreadData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => [`${value} picks`, 'Count']} />
+                  <Legend />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Underdog vs Favorite Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <PieChart className="mr-2 h-5 w-5" />
+              Underdog vs Favorite Picks
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsPieChart>
+                  <Pie
+                    data={pickTypeData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={true}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  >
+                    <Cell fill="#82ca9d" />
+                    <Cell fill="#8884d8" />
+                  </Pie>
+                  <Tooltip formatter={(value) => [`${value} picks`, 'Count']} />
+                  <Legend />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
