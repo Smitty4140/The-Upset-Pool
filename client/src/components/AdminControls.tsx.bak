@@ -21,11 +21,15 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 
-interface GameResultsManagerProps {
-  weekId: number;
-}
+type AdminControlsProps = {
+  leagueId: number;
+};
 
-const GameResultsManager = ({ weekId }: GameResultsManagerProps) => {
+type GameResultsManagerProps = {
+  weekId: number;
+};
+
+function GameResultsManager({ weekId }: GameResultsManagerProps) {
   const { toast } = useToast();
   const [editingGameId, setEditingGameId] = useState<number | null>(null);
   const [homeScore, setHomeScore] = useState<string>("");
@@ -184,7 +188,7 @@ const GameResultsManager = ({ weekId }: GameResultsManagerProps) => {
               </TableCell>
               <TableCell>
                 {game.completed ? (
-                  <Badge className="bg-green-500 hover:bg-green-600">
+                  <Badge variant="success" className="bg-green-500">
                     <CheckCircle className="h-3 w-3 mr-1" /> Completed
                   </Badge>
                 ) : (
@@ -229,11 +233,11 @@ const GameResultsManager = ({ weekId }: GameResultsManagerProps) => {
       </Table>
     </div>
   );
-};
-
-interface AdminControlsProps {
-  leagueId: number;
 }
+
+type AdminControlsProps = {
+  leagueId: number;
+};
 
 export default function AdminControls({ leagueId }: AdminControlsProps) {
   const { user, isLoading: isLoadingAuth } = useAuth();
@@ -456,7 +460,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
         <div>
           <div className="text-sm font-medium mb-2">Update Game Results</div>
           <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-4 flex items-start">
-            <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+            <AlertTriangle className="h-5 w-5 text-green-600 mt-0.5 mr-2 flex-shrink-0" />
             <div className="text-sm text-green-800">
               Enter final scores to mark games as completed. This will automatically calculate points for users
               who picked winning teams. Points are awarded based on the spread at the time of the pick.
