@@ -3,12 +3,237 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database } from "lucide-react";
+import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { formatWeeklyDate } from "@/lib/formatDate";
-import { NFLWeek, League } from "@/lib/types";
+import { NFLWeek, League, NFLGame, NFLTeam } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+
+type AdminControlsProps = {
+  leagueId: number;
+};
+
+type GameResultsManagerProps = {
+  weekId: number;
+};
+
+function GameResultsManager({ weekId }: GameResultsManagerProps) {
+  const { toast } = useToast();
+  const [editingGameId, setEditingGameId] = useState<number | null>(null);
+  const [homeScore, setHomeScore] = useState<string>("");
+  const [awayScore, setAwayScore] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Fetch games for this week
+  const { data: games, isLoading, refetch } = useQuery<(NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam })[]>({
+    queryKey: [`/api/nfl-games/week/${weekId}`],
+  });
+  
+  const startEditing = (game: NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam }) => {
+    setEditingGameId(game.id);
+    setHomeScore(game.homeTeamScore?.toString() || "");
+    setAwayScore(game.awayTeamScore?.toString() || "");
+  };
+  
+  const cancelEditing = () => {
+    setEditingGameId(null);
+    setHomeScore("");
+    setAwayScore("");
+  };
+  
+  const saveGameResult = async (gameId: number) => {
+    if (!homeScore.trim() || !awayScore.trim()) {
+      toast({
+        title: "Missing scores",
+        description: "Please enter both home and away team scores",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const homeScoreNum = parseInt(homeScore);
+    const awayScoreNum = parseInt(awayScore);
+    
+    if (isNaN(homeScoreNum) || isNaN(awayScoreNum)) {
+      toast({
+        title: "Invalid scores",
+        description: "Scores must be valid numbers",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      const response = await fetch(`/api/admin/games/${gameId}/update-result`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          homeTeamScore: homeScoreNum,
+          awayTeamScore: awayScoreNum,
+          completed: true
+        }),
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update game result: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      // Refetch games data to update UI
+      await refetch();
+      
+      // Refetch leaderboard data since points will have changed
+      queryClient.invalidateQueries({ queryKey: ["/api/league/1/leaderboard"] });
+      
+      toast({
+        title: "Success",
+        description: result.message || "Game result updated successfully",
+        variant: "default"
+      });
+      
+      // Reset state
+      cancelEditing();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update game result",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  if (isLoading) {
+    return <div className="text-center py-4">Loading games...</div>;
+  }
+  
+  if (!games || games.length === 0) {
+    return <div className="text-center py-4">No games found for this week.</div>;
+  }
+  
+  return (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[200px]">Game</TableHead>
+            <TableHead className="w-[120px]">Time</TableHead>
+            <TableHead className="w-[120px]">Spread</TableHead>
+            <TableHead className="w-[120px]">Home Score</TableHead>
+            <TableHead className="w-[120px]">Away Score</TableHead>
+            <TableHead className="w-[120px]">Status</TableHead>
+            <TableHead className="w-[120px]">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {games.map(game => (
+            <TableRow key={game.id}>
+              <TableCell className="font-medium">
+                {game.awayTeam.name} @ {game.homeTeam.name}
+              </TableCell>
+              <TableCell className="text-sm">
+                {format(new Date(game.gameTime), "MMM d, h:mm a")}
+              </TableCell>
+              <TableCell>
+                {parseFloat(game.spread.toString()) > 0 
+                  ? `${game.homeTeam.abbreviation} +${game.spread}` 
+                  : parseFloat(game.spread.toString()) < 0
+                    ? `${game.awayTeam.abbreviation} ${-parseFloat(game.spread.toString())}`
+                    : "Even"}
+              </TableCell>
+              <TableCell>
+                {editingGameId === game.id ? (
+                  <Input
+                    type="number"
+                    min="0"
+                    value={homeScore}
+                    onChange={e => setHomeScore(e.target.value)}
+                    className="w-16"
+                  />
+                ) : (
+                  game.homeTeamScore ?? "-"
+                )}
+              </TableCell>
+              <TableCell>
+                {editingGameId === game.id ? (
+                  <Input
+                    type="number"
+                    min="0"
+                    value={awayScore}
+                    onChange={e => setAwayScore(e.target.value)}
+                    className="w-16"
+                  />
+                ) : (
+                  game.awayTeamScore ?? "-"
+                )}
+              </TableCell>
+              <TableCell>
+                {game.completed ? (
+                  <Badge variant="success" className="bg-green-500">
+                    <CheckCircle className="h-3 w-3 mr-1" /> Completed
+                  </Badge>
+                ) : (
+                  <Badge variant="outline">Pending</Badge>
+                )}
+              </TableCell>
+              <TableCell>
+                {editingGameId === game.id ? (
+                  <div className="flex space-x-2">
+                    <Button 
+                      size="sm" 
+                      variant="default"
+                      disabled={isSubmitting}
+                      onClick={() => saveGameResult(game.id)}
+                    >
+                      {isSubmitting ? "Saving..." : "Save"}
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      disabled={isSubmitting}
+                      onClick={cancelEditing}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => startEditing(game)}
+                    disabled={editingGameId !== null}
+                  >
+                    <Edit className="h-4 w-4 mr-1" /> 
+                    {game.completed ? "Edit" : "Enter Score"}
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
 
 type AdminControlsProps = {
   leagueId: number;
@@ -204,7 +429,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
         <Separator className="my-4" />
         
         {/* NFL Games Section */}
-        <div>
+        <div className="mb-6">
           <div className="text-sm font-medium mb-2">Manage NFL Games</div>
           <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 flex items-start">
             <Database className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
@@ -227,6 +452,22 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
               )}
             </Button>
           </div>
+        </div>
+        
+        <Separator className="my-4" />
+        
+        {/* Game Results Section */}
+        <div>
+          <div className="text-sm font-medium mb-2">Update Game Results</div>
+          <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-4 flex items-start">
+            <AlertTriangle className="h-5 w-5 text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+            <div className="text-sm text-green-800">
+              Enter final scores to mark games as completed. This will automatically calculate points for users
+              who picked winning teams. Points are awarded based on the spread at the time of the pick.
+            </div>
+          </div>
+          
+          {currentWeek && <GameResultsManager weekId={currentWeek.id} />}
         </div>
       </CardContent>
     </Card>
