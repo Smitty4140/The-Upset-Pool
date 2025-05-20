@@ -584,6 +584,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Admin route to fetch NFL games from API for the current week
+  app.post('/api/admin/games/fetch-from-api', isAuthenticated, async (req: any, res) => {
+    try {
+      const { weekId } = req.body;
+      
+      if (!weekId || isNaN(parseInt(weekId))) {
+        return res.status(400).json({ message: "Invalid week ID" });
+      }
+      
+      // Check if user is an admin for any league
+      const userId = req.user.claims.sub;
+      const userLeagues = await storage.getUserLeagues(userId);
+      const isAdmin = userLeagues.some(ul => ul.isAdmin);
+      
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+      
+      // Get the week
+      const week = await storage.getNFLWeek(parseInt(weekId));
+      if (!week) {
+        return res.status(404).json({ message: "NFL week not found" });
+      }
+      
+      // Check for API key
+      const apiKey = process.env.THE_ODDS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ message: "The Odds API key not configured" });
+      }
+      
+      // Get NFL teams for mapping
+      const teams = await storage.getNFLTeams();
+      const teamNameMap = new Map();
+      teams.forEach(team => {
+        teamNameMap.set(team.name.toLowerCase(), team);
+      });
+      
+      // Fetch odds from The Odds API (using DraftKings)
+      const response = await fetch(
+        `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${apiKey}&regions=us&markets=spreads&bookmakers=draftkings&oddsFormat=american`
+      );
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ 
+          message: `Failed to fetch from The Odds API: ${response.statusText}` 
+        });
+      }
+      
+      const gamesData = await response.json();
+      
+      // Track results
+      const results = {
+        gamesCreated: 0,
+        gamesUpdated: 0,
+        errors: 0
+      };
+      
+      // Process each game
+      for (const game of gamesData) {
+        try {
+          // Find DraftKings bookmaker
+          const dkBookmaker = game.bookmakers.find(b => b.key === 'draftkings');
+          if (!dkBookmaker) {
+            console.log(`No DraftKings odds for game: ${game.home_team} vs ${game.away_team}`);
+            results.errors++;
+            continue;
+          }
+          
+          // Find spreads market
+          const spreadsMarket = dkBookmaker.markets.find(m => m.key === 'spreads');
+          if (!spreadsMarket) {
+            console.log(`No spreads market for game: ${game.home_team} vs ${game.away_team}`);
+            results.errors++;
+            continue;
+          }
+          
+          const homeOutcome = spreadsMarket.outcomes.find(o => o.name === game.home_team);
+          if (!homeOutcome) {
+            console.log(`No home team outcome for game: ${game.home_team} vs ${game.away_team}`);
+            results.errors++;
+            continue;
+          }
+          
+          const homeSpread = parseFloat(homeOutcome.point) || 0;
+          console.log(`Game: ${game.home_team} vs ${game.away_team}, Spread: ${homeSpread}`);
+          
+          // Find teams
+          const homeTeam = teamNameMap.get(game.home_team.toLowerCase());
+          const awayTeam = teamNameMap.get(game.away_team.toLowerCase());
+          
+          if (!homeTeam) {
+            console.log(`Home team not found: ${game.home_team}`);
+            results.errors++;
+            continue;
+          }
+          
+          if (!awayTeam) {
+            console.log(`Away team not found: ${game.away_team}`);
+            results.errors++;
+            continue;
+          }
+          
+          // Check if game already exists
+          const existingGames = await db.select().from(nflGames).where(
+            and(
+              eq(nflGames.weekId, week.id),
+              eq(nflGames.homeTeamId, homeTeam.id),
+              eq(nflGames.awayTeamId, awayTeam.id)
+            )
+          );
+          
+          if (existingGames.length > 0) {
+            // Update existing game
+            const gameId = existingGames[0].id;
+            await db.update(nflGames)
+              .set({
+                spread: homeSpread,
+                gameTime: new Date(game.commence_time),
+                updatedAt: new Date()
+              })
+              .where(eq(nflGames.id, gameId));
+            
+            console.log(`Updated game ID ${gameId}: ${homeTeam.name} vs ${awayTeam.name}`);
+            results.gamesUpdated++;
+          } else {
+            // Create new game
+            try {
+              const [newGame] = await db.insert(nflGames).values({
+                weekId: week.id,
+                homeTeamId: homeTeam.id,
+                awayTeamId: awayTeam.id,
+                spread: homeSpread,
+                homeTeamRecord: "0-0",
+                awayTeamRecord: "0-0",
+                gameTime: new Date(game.commence_time),
+                completed: false,
+                createdAt: new Date(),
+                updatedAt: new Date()
+              }).returning();
+              
+              console.log(`Created game ID ${newGame.id}: ${homeTeam.name} vs ${awayTeam.name}`);
+              results.gamesCreated++;
+            } catch (insertError) {
+              console.error(`Error inserting game ${homeTeam.name} vs ${awayTeam.name}:`, insertError);
+              results.errors++;
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing game:`, error);
+          results.errors++;
+        }
+      }
+      
+      return res.json({
+        message: `Successfully processed NFL games for Week ${week.weekNumber}`,
+        weekId: week.id,
+        weekNumber: week.weekNumber,
+        created: results.gamesCreated,
+        updated: results.gamesUpdated,
+        errors: results.errors
+      });
+    } catch (error) {
+      console.error("Error fetching NFL games from API:", error);
+      return res.status(500).json({ message: "Failed to fetch NFL games from API" });
+    }
+  });
+  
   // Add user to league (admin only)
   app.post('/api/leagues/:id/members', isAuthenticated, async (req: any, res) => {
     try {

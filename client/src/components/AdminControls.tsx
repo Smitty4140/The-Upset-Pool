@@ -48,7 +48,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
   // Check if user is an admin for this league
   const isAdmin = user && leagueMembers && Array.isArray(leagueMembers) && 
     leagueMembers.some((member: any) => 
-      member.userId === user?.id && member.isAdmin
+      member.userId === user.id && member.isAdmin
     );
 
   // Check if picks are locked
