@@ -80,7 +80,16 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
                     Pick
                   </th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Opponent
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Spread
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pick Type
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Game Time
                   </th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -130,6 +139,44 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap">
                         {userPick ? (
+                          <div className="flex items-center">
+                            <div 
+                              className="h-7 w-7 rounded-full flex items-center justify-center mr-2" 
+                              style={{ 
+                                backgroundColor: 
+                                  (userPick.pickedTeamId === userPick.game.homeTeamId 
+                                    ? userPick.game.awayTeam.primaryColor 
+                                    : userPick.game.homeTeam.primaryColor) || '#e5e7eb' 
+                              }}
+                            >
+                              <img
+                                src={
+                                  userPick.pickedTeamId === userPick.game.homeTeamId 
+                                    ? userPick.game.awayTeam.logoUrl 
+                                    : userPick.game.homeTeam.logoUrl
+                                }
+                                alt={
+                                  userPick.pickedTeamId === userPick.game.homeTeamId 
+                                    ? userPick.game.awayTeam.name 
+                                    : userPick.game.homeTeam.name
+                                }
+                                className="h-5 w-5 object-contain"
+                              />
+                            </div>
+                            <span className="text-sm">
+                              {
+                                userPick.pickedTeamId === userPick.game.homeTeamId 
+                                  ? userPick.game.awayTeam.name 
+                                  : userPick.game.homeTeam.name
+                              }
+                            </span>
+                          </div>
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap">
+                        {userPick ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                             {userPick.spreadAtTimeOfPick > 0 ? '+' : ''}{userPick.spreadAtTimeOfPick}
                           </span>
@@ -138,14 +185,43 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
                         )}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap">
+                        {userPick?.isUnderdog ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-lime-100 text-lime-800">
+                            Underdog
+                          </span>
+                        ) : userPick ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                            Favorite
+                          </span>
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap">
+                        {userPick ? (
+                          <span className="text-xs text-gray-600">
+                            {new Date(userPick.game.gameTime).toLocaleString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
+                          </span>
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap">
                         {userPick ? (
                           userPick.game.completed ? (
-                            // Check if user's picked team won (simplified for now since winnerId isn't in the schema)
+                            // Check if user's picked team won
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                               Result Pending
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                               Pending
                             </span>
                           )
