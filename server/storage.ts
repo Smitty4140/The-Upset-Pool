@@ -31,6 +31,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: Partial<InsertUser> & { id: string }): Promise<User>;
   getAllUsers(): Promise<User[]>;
 
   // NFL Team operations
@@ -49,6 +50,7 @@ export interface IStorage {
   getLeagueMembers(leagueId: number): Promise<(LeagueMember & { user: User })[]>;
   getUserLeagues(userId: string): Promise<(LeagueMember & { league: League })[]>;
   addLeagueMember(member: InsertLeagueMember): Promise<LeagueMember>;
+  addUserToLeague(leagueId: number, userId: string, isAdmin: boolean): Promise<LeagueMember>;
   updateLeagueMember(leagueId: number, userId: string, updates: Partial<InsertLeagueMember>): Promise<LeagueMember>;
   removeLeagueMember(leagueId: number, userId: string): Promise<void>;
 
@@ -94,6 +96,36 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(userData: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(userData).returning();
+    return user;
+  }
+
+  async upsertUser(userData: Partial<InsertUser> & { id: string }): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values({
+        id: userData.id,
+        email: userData.email || '',
+        password: userData.password || '',
+        username: userData.username || `user_${userData.id}`,
+        firstName: userData.firstName || null,
+        lastName: userData.lastName || null,
+        profileImageUrl: userData.profileImageUrl || null,
+        totalPoints: userData.totalPoints || "0",
+        emailVerified: userData.emailVerified || false,
+        receiveNotifications: userData.receiveNotifications || true,
+      })
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          email: userData.email || sql`${users.email}`,
+          username: userData.username || sql`${users.username}`,
+          firstName: userData.firstName || sql`${users.firstName}`,
+          lastName: userData.lastName || sql`${users.lastName}`,
+          profileImageUrl: userData.profileImageUrl || sql`${users.profileImageUrl}`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
     return user;
   }
 
@@ -147,25 +179,29 @@ export class DatabaseStorage implements IStorage {
 
   // League member operations
   async getLeagueMembers(leagueId: number): Promise<(LeagueMember & { user: User })[]> {
-    return await db
-      .select({
-        ...leagueMembers,
-        user: users,
-      })
+    const result = await db
+      .select()
       .from(leagueMembers)
       .innerJoin(users, eq(leagueMembers.userId, users.id))
       .where(eq(leagueMembers.leagueId, leagueId));
+    
+    return result.map(row => ({
+      ...row.league_members,
+      user: row.users
+    })) as (LeagueMember & { user: User })[];
   }
 
   async getUserLeagues(userId: string): Promise<(LeagueMember & { league: League })[]> {
-    return await db
-      .select({
-        ...leagueMembers,
-        league: leagues,
-      })
+    const result = await db
+      .select()
       .from(leagueMembers)
       .innerJoin(leagues, eq(leagueMembers.leagueId, leagues.id))
       .where(eq(leagueMembers.userId, userId));
+    
+    return result.map(row => ({
+      ...row.league_members,
+      league: row.leagues
+    })) as (LeagueMember & { league: League })[];
   }
 
   async addLeagueMember(member: InsertLeagueMember): Promise<LeagueMember> {
@@ -175,6 +211,14 @@ export class DatabaseStorage implements IStorage {
       .onConflictDoNothing({ target: [leagueMembers.leagueId, leagueMembers.userId] })
       .returning();
     return createdMember;
+  }
+
+  async addUserToLeague(leagueId: number, userId: string, isAdmin: boolean): Promise<LeagueMember> {
+    return this.addLeagueMember({
+      leagueId,
+      userId,
+      isAdmin,
+    });
   }
 
   async updateLeagueMember(leagueId: number, userId: string, updates: Partial<InsertLeagueMember>): Promise<LeagueMember> {
@@ -204,13 +248,6 @@ export class DatabaseStorage implements IStorage {
         )
       );
   }
-  
-  async getAllUsers(): Promise<User[]> {
-    return await db
-      .select()
-      .from(users)
-      .orderBy(asc(users.username));
-  }
 
   // NFL Week operations
   async getNFLWeeks(): Promise<NFLWeek[]> {
@@ -218,7 +255,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCurrentNFLWeek(): Promise<NFLWeek | undefined> {
-    const now = new Date();
+    const now = new Date().toISOString().split('T')[0]; // Get YYYY-MM-DD format
     const [week] = await db
       .select()
       .from(nflWeeks)
@@ -632,14 +669,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLeaderboard(leagueId: number): Promise<User[]> {
-    return db
-      .select({
-        ...users,
-      })
+    const result = await db
+      .select()
       .from(users)
       .innerJoin(leagueMembers, eq(users.id, leagueMembers.userId))
       .where(eq(leagueMembers.leagueId, leagueId))
       .orderBy(desc(users.totalPoints));
+    
+    return result.map(row => row.users) as User[];
   }
 
   async processGameResults(gameId: number): Promise<void> {
@@ -682,7 +719,7 @@ export class DatabaseStorage implements IStorage {
         .update(userPicks)
         .set({
           won,
-          pointsEarned: won ? pointsEarned : 0,
+          pointsEarned: won ? pointsEarned.toString() : "0",
         })
         .where(eq(userPicks.id, pick.id));
       
