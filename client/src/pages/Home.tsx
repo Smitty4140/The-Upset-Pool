@@ -306,8 +306,8 @@ export default function Home() {
                             <p className="text-center text-blue-700 font-medium">Please <a href="/api/login" className="font-bold underline hover:text-blue-800 transition-colors">log in</a> to make your pick</p>
                           </div>
                         ) : arePicksLocked ? (
-                          <div className="mt-8 bg-yellow-50 p-6 rounded-md shadow-sm border border-yellow-200">
-                            <p className="text-center text-yellow-700 font-medium">Picks are locked for this week until 1:00 PM EST Sunday</p>
+                          <div className="mt-8 bg-red-50 p-6 rounded-md shadow-sm border border-red-200">
+                            <p className="text-center text-red-700 font-medium">Picks are locked - deadline has passed (1:00 PM EST Sunday)</p>
                           </div>
                         ) : (
                           <div className="mt-8 text-center">
