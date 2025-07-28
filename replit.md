@@ -38,6 +38,7 @@ Preferred communication style: Simple, everyday language.
 - **Session Storage**: PostgreSQL-backed session storage using connect-pg-simple
 - **Security**: Scrypt-based password hashing with salt
 - **User Management**: User profiles with customizable settings and avatars
+- **Auto-League Assignment**: All new users automatically join the default NFL Upset Pool league
 
 ### NFL Game Management
 - **Live Data Integration**: Configured for external sports odds API integration
@@ -119,3 +120,13 @@ Preferred communication style: Simple, everyday language.
 - **Logging**: Structured logging for API requests and database operations
 
 The application is designed for easy deployment on platforms like Replit, Vercel, or traditional VPS hosting, with environment-based configuration for different deployment targets.
+
+## Recent Changes
+
+### July 28, 2025
+- **Pick Locking Logic**: Fixed inverted pick locking - picks are now correctly unlocked before 1:00 PM EST Sunday and locked after
+- **Week Date Filtering**: Games now properly filter by week date ranges to show only relevant games
+- **Game Chronological Ordering**: Games within each week now display in kickoff time order (earliest first)
+- **Deadline Configuration**: Updated all NFL weeks to lock picks at 1:00 PM EST on the Sunday within each week
+- **Auto-League Membership**: Implemented automatic assignment of all new users to the default NFL Upset Pool league
+- **Leaderboard Fix**: Ensured all users appear on the leaderboard by adding them to league membership
