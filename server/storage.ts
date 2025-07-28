@@ -324,7 +324,7 @@ export class DatabaseStorage implements IStorage {
         WHERE g.week_id = ${weekId}
           AND g.game_time >= w.start_date
           AND g.game_time <= (w.end_date + INTERVAL '1 day')
-        ORDER BY g.game_time
+        ORDER BY g.game_time ASC
       `);
       
       // Transform the raw results into properly structured objects
@@ -496,7 +496,7 @@ export class DatabaseStorage implements IStorage {
           AND g.spread IS NOT NULL
           AND g.game_time >= w.start_date
           AND g.game_time <= (w.end_date + INTERVAL '1 day')
-        ORDER BY ABS(g.spread) DESC
+        ORDER BY g.game_time ASC
       `, [weekId]);
       
       // Transform the rows into properly structured objects

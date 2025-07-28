@@ -37,7 +37,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("spreads");
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-  const [sortOption, setSortOption] = useState<SortOption>("spread");
+  const [sortOption, setSortOption] = useState<SortOption>("gameTime");
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
 
   // Default league ID - in a real app we would fetch the user's leagues
