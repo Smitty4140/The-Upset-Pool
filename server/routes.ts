@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./auth";
 import { z } from "zod";
 import { userPickFormSchema } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
@@ -192,22 +192,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
+  // Auth routes are now handled in setupAuth
   
   // Update user profile
   app.patch('/api/auth/profile', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { username, profileImageUrl } = req.body;
       
       if (!username) {
@@ -506,7 +496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get a user's pick for the current week
   app.get('/api/user/pick', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       
       // Get current week
       const currentWeek = await storage.getCurrentNFLWeek();
@@ -1114,7 +1104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Submit a pick for the current week
   app.post('/api/user/pick', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       
       console.log("Pick submission received:", req.body);
       
