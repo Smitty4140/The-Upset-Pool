@@ -158,15 +158,12 @@ export default function Profile() {
       return response;
     },
     onSuccess: () => {
-      // Clear all queries in the cache
+      // Remove the auth query data specifically
+      queryClient.removeQueries({ queryKey: ["/api/auth/user"] });
+      // Clear all other queries in the cache
       queryClient.clear();
-      // Redirect to home page
-      setLocation('/');
-      toast({
-        title: "Logged out",
-        description: "You have been logged out successfully.",
-        variant: "default",
-      });
+      // Force a complete page refresh to reset all state
+      window.location.href = '/';
     },
     onError: (error) => {
       toast({
