@@ -21,6 +21,45 @@ export default function LeaderboardPage() {
     enabled: !!selectedLeagueId
   });
 
+  // Function to calculate proper rankings with ties
+  const calculateRankings = (users: User[]) => {
+    if (!users || users.length === 0) return [];
+    
+    // Sort users by points (descending)
+    const sortedUsers = [...users].sort((a, b) => {
+      const aPoints = parseFloat(a.totalPoints || '0');
+      const bPoints = parseFloat(b.totalPoints || '0');
+      return bPoints - aPoints;
+    });
+    
+    // Calculate rankings with proper tie handling
+    const rankedUsers = [];
+    let currentRank = 1;
+    
+    for (let i = 0; i < sortedUsers.length; i++) {
+      const user = sortedUsers[i];
+      const currentPoints = parseFloat(user.totalPoints || '0');
+      
+      // If this isn't the first user and points are different from previous user
+      if (i > 0) {
+        const previousPoints = parseFloat(sortedUsers[i - 1].totalPoints || '0');
+        if (currentPoints !== previousPoints) {
+          currentRank = i + 1; // Set rank to position + 1
+        }
+        // If points are the same, keep the same rank
+      }
+      
+      rankedUsers.push({
+        ...user,
+        rank: currentRank
+      });
+    }
+    
+    return rankedUsers;
+  };
+
+  const rankedLeaderboard = leaderboard ? calculateRankings(leaderboard) : [];
+
   const formatDate = () => {
     const now = new Date();
     return now.toLocaleDateString(undefined, { 
@@ -112,19 +151,19 @@ export default function LeaderboardPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {leaderboard && leaderboard.length > 0 ? (
-                  leaderboard.map((user, index) => (
+                {rankedLeaderboard && rankedLeaderboard.length > 0 ? (
+                  rankedLeaderboard.map((user) => (
                     <tr key={user.id} className="hover:bg-gray-50">
                       <td className="px-3 py-4 whitespace-nowrap text-sm">
                         <div className="flex items-center">
-                          {index === 0 ? (
+                          {user.rank === 1 ? (
                             <Medal className="h-5 w-5 text-yellow-500 mr-1" />
-                          ) : index === 1 ? (
+                          ) : user.rank === 2 ? (
                             <Medal className="h-5 w-5 text-gray-400 mr-1" />
-                          ) : index === 2 ? (
+                          ) : user.rank === 3 ? (
                             <Medal className="h-5 w-5 text-amber-700 mr-1" />
                           ) : (
-                            <span className="font-medium text-gray-700 mx-1">{index + 1}</span>
+                            <span className="font-medium text-gray-700 mx-1">{user.rank}</span>
                           )}
                         </div>
                       </td>
