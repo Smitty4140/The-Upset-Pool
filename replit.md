@@ -133,7 +133,9 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 
 ### July 29, 2025
 - **Underdog Selection Logic**: Fixed and enforced proper underdog-only selection logic with server-side validation
-- **Game Card UI Enhancement**: Added visual distinction between favorites (grayed out with "FAVORITE" labels) and underdogs (clickable with green spread badges)
+- **Game Card UI Enhancement**: Removed "FAVORITE" labels and made entire game cards clickable while maintaining underdog-only selection
+- **Smart Pick Selection**: System automatically selects underdog team regardless of which team user clicks on game card
 - **Pick Display Component**: Corrected "Your Selected Pick" component to accurately show underdog spread values with proper +/- formatting
 - **Spread Convention**: Confirmed and documented spread logic - positive spread = home team underdog, negative spread = away team underdog
-- **Server-Side Validation**: Added backend protection to reject picks of favorite teams, ensuring data integrity
+- **Server-Side Auto-Switch**: Backend automatically converts any favorite team selections to corresponding underdog teams before database storage
+- **UI Consistency**: Green badges continue to indicate underdog teams while both teams remain visually clickable for better UX
