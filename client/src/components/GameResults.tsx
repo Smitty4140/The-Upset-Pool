@@ -43,6 +43,9 @@ export default function GameResults({ weekId }: GameResultsProps) {
       // Also invalidate the leaderboard to reflect updated points
       queryClient.invalidateQueries({ queryKey: [`/api/league/1/leaderboard`] });
       
+      // Invalidate weekly picks to update the status column immediately
+      queryClient.invalidateQueries({ queryKey: [`/api/league/1/week/${weekId}/picks`] });
+      
       // Invalidate all related queries for good measure
       queryClient.invalidateQueries({ queryKey: [`/api/nfl-games`] });
     },
