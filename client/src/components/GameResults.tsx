@@ -18,7 +18,7 @@ export default function GameResults({ weekId }: GameResultsProps) {
   const { toast } = useToast();
 
   // Get games for the current week
-  const { data: games, isLoading: isLoadingGames } = useQuery<NFLGame[]>({
+  const { data: games, isLoading: isLoadingGames, refetch: refetchGames } = useQuery<NFLGame[]>({
     queryKey: [`/api/nfl-games/week/${weekId}`],
     enabled: !!weekId,
   });
@@ -29,7 +29,7 @@ export default function GameResults({ weekId }: GameResultsProps) {
       return apiRequest("POST", `/api/games/${gameId}/result`, { winningTeamId });
     },
     onSuccess: (data, variables) => {
-      const game = games?.find(g => g.id === variables.gameId);
+      const game = games?.find(g => Number(g.id) === variables.gameId);
       const winningTeam = game?.homeTeamId === variables.winningTeamId ? game.homeTeam : game?.awayTeam;
       
       toast({
@@ -37,8 +37,14 @@ export default function GameResults({ weekId }: GameResultsProps) {
         description: `${winningTeam?.name} has been set as the winner. User points have been calculated.`,
       });
       
-      // Refetch games to update the UI
-      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games/week/${weekId}`] });
+      // Refetch games to update the UI immediately
+      refetchGames();
+      
+      // Also invalidate the leaderboard to reflect updated points
+      queryClient.invalidateQueries({ queryKey: [`/api/league/1/leaderboard`] });
+      
+      // Invalidate all related queries for good measure
+      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games`] });
     },
     onError: (error) => {
       toast({
@@ -166,10 +172,10 @@ export default function GameResults({ weekId }: GameResultsProps) {
                   {game.winningTeamId ? (
                     <div className="text-center">
                       <Badge variant="default" className="bg-green-100 text-green-800">
-                        Result Set
+                        ✓ Result Set
                       </Badge>
                       <div className="text-xs text-gray-500 mt-1">
-                        Winner: {game.winningTeamId === game.homeTeamId ? game.homeTeam.name : game.awayTeam.name}
+                        <strong>Winner:</strong> {game.winningTeamId === game.homeTeamId ? game.homeTeam.name : game.awayTeam.name}
                       </div>
                     </div>
                   ) : (
@@ -178,7 +184,7 @@ export default function GameResults({ weekId }: GameResultsProps) {
                         size="sm"
                         variant="outline"
                         disabled={setResultMutation.isPending}
-                        onClick={() => handleSetResult(game.id, game.awayTeamId)}
+                        onClick={() => handleSetResult(Number(game.id), game.awayTeamId)}
                         className="w-full"
                       >
                         {setResultMutation.isPending ? (
@@ -191,7 +197,7 @@ export default function GameResults({ weekId }: GameResultsProps) {
                         size="sm"
                         variant="outline"
                         disabled={setResultMutation.isPending}
-                        onClick={() => handleSetResult(game.id, game.homeTeamId)}
+                        onClick={() => handleSetResult(Number(game.id), game.homeTeamId)}
                         className="w-full"
                       >
                         {setResultMutation.isPending ? (

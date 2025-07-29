@@ -375,6 +375,7 @@ export class DatabaseStorage implements IStorage {
         awayTeamRecord: game.away_team_record,
         gameTime: game.game_time,
         completed: game.completed,
+        winningTeamId: game.winning_team_id,
         createdAt: game.created_at,
         updatedAt: game.updated_at,
         homeTeam: {
@@ -621,6 +622,7 @@ export class DatabaseStorage implements IStorage {
         awayTeamRecord: game.away_team_record,
         gameTime: game.game_time,
         completed: game.completed,
+        winningTeamId: game.winning_team_id,
         createdAt: game.created_at,
         updatedAt: game.updated_at,
         homeTeam: {
