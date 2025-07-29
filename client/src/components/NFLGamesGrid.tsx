@@ -25,7 +25,7 @@ export default function NFLGamesGrid({
   onPickSubmit
 }: NFLGamesGridProps) {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(userPick?.gameId?.toString() || null);
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(userPick?.teamId || null);
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(userPick?.pickedTeamId || null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -50,11 +50,11 @@ export default function NFLGamesGrid({
   const submitPickMutation = useMutation({
     mutationFn: (pick: { gameId: string; teamId: number }) => {
       return apiRequest({
-        url: "/api/picks/submit",
+        url: "/api/user/pick",
         method: "POST",
         data: {
           gameId: pick.gameId,
-          teamId: pick.teamId,
+          pickedTeamId: pick.teamId,
           leagueId: leagueId,
           weekId: weekId,
         },
