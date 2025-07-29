@@ -65,10 +65,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       <div className="bg-white">
         {/* Away Team Row */}
         <div 
-          className={`px-4 py-4 flex items-center justify-between ${
-            isAwayUnderdog 
-              ? 'cursor-pointer hover:bg-blue-50 transition-colors' 
-              : 'cursor-not-allowed opacity-60'
+          className={`px-4 py-4 flex items-center justify-between cursor-pointer hover:bg-blue-50 transition-colors ${
+            disabled ? 'opacity-60' : ''
           }`} 
           onClick={handleAwayTeamClick}
         >
@@ -85,11 +83,6 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
               />
             </div>
             <div className="font-bold text-gray-800 text-xl">{awayTeam.name}</div>
-            {!isAwayUnderdog && (
-              <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
-                FAVORITE
-              </span>
-            )}
           </div>
           
           {/* Away Team spread if they're the underdog */}
@@ -107,10 +100,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         
         {/* Home Team Row */}
         <div 
-          className={`px-4 py-4 flex items-center justify-between ${
-            isHomeUnderdog 
-              ? 'cursor-pointer hover:bg-blue-50 transition-colors' 
-              : 'cursor-not-allowed opacity-60'
+          className={`px-4 py-4 flex items-center justify-between cursor-pointer hover:bg-blue-50 transition-colors ${
+            disabled ? 'opacity-60' : ''
           }`} 
           onClick={handleHomeTeamClick}
         >
@@ -127,11 +118,6 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
               />
             </div>
             <div className="font-bold text-gray-800 text-xl">{homeTeam.name}</div>
-            {!isHomeUnderdog && (
-              <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
-                FAVORITE
-              </span>
-            )}
           </div>
           
           {/* Home Team spread if they're the underdog */}

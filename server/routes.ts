@@ -1180,18 +1180,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Team picked: ${teamName}, Underdog: ${pickedTeamIsUnderdog}, Spread: ${spreadValue}`);
       
-      // Only allow underdog picks
-      if (!pickedTeamIsUnderdog) {
-        return res.status(400).json({ 
-          message: `You can only pick underdog teams. ${teamName} is the favorite in this game.`,
-          details: {
-            pickedTeam: teamName,
-            isUnderdog: pickedTeamIsUnderdog,
-            spread: dbGame.spread
-          }
-        });
-      }
-      
       // Check for existing pick
       const existingPick = await storage.getUserPick(userId, weekId, leagueId);
       
