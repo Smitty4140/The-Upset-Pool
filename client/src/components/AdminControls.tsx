@@ -240,6 +240,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
   const { toast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoadingGames, setIsLoadingGames] = useState(false);
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
 
   // Get current NFL week
   const { 
@@ -358,6 +359,49 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
     }
   };
 
+  const pullNFLResultsFromAPI = async () => {
+    if (!currentWeek || !user) return;
+    
+    setIsLoadingResults(true);
+    try {
+      const response = await fetch(`/api/admin/games/fetch-results`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          weekId: currentWeek.id
+        }),
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to pull NFL results: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      // Refetch all related data
+      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games/week/${currentWeek.id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/week/${currentWeek.id}/picks`] });
+      
+      toast({
+        title: "Success",
+        description: result.message || `Successfully updated ${result.results?.gamesUpdated || 0} game results for Week ${currentWeek.weekNumber}`,
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to pull NFL results from API",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingResults(false);
+    }
+  };
+
   if (isLoadingAuth || isLoadingWeek || isLoadingLeague || isLoadingMembers) {
     return null; // Don't show anything while loading
   }
@@ -458,12 +502,24 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
           <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-4 flex items-start">
             <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 mr-2 flex-shrink-0" />
             <div className="text-sm text-green-800">
-              Enter final scores to mark games as completed. This will automatically calculate points for users
-              who picked winning teams. Points are awarded based on the spread at the time of the pick.
+              Pull completed game results from ESPN API to automatically update scores and calculate user points.
+              This will fetch final scores for all completed games and process winning picks.
             </div>
           </div>
           
-          {currentWeek && <div className="text-center py-4">Game results management feature coming soon!</div>}
+          <div className="flex justify-end">
+            <Button
+              variant="default"
+              size="sm"
+              disabled={isLoadingResults}
+              onClick={pullNFLResultsFromAPI}
+              className="ml-auto"
+            >
+              {isLoadingResults ? "Loading..." : (
+                <><Database className="h-4 w-4 mr-2" /> Pull Game Results from API</>
+              )}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
