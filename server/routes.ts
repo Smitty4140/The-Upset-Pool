@@ -1207,10 +1207,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (existingPick) {
         console.log(`Updating existing pick for user ${userId}`);
-        // Update existing pick
+        // Update existing pick with current spread
         const updatedPick = await storage.updateUserPick(existingPick.id, {
           gameId: dbGame.id,
-          pickedTeamId: finalPickedTeamId
+          pickedTeamId: finalPickedTeamId,
+          spreadAtTimeOfPick: String(spreadValue),
+          isUnderdog: finalIsUnderdog
         });
         
         if (!updatedPick) {
