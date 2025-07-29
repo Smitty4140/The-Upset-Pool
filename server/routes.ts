@@ -561,7 +561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/users', isAuthenticated, async (req: any, res) => {
     try {
       // Only allow admins to access this route (your account)
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       if (userId !== "42820911") {
         return res.status(403).json({ message: "Unauthorized: Admin access required" });
       }
@@ -579,13 +579,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { weekId } = req.body;
       
+      console.log("Fetch from API route called", { weekId, user: req.user });
+      
       if (!weekId || isNaN(parseInt(weekId))) {
         return res.status(400).json({ message: "Invalid week ID" });
       }
       
       // Check if user is an admin for any league
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
+      console.log("Checking admin status for user:", userId);
       const userLeagues = await storage.getUserLeagues(userId);
+      console.log("User leagues:", userLeagues);
       const isAdmin = userLeagues.some(ul => ul.isAdmin);
       
       if (!isAdmin) {
