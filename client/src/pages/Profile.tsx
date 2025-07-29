@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Pencil, Upload, Camera, X } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 
 // Define the form validation schema
 const profileFormSchema = z.object({
@@ -48,6 +49,7 @@ export default function Profile() {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+  const [, setLocation] = useLocation();
 
   if (isLoading) {
     return (
@@ -138,6 +140,38 @@ export default function Profile() {
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to update profile",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Logout mutation
+  const { mutate: logout, isPending: isLoggingOut } = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/logout', {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to logout');
+      }
+      return response;
+    },
+    onSuccess: () => {
+      // Clear all queries in the cache
+      queryClient.clear();
+      // Redirect to home page
+      setLocation('/');
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+        variant: "default",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to logout",
         variant: "destructive",
       });
     },
@@ -355,8 +389,12 @@ export default function Profile() {
                   </div>
                   
                   <div className="mt-6 flex space-x-4">
-                    <Button asChild variant="outline">
-                      <a href="/api/logout">Sign Out</a>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => logout()}
+                      disabled={isLoggingOut}
+                    >
+                      {isLoggingOut ? "Signing Out..." : "Sign Out"}
                     </Button>
                   </div>
                 </div>
