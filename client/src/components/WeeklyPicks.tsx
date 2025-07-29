@@ -141,7 +141,9 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Spread
                   </th>
-
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Season Total
+                  </th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
@@ -235,7 +237,13 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
                           <span>-</span>
                         )}
                       </td>
-
+                      <td className="px-3 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">
+                            {user.totalPoints || 0} pts
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-3 py-4 whitespace-nowrap">
                         {userPick ? (
                           userPick.game.completed ? (
