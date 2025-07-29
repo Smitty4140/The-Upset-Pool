@@ -113,6 +113,11 @@ export default function Home() {
       return apiRequest("POST", "/api/user/pick", data);
     },
     onSuccess: (data) => {
+      // Invalidate all related queries for immediate UI updates
+      queryClient.invalidateQueries({ queryKey: ["/api/user/pick"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/week/${activeWeekId}/picks`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
+      
       // First fetch the updated pick to ensure we have the latest data
       refetchUserPick().then(() => {
         // Find the selected team info for better UI feedback

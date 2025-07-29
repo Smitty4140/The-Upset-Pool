@@ -66,7 +66,10 @@ export default function NFLGamesGrid({
         description: "Your pick has been submitted.",
         variant: "success",
       });
+      // Invalidate all related queries for immediate UI updates
       queryClient.invalidateQueries({ queryKey: ["/api/user/pick"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/week/${weekId}/picks`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
       onPickSubmit();
     },
     onError: (error) => {
