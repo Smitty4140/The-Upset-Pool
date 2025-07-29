@@ -258,7 +258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Toggle lock status for picks in a week (admin only)
   app.post('/api/admin/week/:id/toggle-lock', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const weekId = parseInt(req.params.id);
       const leagueId = parseInt(req.body.leagueId);
       const locked = req.body.locked;
