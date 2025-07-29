@@ -10,6 +10,7 @@ import WeekSelector from "@/components/WeekSelector";
 import Leaderboard from "@/components/Leaderboard";
 import WeeklyPicks from "@/components/WeeklyPicks";
 import NFLGamesGrid from "@/components/NFLGamesGrid";
+import GameResults from "@/components/GameResults";
 import { NFLWeek, NFLGame, UserPick, User } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
@@ -28,7 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
 
-type Tab = "spreads" | "messageboard" | "leaderboard" | "weeklypicks";
+type Tab = "spreads" | "messageboard" | "leaderboard" | "weeklypicks" | "results";
 type SortOption = "spread" | "homeUnderdog" | "gameTime";
 
 export default function Home() {
@@ -94,6 +95,17 @@ export default function Home() {
   const { data: leaderboard, isLoading: isLoadingLeaderboard } = useQuery<User[]>({
     queryKey: [`/api/league/${leagueId}/leaderboard`],
   });
+
+  // Get league members to check admin status
+  const { data: leagueMembers, isLoading: isLoadingMembers } = useQuery({
+    queryKey: [`/api/leagues/${leagueId}/members`],
+  });
+
+  // Check if user is an admin for this league
+  const isAdmin = user && leagueMembers && Array.isArray(leagueMembers) && 
+    leagueMembers.some((member: any) => 
+      member.userId === user.id && member.isAdmin
+    );
 
   // Mutation for submitting a pick
   const { mutate: submitPick, isPending: isSubmittingPick } = useMutation({
@@ -220,12 +232,18 @@ export default function Home() {
         activeTab={activeTab} 
         onTabChange={(tab) => setActiveTab(tab as Tab)} 
         isPicksLocked={arePicksLocked}
+        isAdmin={isAdmin}
       />
 
       <div>
         {/* Weekly Picks - Only visible when picks are locked */}
         {activeTab === "weeklypicks" && activeWeekId && (
           <WeeklyPicks leagueId={leagueId} weekId={activeWeekId} />
+        )}
+
+        {/* Results Tab - Only visible to admins */}
+        {activeTab === "results" && isAdmin && (
+          <GameResults weekId={selectedWeekId || currentWeek?.id} />
         )}
         
         {/* Pick Selection */}

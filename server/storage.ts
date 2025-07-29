@@ -66,6 +66,7 @@ export interface IStorage {
   getNFLGame(id: number): Promise<(NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam }) | undefined>;
   createNFLGame(game: InsertNFLGame): Promise<NFLGame>;
   updateNFLGame(id: number, game: Partial<InsertNFLGame>): Promise<NFLGame | undefined>;
+  updateGameResult(gameId: number, winningTeamId: number): Promise<NFLGame | undefined>;
   getUnderdogGames(weekId: number): Promise<(NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam })[]>;
 
   // User Pick operations
@@ -492,6 +493,81 @@ export class DatabaseStorage implements IStorage {
       .where(eq(nflGames.id, id))
       .returning();
     return updatedGame;
+  }
+
+  async updateGameResult(gameId: number, winningTeamId: number): Promise<NFLGame | undefined> {
+    try {
+      const [updatedGame] = await db
+        .update(nflGames)
+        .set({ 
+          winningTeamId,
+          completed: true,
+          updatedAt: new Date()
+        })
+        .where(eq(nflGames.id, gameId))
+        .returning();
+
+      // If we successfully updated the game, we should also calculate and update user pick results
+      if (updatedGame) {
+        await this.calculateUserPickResults(gameId, winningTeamId);
+      }
+
+      return updatedGame;
+    } catch (error) {
+      console.error("Error updating game result:", error);
+      return undefined;
+    }
+  }
+
+  // Helper method to calculate user pick results when a game result is set
+  async calculateUserPickResults(gameId: number, winningTeamId: number): Promise<void> {
+    try {
+      // Get all user picks for this game
+      const picks = await db.select().from(userPicks).where(eq(userPicks.gameId, gameId));
+      
+      // Update each pick with win/loss and points earned
+      for (const pick of picks) {
+        const won = pick.pickedTeamId === winningTeamId;
+        const pointsEarned = won ? Math.abs(Number(pick.spreadAtTimeOfPick)) : 0;
+        
+        await db
+          .update(userPicks)
+          .set({
+            won,
+            pointsEarned,
+            updatedAt: new Date()
+          })
+          .where(eq(userPicks.id, pick.id));
+      }
+
+      // Recalculate total points for all affected users
+      const userIds = [...new Set(picks.map(pick => pick.userId))];
+      for (const userId of userIds) {
+        await this.recalculateUserTotalPoints(userId);
+      }
+    } catch (error) {
+      console.error("Error calculating user pick results:", error);
+    }
+  }
+
+  // Helper method to recalculate a user's total points
+  async recalculateUserTotalPoints(userId: string): Promise<void> {
+    try {
+      const result = await db.execute(sql`
+        SELECT COALESCE(SUM(points_earned), 0) as total_points
+        FROM user_picks 
+        WHERE user_id = ${userId} AND won = true
+      `);
+      
+      const totalPoints = result.rows?.[0]?.total_points || 0;
+      
+      await db
+        .update(users)
+        .set({ totalPoints: String(totalPoints) })
+        .where(eq(users.id, userId));
+    } catch (error) {
+      console.error("Error recalculating user total points:", error);
+    }
   }
 
   async getUnderdogGames(weekId: number): Promise<(NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam })[]> {

@@ -849,22 +849,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Admin route to update game results and calculate points
-  app.post('/api/admin/games/:id/update-result', isAuthenticated, async (req: any, res) => {
+  // Admin route to set game winner and calculate points
+  app.post('/api/games/:id/result', isAuthenticated, async (req: any, res) => {
     try {
       const gameId = parseInt(req.params.id);
-      const { homeTeamScore, awayTeamScore, completed } = req.body;
+      const { winningTeamId } = req.body;
       
       if (isNaN(gameId)) {
         return res.status(400).json({ message: "Invalid game ID" });
       }
       
-      if (typeof homeTeamScore !== 'number' || typeof awayTeamScore !== 'number') {
-        return res.status(400).json({ message: "Home and away scores must be numbers" });
+      if (!winningTeamId || isNaN(parseInt(winningTeamId))) {
+        return res.status(400).json({ message: "Valid winning team ID is required" });
       }
       
       // Check if user is an admin for any league
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const userLeagues = await storage.getUserLeagues(userId);
       const isAdmin = userLeagues.some(ul => ul.isAdmin);
       
@@ -872,32 +872,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized: Admin access required" });
       }
       
-      // Get the game
+      // Get the game to verify it exists and the team is valid
       const game = await storage.getNFLGame(gameId);
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
       
-      // Update game with scores and set it as completed
-      await storage.updateNFLGame(gameId, {
-        homeTeamScore,
-        awayTeamScore,
-        completed: completed || true
-      });
+      // Verify the winning team is one of the teams in this game
+      if (winningTeamId !== game.homeTeamId && winningTeamId !== game.awayTeamId) {
+        return res.status(400).json({ 
+          message: "Winning team must be one of the teams playing in this game" 
+        });
+      }
       
-      // Process game results to calculate points for user picks
-      await storage.processGameResults(gameId);
+      // Update game result and calculate user points
+      const updatedGame = await storage.updateGameResult(gameId, winningTeamId);
+      
+      if (!updatedGame) {
+        return res.status(500).json({ message: "Failed to update game result" });
+      }
       
       res.json({
-        message: "Game results updated successfully and user points calculated",
+        message: "Game result updated successfully and user points calculated",
         gameId,
-        homeTeamScore,
-        awayTeamScore,
-        completed
+        winningTeamId,
+        completed: true
       });
     } catch (error) {
-      console.error("Error updating game results:", error);
-      res.status(500).json({ message: "Failed to update game results" });
+      console.error("Error updating game result:", error);
+      res.status(500).json({ message: "Failed to update game result" });
     }
   });
   

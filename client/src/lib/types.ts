@@ -20,6 +20,7 @@ export interface NFLTeam {
   logoUrl: string;
   primaryColor: string | null;
   secondaryColor: string | null;
+  city?: string; // Optional city field
 }
 
 export interface League {
@@ -65,6 +66,7 @@ export interface NFLGame {
   awayTeamRecord: string | null;
   gameTime: string;
   completed: boolean;
+  winningTeamId: number | null; // The team that won the game
   createdAt: string;
   updatedAt: string;
   homeTeam: NFLTeam;

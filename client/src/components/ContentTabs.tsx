@@ -1,14 +1,15 @@
-import { Eye, Shield, MessageSquare, Trophy } from "lucide-react";
+import { Eye, Shield, MessageSquare, Trophy, Flag } from "lucide-react";
 
-type Tab = "spreads" | "messageboard" | "leaderboard" | "weeklypicks";
+type Tab = "spreads" | "messageboard" | "leaderboard" | "weeklypicks" | "results";
 
 type ContentTabsProps = {
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
   isPicksLocked?: boolean;
+  isAdmin?: boolean;
 };
 
-export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = false }: ContentTabsProps) {
+export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = false, isAdmin = false }: ContentTabsProps) {
   return (
     <div className="bg-gradient-to-r from-primary/5 to-secondary/5 rounded-lg shadow overflow-hidden mb-8 border border-gray-200">
       <div className="border-b border-gray-200">
@@ -51,6 +52,20 @@ export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = fa
             Leaderboard
           </button>
           
+          {isAdmin && (
+            <button
+              onClick={() => onTabChange("results")}
+              className={`${
+                activeTab === "results"
+                  ? "bg-white border-primary text-primary"
+                  : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300 hover:bg-white/50"
+              } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm flex items-center transition-all duration-200`}
+            >
+              <Flag className={`h-4 w-4 mr-2 ${activeTab === "results" ? "text-primary" : "text-gray-500"}`} />
+              Results
+            </button>
+          )}
+
           <button
             onClick={() => onTabChange("messageboard")}
             className={`${

@@ -106,6 +106,7 @@ export const nflGames = pgTable("nfl_games", {
   awayTeamRecord: varchar("away_team_record"),
   gameTime: timestamp("game_time").notNull(),
   completed: boolean("completed").default(false),
+  winningTeamId: integer("winning_team_id").references(() => nflTeams.id), // The team that won the game
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
