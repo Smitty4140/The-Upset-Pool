@@ -130,3 +130,10 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Deadline Configuration**: Updated all NFL weeks to lock picks at 1:00 PM EST on the Sunday within each week
 - **Auto-League Membership**: Implemented automatic assignment of all new users to the default NFL Upset Pool league
 - **Leaderboard Fix**: Ensured all users appear on the leaderboard by adding them to league membership
+
+### July 29, 2025
+- **Underdog Selection Logic**: Fixed and enforced proper underdog-only selection logic with server-side validation
+- **Game Card UI Enhancement**: Added visual distinction between favorites (grayed out with "FAVORITE" labels) and underdogs (clickable with green spread badges)
+- **Pick Display Component**: Corrected "Your Selected Pick" component to accurately show underdog spread values with proper +/- formatting
+- **Spread Convention**: Confirmed and documented spread logic - positive spread = home team underdog, negative spread = away team underdog
+- **Server-Side Validation**: Added backend protection to reject picks of favorite teams, ensuring data integrity
