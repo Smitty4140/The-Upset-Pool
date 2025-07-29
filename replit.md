@@ -139,3 +139,4 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Spread Convention**: Confirmed and documented spread logic - positive spread = home team underdog, negative spread = away team underdog
 - **Server-Side Auto-Switch**: Backend automatically converts any favorite team selections to corresponding underdog teams before database storage
 - **UI Consistency**: Green badges continue to indicate underdog teams while both teams remain visually clickable for better UX
+- **Admin Controls Fix**: Fixed authentication issue in lock/unlock picks functionality - admin users can now properly toggle pick deadlines
