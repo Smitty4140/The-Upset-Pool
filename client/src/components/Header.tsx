@@ -14,7 +14,7 @@ export default function Header() {
     return (
       <Link href={href}>
         <span 
-          className={`cursor-pointer text-gray-${active ? "900 font-medium border-b-2 border-primary" : "500 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300"} px-3 py-2`}
+          className={`cursor-pointer ${active ? "text-white font-medium border-b-2 border-accent" : "text-gray-300 hover:text-white border-b-2 border-transparent hover:border-gray-300"} px-3 py-2`}
         >
           {children}
         </span>
@@ -23,7 +23,7 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-gradient-to-r from-primary to-secondary text-white shadow-md">
+    <header className="bg-gray-800 text-white shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
