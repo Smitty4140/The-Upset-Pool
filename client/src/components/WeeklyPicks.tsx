@@ -41,6 +41,45 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
     queryKey: [`/api/league/${leagueId}/leaderboard`],
   });
 
+  // Function to calculate proper standings with ties
+  const calculateStandings = (users: User[]) => {
+    if (!users || users.length === 0) return [];
+    
+    // Sort users by points (descending)
+    const sortedUsers = [...users].sort((a, b) => {
+      const aPoints = parseFloat(a.totalPoints || '0');
+      const bPoints = parseFloat(b.totalPoints || '0');
+      return bPoints - aPoints;
+    });
+    
+    // Calculate standings with proper tie handling
+    const rankedUsers = [];
+    let currentRank = 1;
+    
+    for (let i = 0; i < sortedUsers.length; i++) {
+      const user = sortedUsers[i];
+      const currentPoints = parseFloat(user.totalPoints || '0');
+      
+      // If this isn't the first user and points are different from previous user
+      if (i > 0) {
+        const previousPoints = parseFloat(sortedUsers[i - 1].totalPoints || '0');
+        if (currentPoints !== previousPoints) {
+          currentRank = i + 1; // Set rank to position + 1
+        }
+        // If points are the same, keep the same rank
+      }
+      
+      rankedUsers.push({
+        ...user,
+        standing: currentRank
+      });
+    }
+    
+    return rankedUsers;
+  };
+
+  const rankedLeaderboard = leaderboard ? calculateStandings(leaderboard) : [];
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -132,6 +171,9 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Standing
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Player
                   </th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -152,13 +194,26 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {leaderboard?.map((user) => {
+                {rankedLeaderboard?.map((user) => {
                   const userPick = Object.values(usersWithPicks).find(
                     (pick) => pick.userId === user.id
                   );
                   
+                  // Format standing with ordinal suffix
+                  const getOrdinalSuffix = (num: number) => {
+                    const j = num % 10;
+                    const k = num % 100;
+                    if (j === 1 && k !== 11) return `${num}st`;
+                    if (j === 2 && k !== 12) return `${num}nd`;
+                    if (j === 3 && k !== 13) return `${num}rd`;
+                    return `${num}th`;
+                  };
+                  
                   return (
                     <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {getOrdinalSuffix(user.standing)}
+                      </td>
                       <td className="px-3 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <Avatar className="h-8 w-8 mr-2 border border-gray-200">
