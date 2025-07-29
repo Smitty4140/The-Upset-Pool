@@ -34,16 +34,16 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   const isGameSelected = selectedTeamId !== null && 
                         selectedGameId === game.id;
   
-  // Make the entire game card clickable to select either team
+  // Only allow clicking on underdog teams
   const handleHomeTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (disabled) return;
+    if (disabled || !isHomeUnderdog) return;
     onSelect(game.id, homeTeam.id);
   };
   
   const handleAwayTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (disabled) return;
+    if (disabled || !isAwayUnderdog) return;
     onSelect(game.id, awayTeam.id);
   };
 
@@ -64,7 +64,14 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       
       <div className="bg-white">
         {/* Away Team Row */}
-        <div className="px-4 py-4 flex items-center justify-between cursor-pointer" onClick={handleAwayTeamClick}>
+        <div 
+          className={`px-4 py-4 flex items-center justify-between ${
+            isAwayUnderdog 
+              ? 'cursor-pointer hover:bg-blue-50 transition-colors' 
+              : 'cursor-not-allowed opacity-60'
+          }`} 
+          onClick={handleAwayTeamClick}
+        >
           <div className="flex items-center">
             <div className="w-12 h-12 flex-shrink-0 mr-3">
               <img 
@@ -78,11 +85,16 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
               />
             </div>
             <div className="font-bold text-gray-800 text-xl">{awayTeam.name}</div>
+            {!isAwayUnderdog && (
+              <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
+                FAVORITE
+              </span>
+            )}
           </div>
           
           {/* Away Team spread if they're the underdog */}
           {isAwayUnderdog && (
-            <div className="bg-blue-100 text-blue-800 px-4 py-1.5 rounded-full font-bold text-lg">
+            <div className="bg-green-100 text-green-800 px-4 py-1.5 rounded-full font-bold text-lg">
               {spreadText}
             </div>
           )}
@@ -94,7 +106,14 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         </div>
         
         {/* Home Team Row */}
-        <div className="px-4 py-4 flex items-center justify-between cursor-pointer" onClick={handleHomeTeamClick}>
+        <div 
+          className={`px-4 py-4 flex items-center justify-between ${
+            isHomeUnderdog 
+              ? 'cursor-pointer hover:bg-blue-50 transition-colors' 
+              : 'cursor-not-allowed opacity-60'
+          }`} 
+          onClick={handleHomeTeamClick}
+        >
           <div className="flex items-center">
             <div className="w-12 h-12 flex-shrink-0 mr-3">
               <img 
@@ -108,11 +127,16 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
               />
             </div>
             <div className="font-bold text-gray-800 text-xl">{homeTeam.name}</div>
+            {!isHomeUnderdog && (
+              <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
+                FAVORITE
+              </span>
+            )}
           </div>
           
           {/* Home Team spread if they're the underdog */}
           {isHomeUnderdog && (
-            <div className="bg-blue-100 text-blue-800 px-4 py-1.5 rounded-full font-bold text-lg">
+            <div className="bg-green-100 text-green-800 px-4 py-1.5 rounded-full font-bold text-lg">
               {spreadText}
             </div>
           )}
