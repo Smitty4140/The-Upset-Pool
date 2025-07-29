@@ -760,7 +760,8 @@ export class DatabaseStorage implements IStorage {
           game: {
             ...game,
             homeTeam,
-            awayTeam
+            awayTeam,
+            winningTeamId: game.winningTeamId
           }
         });
       }
