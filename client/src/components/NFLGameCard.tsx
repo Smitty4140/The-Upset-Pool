@@ -34,16 +34,16 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   const isGameSelected = selectedTeamId !== null && 
                         selectedGameId === game.id;
   
-  // Only allow clicking on underdog teams
+  // Allow clicking on any team
   const handleHomeTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (disabled || !isHomeUnderdog) return;
+    if (disabled) return;
     onSelect(game.id, homeTeam.id);
   };
   
   const handleAwayTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (disabled || !isAwayUnderdog) return;
+    if (disabled) return;
     onSelect(game.id, awayTeam.id);
   };
 
