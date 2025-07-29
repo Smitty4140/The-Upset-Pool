@@ -33,8 +33,8 @@ export default function GameResults({ weekId }: GameResultsProps) {
       const winningTeam = game?.homeTeamId === variables.winningTeamId ? game.homeTeam : game?.awayTeam;
       
       toast({
-        title: "Game Result Set",
-        description: `${winningTeam?.name} has been set as the winner. User points have been calculated.`,
+        title: "Game Result Updated",
+        description: `${winningTeam?.name} has been set as the winner. User points have been recalculated.`,
       });
       
       // Refetch games to update the UI immediately
@@ -169,43 +169,46 @@ export default function GameResults({ weekId }: GameResultsProps) {
                 
                 {/* Action buttons */}
                 <div className="flex flex-col space-y-2 ml-4">
-                  {game.winningTeamId ? (
-                    <div className="text-center">
-                      <Badge variant="default" className="bg-green-100 text-green-800">
-                        ✓ Result Set
+                  <div className="space-y-2">
+                    <Button
+                      size="sm"
+                      variant={game.winningTeamId === game.awayTeamId ? "default" : "outline"}
+                      disabled={setResultMutation.isPending}
+                      onClick={() => handleSetResult(Number(game.id), game.awayTeamId)}
+                      className={`w-full ${game.winningTeamId === game.awayTeamId ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
+                    >
+                      {setResultMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          {game.winningTeamId === game.awayTeamId && <CheckCircle className="h-4 w-4 mr-1" />}
+                          {`${game.awayTeam.abbreviation} Wins`}
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={game.winningTeamId === game.homeTeamId ? "default" : "outline"}
+                      disabled={setResultMutation.isPending}
+                      onClick={() => handleSetResult(Number(game.id), game.homeTeamId)}
+                      className={`w-full ${game.winningTeamId === game.homeTeamId ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
+                    >
+                      {setResultMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          {game.winningTeamId === game.homeTeamId && <CheckCircle className="h-4 w-4 mr-1" />}
+                          {`${game.homeTeam.abbreviation} Wins`}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {game.winningTeamId && (
+                    <div className="text-center mt-2">
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                        Current Winner: {game.winningTeamId === game.homeTeamId ? game.homeTeam.abbreviation : game.awayTeam.abbreviation}
                       </Badge>
-                      <div className="text-xs text-gray-500 mt-1">
-                        <strong>Winner:</strong> {game.winningTeamId === game.homeTeamId ? game.homeTeam.name : game.awayTeam.name}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={setResultMutation.isPending}
-                        onClick={() => handleSetResult(Number(game.id), game.awayTeamId)}
-                        className="w-full"
-                      >
-                        {setResultMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          `${game.awayTeam.abbreviation} Wins`
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={setResultMutation.isPending}
-                        onClick={() => handleSetResult(Number(game.id), game.homeTeamId)}
-                        className="w-full"
-                      >
-                        {setResultMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          `${game.homeTeam.abbreviation} Wins`
-                        )}
-                      </Button>
                     </div>
                   )}
                 </div>
@@ -214,7 +217,7 @@ export default function GameResults({ weekId }: GameResultsProps) {
               {game.winningTeamId && (
                 <div className="mt-4 p-3 bg-green-50 rounded-md border border-green-200">
                   <div className="text-sm text-green-800">
-                    <strong>Result:</strong> Points have been calculated for all user picks on this game.
+                    <strong>Result Set:</strong> Points have been calculated for all user picks. You can change the winner anytime to recalculate points.
                   </div>
                 </div>
               )}

@@ -141,3 +141,5 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **UI Consistency**: Green badges continue to indicate underdog teams while both teams remain visually clickable for better UX
 - **Admin Controls Fix**: Fixed authentication issue in lock/unlock picks functionality - admin users can now properly toggle pick deadlines
 - **Weekly Picks Enhancement**: Added Season Total column to weekly picks table showing each player's cumulative points for the season
+- **Game Results Management**: Implemented comprehensive Results tab for admin users with game winner selection and automatic point calculation
+- **Editable Results**: Game results can be changed by admins even after being set, automatically recalculating all affected user points and season totals
