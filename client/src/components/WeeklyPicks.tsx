@@ -18,11 +18,13 @@ type UserPick = {
   pickedTeamId: number;
   isUnderdog: boolean;
   spreadAtTimeOfPick: number;
+  won: boolean | null;
+  pointsEarned: number | null;
   createdAt: string;
   updatedAt: string;
   user: User;
   pickedTeam: NFLTeam;
-  game: NFLGame & { homeTeam: NFLTeam; awayTeam: NFLTeam };
+  game: NFLGame & { homeTeam: NFLTeam; awayTeam: NFLTeam; winningTeamId?: number };
 };
 
 type WeeklyPicksProps = {
@@ -246,14 +248,23 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap">
                         {userPick ? (
-                          userPick.game.completed ? (
-                            // Check if user's picked team won
+                          userPick.game.winningTeamId ? (
+                            // Game has a result
+                            userPick.won ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <Check className="h-3 w-3 mr-1" />
+                                Winner (+{userPick.pointsEarned})
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                <X className="h-3 w-3 mr-1" />
+                                Loser
+                              </span>
+                            )
+                          ) : (
+                            // No result yet
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                               Result Pending
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              Pending
                             </span>
                           )
                         ) : (
