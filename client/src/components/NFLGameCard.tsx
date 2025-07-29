@@ -34,17 +34,23 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   const isGameSelected = selectedTeamId !== null && 
                         selectedGameId === game.id;
   
-  // Allow clicking on any team
+  // Always select the underdog team regardless of which team is clicked
   const handleHomeTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (disabled) return;
-    onSelect(game.id, homeTeam.id);
+    // Always select the underdog team
+    if (underdogTeamId) {
+      onSelect(game.id, underdogTeamId);
+    }
   };
   
   const handleAwayTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (disabled) return;
-    onSelect(game.id, awayTeam.id);
+    // Always select the underdog team
+    if (underdogTeamId) {
+      onSelect(game.id, underdogTeamId);
+    }
   };
 
   return (

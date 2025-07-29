@@ -1180,6 +1180,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Team picked: ${teamName}, Underdog: ${pickedTeamIsUnderdog}, Spread: ${spreadValue}`);
       
+      // Override the picked team to always be the underdog
+      let finalPickedTeamId = pickedTeamId;
+      let finalTeamName = teamName;
+      let finalIsUnderdog = pickedTeamIsUnderdog;
+      
+      if (!pickedTeamIsUnderdog) {
+        // If a favorite was submitted, switch to select the underdog instead
+        if (isHomeUnderdog) {
+          finalPickedTeamId = dbGame.homeTeamId;
+          finalTeamName = dbGame.homeTeam.name;
+          finalIsUnderdog = true;
+        } else if (isAwayUnderdog) {
+          finalPickedTeamId = dbGame.awayTeamId;
+          finalTeamName = dbGame.awayTeam.name;
+          finalIsUnderdog = true;
+        }
+        console.log(`Switched to underdog: ${finalTeamName} (ID: ${finalPickedTeamId})`);
+      }
+      
       // Check for existing pick
       const existingPick = await storage.getUserPick(userId, weekId, leagueId);
       
@@ -1188,7 +1207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update existing pick
         const updatedPick = await storage.updateUserPick(existingPick.id, {
           gameId: dbGame.id,
-          pickedTeamId: pickedTeamId
+          pickedTeamId: finalPickedTeamId
         });
         
         if (!updatedPick) {
@@ -1207,8 +1226,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           weekId,
           leagueId,
           gameId: dbGame.id,
-          pickedTeamId,
-          isUnderdog: pickedTeamIsUnderdog,
+          pickedTeamId: finalPickedTeamId,
+          isUnderdog: finalIsUnderdog,
           spreadAtTimeOfPick: String(spreadValue),
           won: null,
           pointsEarned: null
