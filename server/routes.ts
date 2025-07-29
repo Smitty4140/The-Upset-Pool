@@ -1172,6 +1172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teamName = isHomeTeam ? dbGame.homeTeam.name : dbGame.awayTeam.name;
       
       // Figure out if picked team is underdog and what the spread value is
+      // Spread convention: positive = home team is underdog, negative = away team is underdog
       const isHomeUnderdog = Number(dbGame.spread) > 0;
       const isAwayUnderdog = Number(dbGame.spread) < 0;
       const pickedTeamIsUnderdog = (isHomeTeam && isHomeUnderdog) || (isAwayTeam && isAwayUnderdog);
