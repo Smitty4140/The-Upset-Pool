@@ -143,3 +143,5 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Weekly Picks Enhancement**: Added Season Total column to weekly picks table showing each player's cumulative points for the season
 - **Game Results Management**: Implemented comprehensive Results tab for admin users with game winner selection and automatic point calculation
 - **Editable Results**: Game results can be changed by admins even after being set, automatically recalculating all affected user points and season totals
+- **Cache Synchronization Fix**: Fixed critical cache invalidation issues where pick changes and game result updates weren't immediately reflected in the Weekly Picks table
+- **Real-time UI Updates**: All components now properly invalidate related query caches for immediate UI synchronization when picks are submitted or game results are updated
