@@ -145,3 +145,6 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Editable Results**: Game results can be changed by admins even after being set, automatically recalculating all affected user points and season totals
 - **Cache Synchronization Fix**: Fixed critical cache invalidation issues where pick changes and game result updates weren't immediately reflected in the Weekly Picks table
 - **Real-time UI Updates**: All components now properly invalidate related query caches for immediate UI synchronization when picks are submitted or game results are updated
+- **Pull NFL Game Results API**: Added automated game results fetching from ESPN's free API with admin "Pull Game Results from API" button for real-time score updates and point calculation
+- **Proper Tie Handling in Leaderboards**: Implemented comprehensive tie handling across all leaderboard views - users with same points share identical rankings with proper gap handling (e.g., 1st, 2nd, 2nd, 4th)
+- **Weekly Picks Standings**: Added "Standing" column to Weekly Picks table showing each player's current season position (1st, 2nd, 3rd, etc.) with table ordered by standings
