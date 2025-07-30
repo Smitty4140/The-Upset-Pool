@@ -11,6 +11,7 @@ import Leaderboard from "@/components/Leaderboard";
 import WeeklyPicks from "@/components/WeeklyPicks";
 import NFLGamesGrid from "@/components/NFLGamesGrid";
 import GameResults from "@/components/GameResults";
+import CreateLeague from "@/components/CreateLeague";
 import { NFLWeek, NFLGame, UserPick, User } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
@@ -297,7 +298,19 @@ export default function Home() {
       </Helmet>
       
       {/* League Header with countdown and user's current pick */}
-      <LeagueHeader leagueId={leagueId} hasSubmittedPick={hasSubmittedPick} userPick={userPick} />
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div className="flex-1">
+          <LeagueHeader leagueId={leagueId} hasSubmittedPick={hasSubmittedPick} userPick={userPick} />
+        </div>
+        <div className="flex-shrink-0">
+          <CreateLeague onLeagueCreated={(league) => {
+            toast({
+              title: "Success!",
+              description: `${league.name} has been created. You can now manage it from your leagues.`,
+            });
+          }} />
+        </div>
+      </div>
 
       {/* Deactivated User Banner */}
       {memberStatus && !memberStatus.isActive && (

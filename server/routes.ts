@@ -561,6 +561,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create a new league
+  app.post('/api/leagues', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { name, description } = req.body;
+      
+      // Validate input
+      if (!name || name.trim().length === 0) {
+        return res.status(400).json({ message: "League name is required" });
+      }
+      
+      if (name.trim().length > 100) {
+        return res.status(400).json({ message: "League name must be 100 characters or less" });
+      }
+      
+      // Create the league
+      const newLeague = await storage.createLeague({
+        name: name.trim(),
+        description: description?.trim() || null,
+      });
+      
+      // Add the creator as an admin member
+      await storage.addLeagueMember({
+        leagueId: newLeague.id,
+        userId,
+        isAdmin: true,
+        isActive: true,
+      });
+      
+      res.status(201).json(newLeague);
+    } catch (error) {
+      console.error("Error creating league:", error);
+      res.status(500).json({ message: "Failed to create league" });
+    }
+  });
+
   // Join a league
   app.post('/api/leagues/:id/join', isAuthenticated, async (req: any, res) => {
     try {
