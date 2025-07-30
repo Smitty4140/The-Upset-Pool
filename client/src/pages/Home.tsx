@@ -253,9 +253,12 @@ export default function Home() {
     }
   }) : [];
 
-  // Determine if picks are locked for the current week
-  const arePicksLocked = currentWeek 
-    ? new Date() >= new Date(currentWeek.picksLockAt) 
+  // Get the selected week for lock status check
+  const selectedWeek = allWeeks?.find(week => week.id === (selectedWeekId || activeWeekId));
+  
+  // Determine if picks are locked for the selected week
+  const arePicksLocked = selectedWeek 
+    ? new Date() >= new Date(selectedWeek.picksLockAt) 
     : false;
   
   // Determine if the selected week allows picks (only current week + not locked)
@@ -273,6 +276,13 @@ export default function Home() {
     try {
       const response = await fetch(`/api/admin/week/${weekId}/toggle-lock`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          leagueId: leagueId,
+          locked: !arePicksLocked  // Toggle the current lock status
+        }),
       });
       
       if (response.ok) {
@@ -286,6 +296,13 @@ export default function Home() {
           title: "Success",
           description: data.message || "Pick lock status updated successfully",
           variant: "default",
+        });
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Error",
+          description: errorData.message || "Failed to update pick lock status",
+          variant: "destructive",
         });
       }
     } catch (error) {
