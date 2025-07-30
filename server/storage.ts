@@ -509,6 +509,7 @@ export class DatabaseStorage implements IStorage {
         awayTeamRecord: gameData.away_team_record,
         gameTime: gameData.game_time,
         completed: gameData.completed,
+        winningTeamId: gameData.winning_team_id,
         createdAt: gameData.created_at,
         updatedAt: gameData.updated_at,
         homeTeam: {
@@ -587,7 +588,7 @@ export class DatabaseStorage implements IStorage {
           .update(userPicks)
           .set({
             won,
-            pointsEarned,
+            pointsEarned: pointsEarned.toString(),
             updatedAt: new Date()
           })
           .where(eq(userPicks.id, pick.id));
