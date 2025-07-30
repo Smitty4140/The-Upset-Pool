@@ -257,6 +257,8 @@ export default function Home() {
   const selectedWeek = allWeeks?.find(week => week.id === (selectedWeekId || activeWeekId));
   
   // Determine if picks are locked for the selected week
+  // For admin controls, we consider a week locked if the picksLockAt time is in the past
+  // This allows admins to unlock future weeks that are artificially locked
   const arePicksLocked = selectedWeek 
     ? new Date() >= new Date(selectedWeek.picksLockAt) 
     : false;
