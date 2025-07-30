@@ -190,30 +190,24 @@ class GameScheduler {
     try {
       console.log('[Scheduler] Testing scheduled job execution...');
       
-      // Get current week
-      const currentDate = new Date().toISOString();
-      const currentWeek = await db
+      // For testing, use Week 1 (since we're not in the actual NFL season date range)
+      const testWeek = await db
         .select()
         .from(nflWeeks)
-        .where(
-          and(
-            lte(nflWeeks.startDate, currentDate),
-            gte(nflWeeks.endDate, currentDate)
-          )
-        )
+        .where(eq(nflWeeks.weekNumber, 1))
         .limit(1);
 
-      if (currentWeek.length === 0) {
-        throw new Error('No current NFL week found');
+      if (testWeek.length === 0) {
+        throw new Error('No NFL Week 1 found for testing');
       }
 
-      console.log(`[Scheduler] Simulating data pull for week ${currentWeek[0].weekNumber} as if 12 hours before first game...`);
-      await this.executeDataPull(currentWeek[0]);
+      console.log(`[Scheduler] Simulating data pull for week ${testWeek[0].weekNumber} as if 12 hours before first game...`);
+      await this.executeDataPull(testWeek[0]);
       
       return {
         success: true,
-        message: `Test completed for week ${currentWeek[0].weekNumber}`,
-        weekNumber: currentWeek[0].weekNumber
+        message: `Test completed for week ${testWeek[0].weekNumber}`,
+        weekNumber: testWeek[0].weekNumber
       };
     } catch (error) {
       console.error('[Scheduler] Test failed:', error);
@@ -228,25 +222,19 @@ class GameScheduler {
     try {
       console.log('[Scheduler] Manual data pull triggered');
       
-      // Get current week
-      const currentDate = new Date().toISOString();
-      const currentWeek = await db
+      // For manual testing, use Week 1 (since we're not in the actual NFL season date range)
+      const testWeek = await db
         .select()
         .from(nflWeeks)
-        .where(
-          and(
-            lte(nflWeeks.startDate, currentDate),
-            gte(nflWeeks.endDate, currentDate)
-          )
-        )
+        .where(eq(nflWeeks.weekNumber, 1))
         .limit(1);
 
-      if (currentWeek.length === 0) {
-        throw new Error('No current NFL week found');
+      if (testWeek.length === 0) {
+        throw new Error('No NFL Week 1 found for testing');
       }
 
       // Make internal API call to pull games
-      const response = await fetch(`http://localhost:5000/api/admin/week/${currentWeek[0].id}/pull-games`, {
+      const response = await fetch(`http://localhost:5000/api/admin/week/${testWeek[0].id}/pull-games`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -258,7 +246,7 @@ class GameScheduler {
         console.log(`[Scheduler] Manual pull completed: ${result.gamesUpdated} games updated`);
         return {
           success: true,
-          weekNumber: currentWeek[0].weekNumber,
+          weekNumber: testWeek[0].weekNumber,
           gamesUpdated: result.gamesUpdated
         };
       } else {
