@@ -29,7 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
 
-type Tab = "spreads" | "messageboard" | "leaderboard" | "weeklypicks" | "results";
+type Tab = "spreads" | "messageboard" | "leaderboard" | "weeklypicks" | "results" | "admin";
 type SortOption = "spread" | "homeUnderdog" | "gameTime";
 
 export default function Home() {
@@ -267,9 +267,6 @@ export default function Home() {
       
       {/* League Header with countdown and user's current pick */}
       <LeagueHeader leagueId={leagueId} hasSubmittedPick={hasSubmittedPick} userPick={userPick} />
-      
-      {/* Admin Controls - only visible to league admins */}
-      <AdminControls leagueId={leagueId} />
 
       {/* Content Tabs */}
       <ContentTabs 
@@ -288,6 +285,11 @@ export default function Home() {
         {/* Results Tab - Only visible to admins */}
         {activeTab === "results" && isAdmin && (
           <GameResults weekId={selectedWeekId || currentWeek?.id} />
+        )}
+
+        {/* Admin Tab - Only visible to admins */}
+        {activeTab === "admin" && isAdmin && (
+          <AdminControls leagueId={leagueId} />
         )}
         
         {/* Pick Selection */}

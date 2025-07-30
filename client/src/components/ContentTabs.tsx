@@ -1,6 +1,6 @@
-import { Eye, Shield, MessageSquare, Trophy, Flag } from "lucide-react";
+import { Eye, Shield, MessageSquare, Trophy, Flag, UserCog } from "lucide-react";
 
-type Tab = "spreads" | "messageboard" | "leaderboard" | "weeklypicks" | "results";
+type Tab = "spreads" | "messageboard" | "leaderboard" | "weeklypicks" | "results" | "admin";
 
 type ContentTabsProps = {
   activeTab: Tab;
@@ -63,6 +63,20 @@ export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = fa
             >
               <Flag className={`h-4 w-4 mr-2 ${activeTab === "results" ? "text-primary" : "text-gray-500"}`} />
               Results
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              onClick={() => onTabChange("admin")}
+              className={`${
+                activeTab === "admin"
+                  ? "bg-white border-primary text-primary"
+                  : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300 hover:bg-white/50"
+              } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm flex items-center transition-all duration-200`}
+            >
+              <UserCog className={`h-4 w-4 mr-2 ${activeTab === "admin" ? "text-primary" : "text-gray-500"}`} />
+              Admin
             </button>
           )}
 
