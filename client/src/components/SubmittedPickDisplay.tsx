@@ -1,6 +1,7 @@
 import React from 'react';
 import { UserPick } from '@/lib/types';
-import { Check, Award } from 'lucide-react';
+import { Check, Clock } from 'lucide-react';
+import { formatGameTime } from "@/lib/formatDate";
 
 type SubmittedPickDisplayProps = {
   userPick: UserPick;
@@ -11,63 +12,113 @@ export default function SubmittedPickDisplay({ userPick }: SubmittedPickDisplayP
     return null;
   }
 
-  const isHomeTeam = userPick.game.homeTeamId === userPick.pickedTeamId;
-  const opponent = isHomeTeam ? userPick.game.awayTeam : userPick.game.homeTeam;
+  const game = userPick.game;
+  const pickedTeam = userPick.pickedTeam;
   
-  // Calculate the correct spread display for the picked team
-  const gameSpread = Number(userPick.game.spread);
-  let spreadValue: string;
+  // Determine which teams are underdogs based on the spread
+  const isHomeUnderdog = Number(game.spread) > 0;
+  const isAwayUnderdog = Number(game.spread) < 0;
   
-  if (userPick.isUnderdog) {
-    // For underdogs, show the points they receive (always positive)
-    const underdogSpread = Math.abs(gameSpread);
-    spreadValue = `+${underdogSpread.toFixed(1)}`;
-  } else {
-    // For favorites, show the points they give (always negative)  
-    const favoriteSpread = Math.abs(gameSpread);
-    spreadValue = `-${favoriteSpread.toFixed(1)}`;
-  }
+  // Determine the absolute spread value for display
+  const spreadValue = Math.abs(Number(game.spread));
+  const spreadText = spreadValue === 0 ? "EVEN" : `+${spreadValue.toFixed(1)}`;
+
+  // Get the away and home teams
+  const awayTeam = game.awayTeam;
+  const homeTeam = game.homeTeam;
+  
+  // Determine which team is the underdog
+  const underdogTeam = isHomeUnderdog ? homeTeam : isAwayUnderdog ? awayTeam : null;
+  
+  const isPickedTeamUnderdog = underdogTeam?.id === pickedTeam.id;
 
   return (
-    <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-md border border-green-200 shadow-sm mt-3">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-sm font-medium text-gray-600">Your Selected Pick:</h3>
-        <div className="bg-primary text-white text-xs font-bold px-2 py-1 rounded-sm">
-          Current Selection
-        </div>
-      </div>
-      
-      <div className="flex items-center">
-        <div className="w-12 h-12 flex-shrink-0 mr-3 bg-white p-1 rounded-full shadow-sm border border-gray-100">
-          <img 
-            src={userPick.pickedTeam.logoUrl} 
-            alt={`${userPick.pickedTeam.name} logo`} 
-            className="w-full h-full object-contain"
-          />
+    <div className="flex justify-center mb-6">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-3">
+          <h3 className="text-sm font-medium text-gray-600 mb-1">Your Selected Pick:</h3>
+          <div className="inline-flex bg-primary text-white text-xs font-bold px-3 py-1 rounded-full">
+            Current Selection
+          </div>
         </div>
         
-        <div className="flex-1">
-          <div className="flex items-center">
-            <span className="font-bold text-lg text-gray-900 mr-2">{userPick.pickedTeam.name}</span>
-            <Check className="w-4 h-4 text-green-600" />
+        <div className="bg-white rounded-lg border border-green-300 shadow-md p-4 relative">
+          {/* Selected Pick Indicator */}
+          <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-1 rounded-full text-xs font-semibold flex items-center shadow-md">
+            <Check className="w-3 h-3 mr-1" />
+            SELECTED GAME
           </div>
-          
-          <div className="flex flex-wrap items-center gap-2 mt-1">
-            {userPick.isUnderdog ? (
-              <span className="bg-lime-100 text-lime-800 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center">
-                <Award className="w-3 h-3 mr-1" />
-                UNDERDOG {spreadValue}
-              </span>
-            ) : (
-              <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center">
-                <Award className="w-3 h-3 mr-1" />
-                FAVORITE {spreadValue}
-              </span>
-            )}
+
+          {/* Game Time */}
+          <div className="text-center mb-4 mt-2">
+            <div className="flex items-center justify-center text-sm text-gray-600">
+              <Clock className="w-4 h-4 mr-1" />
+              {formatGameTime(game.gameTime)}
+            </div>
+          </div>
+
+          {/* Away Team (Top) */}
+          <div className="flex items-center justify-between mb-3 p-2 rounded-lg hover:bg-gray-50">
+            <div className="flex items-center">
+              <div className="w-8 h-8 mr-3">
+                <img 
+                  src={awayTeam.logoUrl} 
+                  alt={`${awayTeam.name} logo`} 
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <span className="font-medium text-gray-900">{awayTeam.name}</span>
+            </div>
             
-            <span className="text-gray-500 text-xs">
-              vs. {opponent.name} ({isHomeTeam ? 'HOME' : 'AWAY'})
-            </span>
+            <div className="flex items-center space-x-2">
+              {pickedTeam.id === awayTeam.id && (
+                <Check className="w-4 h-4 text-green-600" />
+              )}
+              {isAwayUnderdog && (
+                <span className="bg-lime-100 text-lime-800 px-2 py-1 rounded text-xs font-semibold">
+                  {spreadText}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* AT divider */}
+          <div className="text-center text-xs text-gray-500 mb-3">AT</div>
+
+          {/* Home Team (Bottom) */}
+          <div className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50">
+            <div className="flex items-center">
+              <div className="w-8 h-8 mr-3">
+                <img 
+                  src={homeTeam.logoUrl} 
+                  alt={`${homeTeam.name} logo`} 
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <span className="font-medium text-gray-900">{homeTeam.name}</span>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              {pickedTeam.id === homeTeam.id && (
+                <Check className="w-4 h-4 text-green-600" />
+              )}
+              {isHomeUnderdog && (
+                <span className="bg-lime-100 text-lime-800 px-2 py-1 rounded text-xs font-semibold">
+                  {spreadText}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Pick Status */}
+          <div className="mt-4 pt-3 border-t border-gray-100 text-center">
+            <div className="bg-green-50 text-green-800 px-3 py-2 rounded-lg text-sm font-medium">
+              {isPickedTeamUnderdog ? (
+                <>✓ Underdog Pick - {pickedTeam.name} {spreadText}</>
+              ) : (
+                <>✓ Favorite Pick - {pickedTeam.name}</>
+              )}
+            </div>
           </div>
         </div>
       </div>
