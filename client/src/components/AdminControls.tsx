@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity } from "lucide-react";
+import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { formatWeeklyDate } from "@/lib/formatDate";
-import { NFLWeek, League, NFLGame, NFLTeam } from "@/lib/types";
+import { NFLWeek, League, NFLGame, NFLTeam, User } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Separator } from "@/components/ui/separator";
 import { 
   Table, 
@@ -157,7 +158,7 @@ const GameResultsManager = ({ weekId }: GameResultsManagerProps) => {
                     : "Even"}
               </TableCell>
               <TableCell>
-                {editingGameId === game.id ? (
+                {editingGameId === Number(game.id) ? (
                   <Input
                     type="number"
                     min="0"
@@ -170,7 +171,7 @@ const GameResultsManager = ({ weekId }: GameResultsManagerProps) => {
                 )}
               </TableCell>
               <TableCell>
-                {editingGameId === game.id ? (
+                {editingGameId === Number(game.id) ? (
                   <Input
                     type="number"
                     min="0"
@@ -192,13 +193,13 @@ const GameResultsManager = ({ weekId }: GameResultsManagerProps) => {
                 )}
               </TableCell>
               <TableCell>
-                {editingGameId === game.id ? (
+                {editingGameId === Number(game.id) ? (
                   <div className="flex space-x-2">
                     <Button 
                       size="sm" 
                       variant="default"
                       disabled={isSubmitting}
-                      onClick={() => saveGameResult(game.id)}
+                      onClick={() => saveGameResult(Number(game.id))}
                     >
                       {isSubmitting ? "Saving..." : "Save"}
                     </Button>
@@ -717,7 +718,157 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
             </Button>
           </div>
         </div>
+        
+        <Separator className="my-6" />
+        
+        {/* User Management Section */}
+        <UserManagement leagueId={leagueId} />
       </CardContent>
     </Card>
   );
 }
+
+// User Management Component
+interface UserManagementProps {
+  leagueId: number;
+}
+
+const UserManagement = ({ leagueId }: UserManagementProps) => {
+  const { toast } = useToast();
+  
+  // Fetch all league members with user details
+  const { data: leagueMembers, isLoading, refetch } = useQuery<any[]>({
+    queryKey: [`/api/leagues/${leagueId}/members`],
+  });
+
+  // Mutation for toggling user activation status
+  const toggleActivationMutation = useMutation({
+    mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
+      return apiRequest("POST", `/api/admin/league/${leagueId}/member/${userId}/toggle-active`, {});
+    },
+    onSuccess: (data: any, variables) => {
+      toast({
+        title: "Success",
+        description: data.message || `User ${data.isActive ? 'activated' : 'deactivated'} successfully`,
+        variant: "default"
+      });
+      // Refetch league members to update the UI
+      refetch();
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/members`] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user status",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleToggleActivation = (userId: string, currentStatus: boolean) => {
+    toggleActivationMutation.mutate({ userId, isActive: currentStatus });
+  };
+
+  if (isLoading) {
+    return (
+      <div>
+        <div className="text-sm font-medium mb-4 flex items-center">
+          <Users className="h-4 w-4 mr-2" />
+          User Management
+        </div>
+        <div className="text-sm text-gray-500">Loading users...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="text-sm font-medium mb-4 flex items-center">
+        <Users className="h-4 w-4 mr-2" />
+        User Management
+      </div>
+      
+      <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 flex items-start">
+        <UserCog className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+        <div className="text-sm text-blue-800">
+          Manage league member activation status. Inactive users cannot submit picks and will see a message to contact the admin.
+        </div>
+      </div>
+
+      <div className="border rounded-lg overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[300px]">User</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-center">Admin</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {leagueMembers?.map((member) => (
+              <TableRow key={member.id}>
+                <TableCell>
+                  <div className="flex items-center space-x-2">
+                    <div className="font-medium">{member.user?.username || member.user?.email}</div>
+                  </div>
+                </TableCell>
+                <TableCell className="text-sm text-gray-600">
+                  {member.user?.email || 'No email'}
+                </TableCell>
+                <TableCell className="text-center">
+                  <Badge 
+                    variant={member.isActive ? "default" : "secondary"}
+                    className={member.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+                  >
+                    {member.isActive ? (
+                      <><UserCheck className="h-3 w-3 mr-1" /> Active</>
+                    ) : (
+                      <><UserX className="h-3 w-3 mr-1" /> Inactive</>
+                    )}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-center">
+                  {member.isAdmin && (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                      <UserCog className="h-3 w-3 mr-1" />
+                      Admin
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    size="sm"
+                    variant={member.isActive ? "outline" : "default"}
+                    onClick={() => handleToggleActivation(member.userId, member.isActive)}
+                    disabled={toggleActivationMutation.isPending}
+                    className={member.isActive ? 
+                      "text-red-600 hover:text-red-700 hover:bg-red-50" : 
+                      "bg-green-600 hover:bg-green-700"
+                    }
+                  >
+                    {toggleActivationMutation.isPending ? (
+                      "Updating..."
+                    ) : member.isActive ? (
+                      <><UserX className="h-3 w-3 mr-1" /> Deactivate</>
+                    ) : (
+                      <><UserCheck className="h-3 w-3 mr-1" /> Activate</>
+                    )}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      
+      {leagueMembers?.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          No league members found.
+        </div>
+      )}
+    </div>
+  );
+};
