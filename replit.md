@@ -161,3 +161,7 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Scheduler Integration**: Full automation now covers entire NFL season with both data pulls and results processing scheduled for all 18 weeks
 - **Week Selector UI Improvement**: Moved week selector component above tab content for better visual hierarchy and accessibility across Game Spreads, Weekly Picks, and Results tabs
 - **Cross-Tab Week Selection**: Week selector now properly synchronizes across all relevant tabs, allowing users to view historical data for any NFL week
+- **Dropdown Week Selector**: Converted week selector from pagination-style to dropdown format showing "Week x (date - date)" for easy identification and access to all weeks
+- **Future Week Viewing**: Users can now select and view any NFL week spreads while picks remain locked for future weeks with informative hover tooltips
+- **Database Week Assignment Fix**: Corrected critical database issue where all 273 games were incorrectly assigned to week 1; games now properly distributed across all 18 NFL weeks based on game dates
+- **Enhanced Pick Restrictions**: Implemented comprehensive future week pick locking with visual indicators and hover messages explaining "Picks are not allowed until 12 hours before the first game of the week. Spreads may change until that point."
