@@ -181,3 +181,6 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **League-Specific Pick Selection**: Fixed critical bug where user picks were not properly isolated by league - picks are now correctly filtered by selected league ID, ensuring each league maintains separate pick selections
 - **Top Navigation League Selector**: Moved league selector from leaderboard page to main navigation with dropdown showing all user leagues and admin crown icons for leagues where user has admin privileges
 - **Dynamic League Content**: All application content (picks, leaderboard, admin controls, weekly picks) now updates automatically based on selected league from top navigation dropdown
+- **Invite Code System Implementation**: Added comprehensive league joining system with unique 6-character invite codes for each league, JoinLeague dialog component, and backend API validation
+- **League Independence Fix**: Resolved critical leaderboard bug where points were calculated globally across all leagues - implemented league-specific point aggregation ensuring complete data isolation between leagues
+- **Admin Invite Code Display**: Added invite code section in Admin Controls with copy-to-clipboard functionality for league administrators to share with potential members
