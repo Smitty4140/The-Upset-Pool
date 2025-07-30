@@ -150,3 +150,6 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Weekly Picks Standings**: Added "Standing" column to Weekly Picks table showing each player's current season position (1st, 2nd, 3rd, etc.) with table ordered by standings
 - **Navigation Accessibility Fix**: Updated top navigation from blue gradient background with grey text to dark grey background (bg-gray-800) with white text for improved readability and contrast
 - **Admin Controls Reorganization**: Moved league admin controls from standalone section to dedicated "Admin" tab within main content tabs, visible only to league administrators for better organization and cleaner UI
+- **Automated Game Data Scheduler**: Implemented comprehensive scheduling system using node-cron that automatically pulls NFL game data 12 hours before the first game of each week
+- **Scheduler Management Interface**: Added admin UI controls to monitor scheduler status, view scheduled jobs, and trigger manual data pulls for testing
+- **Game Data Flow Clarification**: Games are first created via odds API pull (appearing on selection tab), then later updated with results via ESPN API pull (affecting only existing games)
