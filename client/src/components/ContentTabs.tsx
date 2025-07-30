@@ -26,19 +26,17 @@ export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = fa
             Game Spreads
           </button>
 
-          {isPicksLocked && (
-            <button
-              onClick={() => onTabChange("weeklypicks")}
-              className={`${
-                activeTab === "weeklypicks"
-                  ? "bg-white border-primary text-primary"
-                  : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300 hover:bg-white/50"
-              } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm flex items-center transition-all duration-200`}
-            >
-              <Eye className={`h-4 w-4 mr-2 ${activeTab === "weeklypicks" ? "text-primary" : "text-gray-500"}`} />
-              Weekly Picks
-            </button>
-          )}
+          <button
+            onClick={() => onTabChange("weeklypicks")}
+            className={`${
+              activeTab === "weeklypicks"
+                ? "bg-white border-primary text-primary"
+                : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300 hover:bg-white/50"
+            } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm flex items-center transition-all duration-200`}
+          >
+            <Eye className={`h-4 w-4 mr-2 ${activeTab === "weeklypicks" ? "text-primary" : "text-gray-500"}`} />
+            Weekly Picks
+          </button>
 
           <button
             onClick={() => onTabChange("leaderboard")}

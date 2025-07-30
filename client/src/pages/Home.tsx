@@ -296,9 +296,9 @@ export default function Home() {
       )}
 
       <div>
-        {/* Weekly Picks - Only visible when picks are locked */}
+        {/* Weekly Picks - Always available, shows different content based on lock status */}
         {activeTab === "weeklypicks" && activeWeekId && (
-          <WeeklyPicks leagueId={leagueId} weekId={selectedWeekId || activeWeekId} />
+          <WeeklyPicks leagueId={leagueId} weekId={selectedWeekId || activeWeekId} isPicksLocked={arePicksLocked} />
         )}
 
         {/* Results Tab - Only visible to admins */}

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { User, NFLGame, NFLTeam } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Check, X, BarChart3, PieChart } from "lucide-react";
+import { Check, X, BarChart3, PieChart, Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -30,9 +30,10 @@ type UserPick = {
 type WeeklyPicksProps = {
   leagueId: number;
   weekId: number;
+  isPicksLocked?: boolean;
 };
 
-export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
+export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }: WeeklyPicksProps) {
   const { data: weeklyPicks, isLoading } = useQuery<UserPick[]>({
     queryKey: [`/api/league/${leagueId}/week/${weekId}/picks`],
   });
@@ -95,6 +96,40 @@ export default function WeeklyPicks({ leagueId, weekId }: WeeklyPicksProps) {
             ))}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // If picks are not locked, show a message explaining why picks aren't visible
+  if (!isPicksLocked) {
+    return (
+      <div className="space-y-6">
+        <Card className="bg-white shadow-md">
+          <CardContent className="p-0">
+            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 px-6 py-4 border-b border-amber-200">
+              <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                <Eye className="h-5 w-5 mr-2 text-amber-600" />
+                Week {weekId} Picks
+              </h3>
+              <p className="text-sm text-amber-700 mt-1">Picks are hidden until the deadline passes</p>
+            </div>
+            
+            <div className="px-6 py-12 text-center">
+              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                <Eye className="h-8 w-8 text-gray-400" />
+              </div>
+              <h4 className="text-lg font-medium text-gray-900 mb-2">Picks Are Hidden</h4>
+              <p className="text-gray-600 max-w-md mx-auto mb-6">
+                Weekly picks will be revealed once the pick deadline has passed. This keeps the competition fair by preventing people from seeing others' selections before making their own.
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-sm mx-auto">
+                <p className="text-sm text-blue-800 font-medium">
+                  Come back after 1:00 PM EST on Sunday to see everyone's picks!
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
