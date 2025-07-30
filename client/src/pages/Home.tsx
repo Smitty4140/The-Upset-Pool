@@ -92,6 +92,15 @@ export default function Home() {
     queryKey: ["/api/user/pick", { weekId: pickableWeekId, leagueId }],
     enabled: !!pickableWeekId && isAuthenticated,
   });
+
+  // Get the user's pick for the selected week (for display purposes)
+  const { data: selectedWeekPick, isLoading: isLoadingSelectedWeekPick } = useQuery<UserPick | null>({
+    queryKey: ["/api/user/pick", { weekId: activeWeekId, leagueId }],
+    enabled: !!activeWeekId && isAuthenticated,
+  });
+
+  // Get the current selected week details for display
+  const selectedWeekDetails = allWeeks?.find(week => week.id === activeWeekId);
   
   // Get the leaderboard data
   const { data: leaderboard, isLoading: isLoadingLeaderboard } = useQuery<User[]>({
@@ -342,10 +351,10 @@ export default function Home() {
                     Pick Selection
                   </h3>
                   
-                  {userPick && (
+                  {selectedWeekPick && selectedWeekDetails && (
                     <div className="bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-medium flex items-center">
-                      <span className="mr-2">Current Pick:</span> 
-                      <span className="font-bold">{userPick.pickedTeam?.name || "Selected Team"}</span>
+                      <span className="mr-2">Week {selectedWeekDetails.weekNumber} Pick:</span> 
+                      <span className="font-bold">{selectedWeekPick.pickedTeam?.name || "Selected Team"}</span>
                     </div>
                   )}
                   
