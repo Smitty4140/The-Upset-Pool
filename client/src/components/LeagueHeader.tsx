@@ -52,7 +52,8 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
   return (
     <div className="mb-8">
       <div className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg p-6 shadow-md border border-primary/20">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center">
+        {/* Header info and countdown */}
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4">
           <div>
             <div className="flex items-center mb-2">
               <Trophy className="h-6 w-6 text-accent mr-2" />
@@ -70,24 +71,18 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
               </div>
             )}
             
-            {/* Status message and pick selection */}
+            {/* Status message */}
             {!hasSubmittedPick ? (
               <div className="flex items-center text-red-600">
                 <AlertTriangle className="h-5 w-5 mr-1" />
                 <p className="font-medium">You have not submitted a pick for this week</p>
               </div>
-            ) : userPick && userPick.pickedTeam ? (
-              <div className="flex flex-col">
-                <div className="flex items-center text-green-600 mb-2">
-                  <CheckCircle2 className="h-5 w-5 mr-1" />
-                  <p className="font-medium">Pick submitted for this week</p>
-                </div>
-                
-                {/* Display current pick with our dedicated component */}
-                <SubmittedPickDisplay userPick={userPick} />
+            ) : (
+              <div className="flex items-center text-green-600">
+                <CheckCircle2 className="h-5 w-5 mr-1" />
+                <p className="font-medium">Pick submitted for this week</p>
               </div>
-            ) : null}
-            
+            )}
           </div>
           
           <div className="mt-6 md:mt-0">
@@ -113,6 +108,15 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
             </div>
           </div>
         </div>
+
+        {/* Centered pick display */}
+        {hasSubmittedPick && userPick && userPick.pickedTeam && (
+          <div className="flex justify-center">
+            <div className="w-full max-w-md">
+              <SubmittedPickDisplay userPick={userPick} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

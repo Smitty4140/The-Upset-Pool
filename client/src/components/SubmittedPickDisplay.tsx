@@ -33,14 +33,13 @@ export default function SubmittedPickDisplay({ userPick }: SubmittedPickDisplayP
   const isPickedTeamUnderdog = underdogTeam?.id === pickedTeam.id;
 
   return (
-    <div className="flex justify-center mb-6">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-3">
-          <h3 className="text-sm font-medium text-gray-600 mb-1">Your Selected Pick:</h3>
-          <div className="inline-flex bg-primary text-white text-xs font-bold px-3 py-1 rounded-full">
-            Current Selection
-          </div>
+    <div>
+      <div className="text-center mb-3">
+        <h3 className="text-sm font-medium text-gray-600 mb-1">Your Selected Pick:</h3>
+        <div className="inline-flex bg-primary text-white text-xs font-bold px-3 py-1 rounded-full">
+          Current Selection
         </div>
+      </div>
         
         <div className="bg-white rounded-lg border border-green-300 shadow-md p-4 relative">
           {/* Selected Pick Indicator */}
@@ -121,7 +120,6 @@ export default function SubmittedPickDisplay({ userPick }: SubmittedPickDisplayP
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }
