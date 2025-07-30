@@ -165,3 +165,4 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Future Week Viewing**: Users can now select and view any NFL week spreads while picks remain locked for future weeks with informative hover tooltips
 - **Database Week Assignment Fix**: Corrected critical database issue where all 273 games were incorrectly assigned to week 1; games now properly distributed across all 18 NFL weeks based on game dates
 - **Enhanced Pick Restrictions**: Implemented comprehensive future week pick locking with visual indicators and hover messages explaining "Picks are not allowed until 12 hours before the first game of the week. Spreads may change until that point."
+- **Individual Game Card Submit Buttons**: Redesigned pick submission UX - "Selected Game" indicator now appears at top of cards with individual "SUBMIT PICK" buttons at bottom, replacing centralized submit button for improved user clarity
