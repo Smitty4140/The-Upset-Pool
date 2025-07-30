@@ -166,3 +166,11 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Database Week Assignment Fix**: Corrected critical database issue where all 273 games were incorrectly assigned to week 1; games now properly distributed across all 18 NFL weeks based on game dates
 - **Enhanced Pick Restrictions**: Implemented comprehensive future week pick locking with visual indicators and hover messages explaining "Picks are not allowed until 12 hours before the first game of the week. Spreads may change until that point."
 - **Individual Game Card Submit Buttons**: Redesigned pick submission UX - "Selected Game" indicator now appears at top of cards with individual "SUBMIT PICK" buttons at bottom, replacing centralized submit button for improved user clarity
+
+### July 30, 2025
+- **Complete Admin User Management Interface**: Added comprehensive user management section to admin tab displaying all league members with names, emails, activation status badges, and admin privilege indicators
+- **Dual Admin Controls**: Implemented toggle buttons for both user activation (Activate/Deactivate) and admin privileges (Make Admin/Remove Admin) with proper authentication and security measures
+- **Self-Protection Safeguards**: Added backend protection preventing admins from removing their own admin privileges to avoid system lockout scenarios
+- **Admin Privilege Toggle API**: Created new `/api/admin/league/:leagueId/member/:userId/toggle-admin` endpoint with proper validation and error handling
+- **Deactivated User Experience Enhancement**: Added prominent red banner at top of league interface for deactivated users with same messaging as game card tooltips: "Your team is not activated. Contact your league admin to start picking upsets."
+- **Visual Status Indicators**: Enhanced admin interface with color-coded badges (Active/Inactive for activation status, Admin/Member for privilege levels) and contextual button styling
