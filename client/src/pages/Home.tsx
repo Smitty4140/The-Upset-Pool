@@ -88,10 +88,10 @@ export default function Home() {
   
   const isLoadingGames = isLoadingDatabaseGames;
 
-  // Get the user's pick for the current week (picks only for current week)
+  // Get the user's pick for the selected week
   const { data: userPick, isLoading: isLoadingPick, refetch: refetchUserPick } = useQuery<UserPick | null>({
-    queryKey: ["/api/user/pick", { weekId: pickableWeekId, leagueId }],
-    enabled: !!pickableWeekId && isAuthenticated,
+    queryKey: ["/api/user/pick", { weekId: activeWeekId, leagueId }],
+    enabled: !!activeWeekId && isAuthenticated,
   });
   
   // Get the leaderboard data
@@ -194,7 +194,7 @@ export default function Home() {
 
   // Handle pick submission
   const handleSubmitPick = () => {
-    if (!selectedGameId || !selectedTeamId || !pickableWeekId) {
+    if (!selectedGameId || !selectedTeamId || !activeWeekId) {
       toast({
         title: "Error",
         description: "Please select a team",
@@ -212,7 +212,7 @@ export default function Home() {
       gameId: selectedGameId,
       pickedTeamId: selectedTeamId,
       leagueId,
-      weekId: pickableWeekId,
+      weekId: activeWeekId,
     });
     
     // Show a toast with the selected team to make it obvious
@@ -276,11 +276,13 @@ export default function Home() {
     return true;
   })() : false;
   
-  // Determine if the selected week allows picks (only current week + not locked)
-  const canMakePicks = activeWeekId === pickableWeekId && !arePicksLocked;
+  // Determine if the selected week allows picks
+  // Picks are allowed if: the week is not locked (regardless of which week it is)
+  const canMakePicks = !arePicksLocked;
   
-  // Check if viewing a future week (picks not allowed yet)
-  const isViewingFutureWeek = activeWeekId !== pickableWeekId && selectedWeekId && selectedWeekId !== pickableWeekId;
+  // Check if viewing a future week where picks are locked
+  // This is now only true for future weeks that haven't been unlocked by admin
+  const isViewingFutureWeek = activeWeekId !== pickableWeekId && arePicksLocked;
 
   // Loading state
   const isLoading = isLoadingWeek || isLoadingGames || isLoadingPick || isLoadingAuth;
