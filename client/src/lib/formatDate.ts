@@ -11,7 +11,7 @@ export function formatWeeklyDate(dateStr: string): string {
 }
 
 /**
- * Format a date for displaying the game time
+ * Format a date for displaying the game time in Eastern Time
  * @param dateStr Date string to format
  */
 export function formatGameTime(dateStr: string): string {
@@ -22,6 +22,7 @@ export function formatGameTime(dateStr: string): string {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: 'America/New_York',
     timeZoneName: 'short'
   });
 }
