@@ -360,6 +360,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to toggle member admin status" });
     }
   });
+
+  // Admin-only route to remove a member from a league
+  app.delete('/api/admin/league/:leagueId/member/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const adminUserId = req.user.id;
+      const leagueId = parseInt(req.params.leagueId);
+      const targetUserId = req.params.userId;
+      
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+      
+      // Check if the requesting user is an admin of this league
+      const adminMember = await storage.getLeagueMember(leagueId, adminUserId);
+      if (!adminMember || !adminMember.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      // Get the target member to verify they exist
+      const targetMember = await storage.getLeagueMember(leagueId, targetUserId);
+      if (!targetMember) {
+        return res.status(404).json({ message: "Member not found in this league" });
+      }
+      
+      // Prevent admin from removing themselves
+      if (adminUserId === targetUserId) {
+        return res.status(400).json({ message: "You cannot remove yourself from the league" });
+      }
+      
+      // Remove the member from the league
+      await storage.removeLeagueMember(leagueId, targetUserId);
+      
+      res.json({ 
+        message: "User removed from league successfully"
+      });
+    } catch (error) {
+      console.error("Error removing league member:", error);
+      res.status(500).json({ message: "Failed to remove user from league" });
+    }
+  });
   
   // Toggle lock status for picks in a week (admin only)
   app.post('/api/admin/week/:id/toggle-lock', isAuthenticated, async (req: any, res) => {

@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share } from "lucide-react";
+import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share, Trash2 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { formatWeeklyDate } from "@/lib/formatDate";
 import { NFLWeek, League, NFLGame, NFLTeam, User } from "@/lib/types";
@@ -833,12 +833,44 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
     }
   });
 
+  // Mutation for removing league member
+  const removeMemberMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await apiRequest("DELETE", `/api/admin/league/${leagueId}/member/${userId}`, {});
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Success",
+        description: data.message || "User removed from league successfully",
+        variant: "default"
+      });
+      // Refetch league members to update the UI
+      refetch();
+      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/members`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove user from league",
+        variant: "destructive"
+      });
+    }
+  });
+
   const handleToggleActivation = (userId: string, currentStatus: boolean) => {
     toggleActivationMutation.mutate({ userId, isActive: currentStatus });
   };
 
   const handleToggleAdmin = (userId: string, currentStatus: boolean) => {
     toggleAdminMutation.mutate({ userId, isAdmin: currentStatus });
+  };
+
+  const handleRemoveMember = (userId: string, username: string) => {
+    if (window.confirm(`Are you sure you want to remove ${username} from this league? This action cannot be undone.`)) {
+      removeMemberMutation.mutate(userId);
+    }
   };
 
   if (isLoading) {
@@ -876,6 +908,7 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-center">Role</TableHead>
               <TableHead className="text-center">Updates</TableHead>
+              <TableHead className="text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -961,6 +994,17 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
                   {(toggleActivationMutation.isPending || toggleAdminMutation.isPending) && (
                     <div className="text-sm text-gray-500">Updating...</div>
                   )}
+                </TableCell>
+                <TableCell className="text-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleRemoveMember(member.userId, member.user?.username || member.user?.email || 'User')}
+                    disabled={removeMemberMutation.isPending || toggleActivationMutation.isPending || toggleAdminMutation.isPending}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
