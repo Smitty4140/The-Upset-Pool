@@ -1997,6 +1997,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/admin/scheduler/test-results-job', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is an admin  
+      const userId = req.user.id;
+      const userLeagues = await storage.getUserLeagues(userId);
+      const isAdmin = userLeagues.some(ul => ul.isAdmin);
+      
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+
+      // Import scheduler and test the results job
+      const { gameScheduler } = await import("./scheduler.js");
+      const result = await gameScheduler.testResultsJob();
+      
+      res.json({
+        message: "Scheduled results job test completed",
+        result
+      });
+    } catch (error) {
+      console.error("Error testing results job:", error);
+      res.status(500).json({ message: "Failed to test results job" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

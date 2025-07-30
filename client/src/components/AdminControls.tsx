@@ -496,6 +496,47 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
     }
   };
 
+  const testResultsJob = async () => {
+    if (!user) return;
+    
+    setIsLoadingScheduler(true);
+    try {
+      const response = await fetch("/api/admin/scheduler/test-results-job", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to test results job: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      // Refetch all related data
+      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games/week/${currentWeek?.id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/week/${currentWeek?.id}/picks`] });
+      refetchSchedulerStatus();
+      
+      toast({
+        title: "Success",
+        description: result.message || "Results job test completed successfully",
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to test results job",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingScheduler(false);
+    }
+  };
+
   if (isLoadingAuth || isLoadingWeek || isLoadingLeague || isLoadingMembers) {
     return null; // Don't show anything while loading
   }
@@ -596,8 +637,8 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
           <div className="bg-purple-50 border border-purple-200 rounded-md p-3 mb-4 flex items-start">
             <Clock className="h-5 w-5 text-purple-500 mt-0.5 mr-2 flex-shrink-0" />
             <div className="text-sm text-purple-800">
-              The scheduler automatically pulls game data 12 hours before the first NFL game of each week.
-              You can check the status and manually trigger a data pull if needed.
+              The scheduler automatically pulls game data 12 hours before the first NFL game and results 5 hours after the last game of each week.
+              You can check the status and manually trigger pulls if needed.
             </div>
           </div>
           
@@ -632,7 +673,17 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
                 onClick={testScheduledJob}
               >
                 {isLoadingScheduler ? "Testing..." : (
-                  <><Clock className="h-4 w-4 mr-2" /> Test Scheduled Job</>
+                  <><Clock className="h-4 w-4 mr-2" /> Test Data Pull</>
+                )}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={isLoadingScheduler}
+                onClick={testResultsJob}
+              >
+                {isLoadingScheduler ? "Testing..." : (
+                  <><CheckCircle className="h-4 w-4 mr-2" /> Test Results Pull</>
                 )}
               </Button>
             </div>

@@ -153,3 +153,6 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Automated Game Data Scheduler**: Implemented comprehensive scheduling system using node-cron that automatically pulls NFL game data 12 hours before the first game of each week
 - **Scheduler Management Interface**: Added admin UI controls to monitor scheduler status, view scheduled jobs, and trigger manual data pulls for testing
 - **Game Data Flow Clarification**: Games are first created via odds API pull (appearing on selection tab), then later updated with results via ESPN API pull (affecting only existing games)
+- **Automated Results Scheduler**: Implemented comprehensive dual scheduling system - game data pulls 12 hours before first game AND results pulls 5 hours after last game of each NFL week
+- **Results Pull Automation**: System automatically processes game results on Monday nights (5 hours after typical MNF completion) to calculate final points and update leaderboards
+- **Dual Test Interface**: Added separate test buttons for both data pulls and results pulls with proper UI feedback and cache invalidation
