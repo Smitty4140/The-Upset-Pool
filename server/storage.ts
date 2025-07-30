@@ -593,33 +593,9 @@ export class DatabaseStorage implements IStorage {
           .where(eq(userPicks.id, pick.id));
       }
 
-      // Recalculate total points for all affected users
-      const userIds = [...new Set(picks.map(pick => pick.userId))];
-      for (const userId of userIds) {
-        await this.recalculateUserTotalPoints(userId);
-      }
+      // Note: Total points are now calculated dynamically per league, no global recalculation needed
     } catch (error) {
       console.error("Error calculating user pick results:", error);
-    }
-  }
-
-  // Helper method to recalculate a user's total points
-  async recalculateUserTotalPoints(userId: string): Promise<void> {
-    try {
-      const result = await db.execute(sql`
-        SELECT COALESCE(SUM(points_earned), 0) as total_points
-        FROM user_picks 
-        WHERE user_id = ${userId} AND won = true
-      `);
-      
-      const totalPoints = result.rows?.[0]?.total_points || 0;
-      
-      await db
-        .update(users)
-        .set({ totalPoints: String(totalPoints) })
-        .where(eq(users.id, userId));
-    } catch (error) {
-      console.error("Error recalculating user total points:", error);
     }
   }
 
@@ -841,13 +817,23 @@ export class DatabaseStorage implements IStorage {
 
   async getLeaderboard(leagueId: number): Promise<User[]> {
     const result = await db
-      .select()
+      .select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        totalPoints: sql<string>`COALESCE(SUM(${userPicks.pointsEarned}), 0)`.as('totalPoints')
+      })
       .from(users)
       .innerJoin(leagueMembers, eq(users.id, leagueMembers.userId))
+      .leftJoin(userPicks, and(
+        eq(userPicks.userId, users.id),
+        eq(userPicks.leagueId, leagueId)
+      ))
       .where(eq(leagueMembers.leagueId, leagueId))
-      .orderBy(desc(users.totalPoints));
+      .groupBy(users.id, users.username, users.email)
+      .orderBy(desc(sql`COALESCE(SUM(${userPicks.pointsEarned}), 0)`));
     
-    return result.map(row => row.users) as User[];
+    return result as User[];
   }
 
   async processGameResults(gameId: number): Promise<void> {
@@ -893,16 +879,6 @@ export class DatabaseStorage implements IStorage {
           pointsEarned: won ? pointsEarned.toString() : "0",
         })
         .where(eq(userPicks.id, pick.id));
-      
-      // Update user's total points if they won
-      if (won) {
-        await db
-          .update(users)
-          .set({
-            totalPoints: sql`${users.totalPoints} + ${pointsEarned}`,
-          })
-          .where(eq(users.id, pick.userId));
-      }
     }
   }
 }
