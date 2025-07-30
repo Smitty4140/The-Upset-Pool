@@ -257,11 +257,24 @@ export default function Home() {
   const selectedWeek = allWeeks?.find(week => week.id === (selectedWeekId || activeWeekId));
   
   // Determine if picks are locked for the selected week
-  // For admin controls, we consider a week locked if the picksLockAt time is in the past
-  // This allows admins to unlock future weeks that are artificially locked
-  const arePicksLocked = selectedWeek 
-    ? new Date() >= new Date(selectedWeek.picksLockAt) 
-    : false;
+  // For admin UI: A week is "locked" if picks are not allowed
+  // - If picksLockAt is in the past = locked (admin locked it or natural deadline passed)
+  // - If picksLockAt is normal future deadline = locked (default state)
+  // - If picksLockAt is far future (admin unlocked) = unlocked
+  const arePicksLocked = selectedWeek ? (() => {
+    const now = new Date();
+    const lockTime = new Date(selectedWeek.picksLockAt);
+    
+    // If lockTime is in the past, definitely locked
+    if (now >= lockTime) return true;
+    
+    // If lockTime is far in the future (more than 1 year from now), it's unlocked by admin
+    const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+    if (lockTime > oneYearFromNow) return false;
+    
+    // Otherwise, it's locked (normal deadline state)
+    return true;
+  })() : false;
   
   // Determine if the selected week allows picks (only current week + not locked)
   const canMakePicks = activeWeekId === pickableWeekId && !arePicksLocked;
