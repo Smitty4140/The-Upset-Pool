@@ -177,3 +177,4 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Admin Dropdown Controls**: Replaced button-based admin controls with intuitive dropdown selectors for both user activation status and admin privileges, maintaining clear color-coded styling
 - **Week Lock Date Fix**: Corrected critical bug in admin week lock/unlock system that was setting lock dates relative to current date instead of the actual NFL week's Sunday at 1:00 PM EST
 - **Enhanced Pick Display Component**: Redesigned "Your Selected Pick" component to match game card format with centered layout, game time display, away team on top, home team on bottom, and proper spread indicators
+- **Streamlined Pick Display Layout**: Simplified selected pick component by removing redundant text labels and status messages, keeping only "SELECTED GAME" indicator and game card, horizontally aligned with header elements for compact design

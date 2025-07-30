@@ -52,9 +52,9 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
   return (
     <div className="mb-8">
       <div className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg p-6 shadow-md border border-primary/20">
-        {/* Header info and countdown */}
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4">
-          <div>
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-6">
+          {/* Left: Header info */}
+          <div className="flex-shrink-0">
             <div className="flex items-center mb-2">
               <Trophy className="h-6 w-6 text-accent mr-2" />
               <h2 className="text-2xl font-bold text-gray-900">
@@ -84,9 +84,18 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
               </div>
             )}
           </div>
+
+          {/* Center: Pick display */}
+          {hasSubmittedPick && userPick && userPick.pickedTeam && (
+            <div className="flex-grow flex justify-center">
+              <div className="w-full max-w-sm">
+                <SubmittedPickDisplay userPick={userPick} />
+              </div>
+            </div>
+          )}
           
-          <div className="mt-6 md:mt-0">
-            {/* Picks lock countdown timer */}
+          {/* Right: Countdown timer */}
+          <div className="flex-shrink-0">
             <div className={`rounded-lg px-5 py-4 shadow-md flex items-center 
               ${isExpired 
                 ? "bg-red-100 border border-red-200" 
@@ -108,15 +117,6 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
             </div>
           </div>
         </div>
-
-        {/* Centered pick display */}
-        {hasSubmittedPick && userPick && userPick.pickedTeam && (
-          <div className="flex justify-center">
-            <div className="w-full max-w-md">
-              <SubmittedPickDisplay userPick={userPick} />
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
