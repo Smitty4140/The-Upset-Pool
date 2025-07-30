@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX } from "lucide-react";
+import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { formatWeeklyDate } from "@/lib/formatDate";
 import { NFLWeek, League, NFLGame, NFLTeam, User } from "@/lib/types";
@@ -20,6 +20,13 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { format } from "date-fns";
 
 interface GameResultsManagerProps {
@@ -831,8 +838,8 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
               <TableHead className="w-[300px]">User</TableHead>
               <TableHead>Email</TableHead>
               <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-center">Admin</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="text-center">Role</TableHead>
+              <TableHead className="text-center">Updates</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -847,68 +854,77 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
                   {member.user?.email || 'No email'}
                 </TableCell>
                 <TableCell className="text-center">
-                  <Badge 
-                    variant={member.isActive ? "default" : "secondary"}
-                    className={member.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+                  <Select 
+                    value={member.isActive ? "active" : "inactive"}
+                    onValueChange={(value) => {
+                      if ((value === "active") !== member.isActive) {
+                        handleToggleActivation(member.userId, member.isActive);
+                      }
+                    }}
+                    disabled={toggleActivationMutation.isPending || toggleAdminMutation.isPending}
                   >
-                    {member.isActive ? (
-                      <><UserCheck className="h-3 w-3 mr-1" /> Active</>
-                    ) : (
-                      <><UserX className="h-3 w-3 mr-1" /> Inactive</>
-                    )}
-                  </Badge>
+                    <SelectTrigger className={`w-[120px] ${member.isActive ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                      <div className="flex items-center">
+                        {member.isActive ? (
+                          <UserCheck className="h-3 w-3 mr-1" />
+                        ) : (
+                          <UserX className="h-3 w-3 mr-1" />
+                        )}
+                        <SelectValue />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active" className="text-green-700">
+                        <div className="flex items-center">
+                          <UserCheck className="h-3 w-3 mr-2" />
+                          Active
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="inactive" className="text-red-700">
+                        <div className="flex items-center">
+                          <UserX className="h-3 w-3 mr-2" />
+                          Inactive
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </TableCell>
                 <TableCell className="text-center">
-                  <Badge 
-                    variant={member.isAdmin ? "default" : "outline"}
-                    className={member.isAdmin ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-600"}
+                  <Select 
+                    value={member.isAdmin ? "admin" : "member"}
+                    onValueChange={(value) => {
+                      if ((value === "admin") !== member.isAdmin) {
+                        handleToggleAdmin(member.userId, member.isAdmin);
+                      }
+                    }}
+                    disabled={toggleActivationMutation.isPending || toggleAdminMutation.isPending}
                   >
-                    {member.isAdmin ? (
-                      <><UserCog className="h-3 w-3 mr-1" /> Admin</>
-                    ) : (
-                      <><UserCog className="h-3 w-3 mr-1" /> Member</>
-                    )}
-                  </Badge>
+                    <SelectTrigger className={`w-[120px] ${member.isAdmin ? 'bg-blue-50 border-blue-200 text-blue-800' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
+                      <div className="flex items-center">
+                        <UserCog className="h-3 w-3 mr-1" />
+                        <SelectValue />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin" className="text-blue-700">
+                        <div className="flex items-center">
+                          <UserCog className="h-3 w-3 mr-2" />
+                          Admin
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="member" className="text-gray-700">
+                        <div className="flex items-center">
+                          <UserCog className="h-3 w-3 mr-2" />
+                          Member
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex space-x-2 justify-end">
-                    <Button
-                      size="sm"
-                      variant={member.isActive ? "outline" : "default"}
-                      onClick={() => handleToggleActivation(member.userId, member.isActive)}
-                      disabled={toggleActivationMutation.isPending || toggleAdminMutation.isPending}
-                      className={member.isActive ? 
-                        "text-red-600 hover:text-red-700 hover:bg-red-50" : 
-                        "bg-green-600 hover:bg-green-700"
-                      }
-                    >
-                      {toggleActivationMutation.isPending ? (
-                        "Updating..."
-                      ) : member.isActive ? (
-                        <><UserX className="h-3 w-3 mr-1" /> Deactivate</>
-                      ) : (
-                        <><UserCheck className="h-3 w-3 mr-1" /> Activate</>
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={member.isAdmin ? "outline" : "default"}
-                      onClick={() => handleToggleAdmin(member.userId, member.isAdmin)}
-                      disabled={toggleActivationMutation.isPending || toggleAdminMutation.isPending}
-                      className={member.isAdmin ? 
-                        "text-orange-600 hover:text-orange-700 hover:bg-orange-50" : 
-                        "bg-blue-600 hover:bg-blue-700"
-                      }
-                    >
-                      {toggleAdminMutation.isPending ? (
-                        "Updating..."
-                      ) : member.isAdmin ? (
-                        <><UserX className="h-3 w-3 mr-1" /> Remove Admin</>
-                      ) : (
-                        <><UserCog className="h-3 w-3 mr-1" /> Make Admin</>
-                      )}
-                    </Button>
-                  </div>
+                <TableCell className="text-center">
+                  {(toggleActivationMutation.isPending || toggleAdminMutation.isPending) && (
+                    <div className="text-sm text-gray-500">Updating...</div>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
