@@ -149,3 +149,4 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Proper Tie Handling in Leaderboards**: Implemented comprehensive tie handling across all leaderboard views - users with same points share identical rankings with proper gap handling (e.g., 1st, 2nd, 2nd, 4th)
 - **Weekly Picks Standings**: Added "Standing" column to Weekly Picks table showing each player's current season position (1st, 2nd, 3rd, etc.) with table ordered by standings
 - **Navigation Accessibility Fix**: Updated top navigation from blue gradient background with grey text to dark grey background (bg-gray-800) with white text for improved readability and contrast
+- **Admin Controls Reorganization**: Moved league admin controls from standalone section to dedicated "Admin" tab within main content tabs, visible only to league administrators for better organization and cleaner UI
