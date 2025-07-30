@@ -54,7 +54,7 @@ class GameScheduler {
       console.log('[Scheduler] Checking for games that need data pulls...');
 
       // Get all NFL weeks from current date forward
-      const currentDate = new Date();
+      const currentDate = new Date().toISOString();
       const weeks = await db
         .select()
         .from(nflWeeks)
@@ -120,7 +120,6 @@ class GameScheduler {
         this.scheduledJobs.delete(weekKey);
         job.destroy();
       }, {
-        scheduled: true,
         timezone: 'America/New_York' // NFL times are typically in Eastern Time
       });
 
@@ -185,6 +184,44 @@ class GameScheduler {
   }
 
   /**
+   * Test the scheduled job by running it as if it were 12 hours before first game
+   */
+  async testScheduledJob() {
+    try {
+      console.log('[Scheduler] Testing scheduled job execution...');
+      
+      // Get current week
+      const currentDate = new Date().toISOString();
+      const currentWeek = await db
+        .select()
+        .from(nflWeeks)
+        .where(
+          and(
+            lte(nflWeeks.startDate, currentDate),
+            gte(nflWeeks.endDate, currentDate)
+          )
+        )
+        .limit(1);
+
+      if (currentWeek.length === 0) {
+        throw new Error('No current NFL week found');
+      }
+
+      console.log(`[Scheduler] Simulating data pull for week ${currentWeek[0].weekNumber} as if 12 hours before first game...`);
+      await this.executeDataPull(currentWeek[0]);
+      
+      return {
+        success: true,
+        message: `Test completed for week ${currentWeek[0].weekNumber}`,
+        weekNumber: currentWeek[0].weekNumber
+      };
+    } catch (error) {
+      console.error('[Scheduler] Test failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Manually trigger a data pull for the current week (for testing)
    */
   async triggerManualPull() {
@@ -192,13 +229,14 @@ class GameScheduler {
       console.log('[Scheduler] Manual data pull triggered');
       
       // Get current week
+      const currentDate = new Date().toISOString();
       const currentWeek = await db
         .select()
         .from(nflWeeks)
         .where(
           and(
-            lte(nflWeeks.startDate, new Date()),
-            gte(nflWeeks.endDate, new Date())
+            lte(nflWeeks.startDate, currentDate),
+            gte(nflWeeks.endDate, currentDate)
           )
         )
         .limit(1);
