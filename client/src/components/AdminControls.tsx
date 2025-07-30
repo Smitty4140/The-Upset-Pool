@@ -766,8 +766,36 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
     }
   });
 
+  // Mutation for toggling admin status
+  const toggleAdminMutation = useMutation({
+    mutationFn: async ({ userId, isAdmin }: { userId: string; isAdmin: boolean }) => {
+      return apiRequest("POST", `/api/admin/league/${leagueId}/member/${userId}/toggle-admin`, {});
+    },
+    onSuccess: (data: any, variables) => {
+      toast({
+        title: "Success",
+        description: data.message || `User admin status updated successfully`,
+        variant: "default"
+      });
+      // Refetch league members to update the UI
+      refetch();
+      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/members`] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update admin status",
+        variant: "destructive"
+      });
+    }
+  });
+
   const handleToggleActivation = (userId: string, currentStatus: boolean) => {
     toggleActivationMutation.mutate({ userId, isActive: currentStatus });
+  };
+
+  const handleToggleAdmin = (userId: string, currentStatus: boolean) => {
+    toggleAdminMutation.mutate({ userId, isAdmin: currentStatus });
   };
 
   if (isLoading) {
@@ -792,7 +820,7 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
       <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 flex items-start">
         <UserCog className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
         <div className="text-sm text-blue-800">
-          Manage league member activation status. Inactive users cannot submit picks and will see a message to contact the admin.
+          Manage league member activation status and admin privileges. Inactive users cannot submit picks. Admin users can manage game results and other admin functions.
         </div>
       </div>
 
@@ -831,32 +859,56 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-center">
-                  {member.isAdmin && (
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                      <UserCog className="h-3 w-3 mr-1" />
-                      Admin
-                    </Badge>
-                  )}
+                  <Badge 
+                    variant={member.isAdmin ? "default" : "outline"}
+                    className={member.isAdmin ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-600"}
+                  >
+                    {member.isAdmin ? (
+                      <><UserCog className="h-3 w-3 mr-1" /> Admin</>
+                    ) : (
+                      <><UserCog className="h-3 w-3 mr-1" /> Member</>
+                    )}
+                  </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    size="sm"
-                    variant={member.isActive ? "outline" : "default"}
-                    onClick={() => handleToggleActivation(member.userId, member.isActive)}
-                    disabled={toggleActivationMutation.isPending}
-                    className={member.isActive ? 
-                      "text-red-600 hover:text-red-700 hover:bg-red-50" : 
-                      "bg-green-600 hover:bg-green-700"
-                    }
-                  >
-                    {toggleActivationMutation.isPending ? (
-                      "Updating..."
-                    ) : member.isActive ? (
-                      <><UserX className="h-3 w-3 mr-1" /> Deactivate</>
-                    ) : (
-                      <><UserCheck className="h-3 w-3 mr-1" /> Activate</>
-                    )}
-                  </Button>
+                  <div className="flex space-x-2 justify-end">
+                    <Button
+                      size="sm"
+                      variant={member.isActive ? "outline" : "default"}
+                      onClick={() => handleToggleActivation(member.userId, member.isActive)}
+                      disabled={toggleActivationMutation.isPending || toggleAdminMutation.isPending}
+                      className={member.isActive ? 
+                        "text-red-600 hover:text-red-700 hover:bg-red-50" : 
+                        "bg-green-600 hover:bg-green-700"
+                      }
+                    >
+                      {toggleActivationMutation.isPending ? (
+                        "Updating..."
+                      ) : member.isActive ? (
+                        <><UserX className="h-3 w-3 mr-1" /> Deactivate</>
+                      ) : (
+                        <><UserCheck className="h-3 w-3 mr-1" /> Activate</>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={member.isAdmin ? "outline" : "default"}
+                      onClick={() => handleToggleAdmin(member.userId, member.isAdmin)}
+                      disabled={toggleActivationMutation.isPending || toggleAdminMutation.isPending}
+                      className={member.isAdmin ? 
+                        "text-orange-600 hover:text-orange-700 hover:bg-orange-50" : 
+                        "bg-blue-600 hover:bg-blue-700"
+                      }
+                    >
+                      {toggleAdminMutation.isPending ? (
+                        "Updating..."
+                      ) : member.isAdmin ? (
+                        <><UserX className="h-3 w-3 mr-1" /> Remove Admin</>
+                      ) : (
+                        <><UserCog className="h-3 w-3 mr-1" /> Make Admin</>
+                      )}
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

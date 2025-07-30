@@ -317,6 +317,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to toggle member activation" });
     }
   });
+
+  // Admin-only route to toggle member admin status
+  app.post('/api/admin/league/:leagueId/member/:userId/toggle-admin', isAuthenticated, async (req: any, res) => {
+    try {
+      const adminUserId = req.user.id;
+      const leagueId = parseInt(req.params.leagueId);
+      const targetUserId = req.params.userId;
+      
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+      
+      // Check if the requesting user is an admin of this league
+      const adminMember = await storage.getLeagueMember(leagueId, adminUserId);
+      if (!adminMember || !adminMember.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      // Get the target member
+      const targetMember = await storage.getLeagueMember(leagueId, targetUserId);
+      if (!targetMember) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+      
+      // Prevent admin from removing their own admin status (to avoid locking themselves out)
+      if (adminUserId === targetUserId && targetMember.isAdmin) {
+        return res.status(400).json({ message: "Cannot remove your own admin privileges" });
+      }
+      
+      // Toggle admin status
+      const updatedMember = await storage.updateLeagueMember(leagueId, targetUserId, {
+        isAdmin: !targetMember.isAdmin
+      });
+      
+      res.json({ 
+        message: `Admin privileges ${updatedMember.isAdmin ? 'granted to' : 'removed from'} member successfully`,
+        isAdmin: updatedMember.isAdmin 
+      });
+    } catch (error) {
+      console.error("Error toggling member admin status:", error);
+      res.status(500).json({ message: "Failed to toggle member admin status" });
+    }
+  });
   
   // Toggle lock status for picks in a week (admin only)
   app.post('/api/admin/week/:id/toggle-lock', isAuthenticated, async (req: any, res) => {
