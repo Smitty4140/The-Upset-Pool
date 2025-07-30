@@ -23,6 +23,11 @@ type NFLGameCardProps = {
 };
 
 export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false, isInactive = false }: NFLGameCardProps) {
+  // Check if the game has already started (kickoff time passed)
+  const now = new Date();
+  const gameKickoffTime = new Date(game.gameTime);
+  const hasGameStarted = now > gameKickoffTime;
+  
   // Determine which teams are underdogs based on the spread
   const isHomeUnderdog = Number(game.spread) > 0;
   const isAwayUnderdog = Number(game.spread) < 0;
@@ -48,7 +53,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   // Always select the underdog team regardless of which team is clicked
   const handleHomeTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (disabled || isViewingFutureWeek || isInactive) return;
+    if (disabled || isViewingFutureWeek || isInactive || hasGameStarted) return;
     // Always select the underdog team
     if (underdogTeamId) {
       onSelect(game.id, underdogTeamId);
@@ -57,7 +62,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   
   const handleAwayTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (disabled || isViewingFutureWeek || isInactive) return;
+    if (disabled || isViewingFutureWeek || isInactive || hasGameStarted) return;
     // Always select the underdog team
     if (underdogTeamId) {
       onSelect(game.id, underdogTeamId);
@@ -66,6 +71,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
 
   const tooltipContent = isInactive
     ? "Your team is not activated. Contact your league admin to start picking upsets."
+    : hasGameStarted
+      ? "This game has already started and is no longer available for picks"
     : isViewingFutureWeek 
       ? "Picks are not allowed until 12 hours before the first game of the week. Spreads may change until that point."
       : disabled 
@@ -75,10 +82,11 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   const gameCard = (
     <div 
       className={`game-card transition-all duration-150 ease-in-out border rounded-lg mb-4 last:mb-0 overflow-hidden shadow-sm 
-        ${!disabled && !isViewingFutureWeek && !isInactive ? 'hover:shadow-md' : ''} 
+        ${!disabled && !isViewingFutureWeek && !isInactive && !hasGameStarted ? 'hover:shadow-md' : ''} 
         ${isGameSelected ? 'border-primary border-2 shadow-md relative' : 'border-gray-200'}
-        ${disabled || isViewingFutureWeek || isInactive ? 'opacity-75' : ''}
-        ${isViewingFutureWeek || isInactive ? 'cursor-not-allowed' : ''}`}
+        ${disabled || isViewingFutureWeek || isInactive || hasGameStarted ? 'opacity-75' : ''}
+        ${isViewingFutureWeek || isInactive || hasGameStarted ? 'cursor-not-allowed' : ''}
+        ${hasGameStarted ? 'bg-gray-50 border-gray-300' : ''}`}
     >
       {/* Selected Game indicator at the top */}
       {isGameSelected && (
@@ -89,19 +97,25 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       )}
       
       {/* Game time header */}
-      <div className="bg-white px-4 py-3 flex items-center text-sm text-blue-800 border-b border-gray-100">
+      <div className={`px-4 py-3 flex items-center justify-between text-sm border-b border-gray-100 ${hasGameStarted ? 'bg-gray-100' : 'bg-white'}`}>
         <div className="flex items-center">
-          <Clock className="h-4 w-4 mr-2 text-blue-700" />
-          <span className="text-blue-800 font-medium">{formatGameTime(game.gameTime)}</span>
+          <Clock className={`h-4 w-4 mr-2 ${hasGameStarted ? 'text-gray-500' : 'text-blue-700'}`} />
+          <span className={`font-medium ${hasGameStarted ? 'text-gray-600' : 'text-blue-800'}`}>{formatGameTime(game.gameTime)}</span>
         </div>
+        {hasGameStarted && (
+          <div className="flex items-center text-red-600">
+            <Lock className="h-4 w-4 mr-1" />
+            <span className="text-xs font-medium">STARTED</span>
+          </div>
+        )}
       </div>
       
       <div className="bg-white">
         {/* Away Team Row */}
         <div 
           className={`px-4 py-4 flex items-center justify-between transition-colors ${
-            !disabled && !isViewingFutureWeek && !isInactive ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
-          } ${disabled || isViewingFutureWeek || isInactive ? 'opacity-60' : ''
+            !disabled && !isViewingFutureWeek && !isInactive && !hasGameStarted ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
+          } ${disabled || isViewingFutureWeek || isInactive || hasGameStarted ? 'opacity-60' : ''
           }`} 
           onClick={handleAwayTeamClick}
         >
@@ -136,8 +150,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         {/* Home Team Row */}
         <div 
           className={`px-4 py-4 flex items-center justify-between transition-colors ${
-            !disabled && !isViewingFutureWeek && !isInactive ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
-          } ${disabled || isViewingFutureWeek || isInactive ? 'opacity-60' : ''
+            !disabled && !isViewingFutureWeek && !isInactive && !hasGameStarted ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
+          } ${disabled || isViewingFutureWeek || isInactive || hasGameStarted ? 'opacity-60' : ''
           }`} 
           onClick={handleHomeTeamClick}
         >
@@ -166,7 +180,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       </div>
       
       {/* Submit button at the bottom when game is selected */}
-      {isGameSelected && onSubmit && !disabled && !isViewingFutureWeek && !isInactive && (
+      {isGameSelected && onSubmit && !disabled && !isViewingFutureWeek && !isInactive && !hasGameStarted && (
         <div className="bg-gray-50 px-4 py-3 border-t border-gray-100">
           <Button 
             onClick={(e) => {

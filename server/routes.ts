@@ -1559,6 +1559,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Check if the individual game has already started (kickoff time passed)
+      const gameKickoffTime = new Date(dbGame.gameTime);
+      if (now > gameKickoffTime) {
+        return res.status(400).json({ 
+          message: "This game has already started and is no longer available for picks",
+          details: { 
+            gameTime: dbGame.gameTime,
+            homeTeam: dbGame.homeTeam.name,
+            awayTeam: dbGame.awayTeam.name
+          }
+        });
+      }
+      
       console.log(`Found game: ${dbGame.id} - ${dbGame.homeTeam.name} vs ${dbGame.awayTeam.name}`);
       
       // Validate that picked team is part of the game

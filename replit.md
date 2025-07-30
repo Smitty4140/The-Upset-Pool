@@ -188,3 +188,5 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **System vs League Admin Separation**: Separated league-level admin functions (user management, activation control, member removal) from system-level admin functions requiring super user status
 - **Results Tab Access Control**: Restricted Results tab and game winner selection capabilities exclusively to super user to prevent unauthorized game result manipulation
 - **System Admin Function Protection**: Protected NFL data pulling, game results processing, and scheduler management with super user authentication middleware
+- **Individual Game Kickoff Locking**: Implemented game-specific pick restrictions where games become unselectable once their kickoff time has passed, even before the overall Sunday 1pm deadline
+- **Real-time Game Status Display**: Added visual indicators showing "STARTED" status with lock icons for games that have begun, preventing pick submission attempts
