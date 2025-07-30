@@ -49,12 +49,13 @@ export default function JoinLeague({ onLeagueJoined }: JoinLeagueProps) {
 
   const joinLeagueMutation = useMutation({
     mutationFn: async (data: JoinLeagueFormData) => {
-      return apiRequest("POST", "/api/leagues/join", data);
+      const response = await apiRequest("POST", "/api/leagues/join", data);
+      return await response.json();
     },
     onSuccess: (result: any) => {
       toast({
         title: "League Joined!",
-        description: result.message,
+        description: result.message || `Successfully joined ${result.league?.name || 'league'}`,
       });
       
       // Reset form and close dialog
@@ -65,12 +66,28 @@ export default function JoinLeague({ onLeagueJoined }: JoinLeagueProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/user/leagues"] });
       
       // Call the callback if provided
-      if (onLeagueJoined) {
+      if (onLeagueJoined && result.league) {
         onLeagueJoined(result.league);
       }
     },
     onError: (error: any) => {
-      const errorMessage = error?.message || "Failed to join league";
+      console.error("Join league error:", error);
+      let errorMessage = "Failed to join league";
+      
+      // Try to extract error message from the response
+      if (error?.message) {
+        // Check if it's a network error or a parsed error message
+        if (error.message.includes(":")) {
+          // Format: "400: Invalid invite code"
+          const parts = error.message.split(":");
+          if (parts.length > 1) {
+            errorMessage = parts.slice(1).join(":").trim();
+          }
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: "Error",
         description: errorMessage,
