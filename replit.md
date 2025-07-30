@@ -191,3 +191,4 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Individual Game Kickoff Locking**: Implemented game-specific pick restrictions where games become unselectable once their kickoff time has passed, even before the overall Sunday 1pm deadline
 - **Real-time Game Status Display**: Added visual indicators showing "STARTED" status with lock icons for games that have begun, preventing pick submission attempts
 - **User Pick Locking**: Implemented game-specific user pick restrictions where users cannot change their pick once their selected game has started, displaying "Error: You cannot make a new pick. Your selected game has started and you are LOCKED IN" message
+- **Server-Side Time Security**: All time-based validations use server time exclusively and cannot be bypassed by manipulating client clock settings - includes week locks, individual game kickoffs, and user pick restrictions

@@ -1541,7 +1541,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Pick must be for the current week" });
       }
       
-      // Check if the pick lock time has passed
+      // Check if the pick lock time has passed (using server time - cannot be bypassed by client clock manipulation)
       const now = new Date();
       const lockTime = new Date(currentWeek.picksLockAt);
       if (now > lockTime) {
@@ -1559,7 +1559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Check if the individual game has already started (kickoff time passed)
+      // Check if the individual game has already started (using server time - cannot be bypassed by client clock manipulation)
       const gameKickoffTime = new Date(dbGame.gameTime);
       if (now > gameKickoffTime) {
         return res.status(400).json({ 
@@ -1624,7 +1624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check for existing pick
       const existingPick = await storage.getUserPick(userId, weekId, leagueId);
       
-      // If user has an existing pick, check if their picked game has started
+      // If user has an existing pick, check if their picked game has started (using server time - cannot be bypassed by client clock manipulation)
       if (existingPick && existingPick.game) {
         const existingGameKickoffTime = new Date(existingPick.game.gameTime);
         if (now > existingGameKickoffTime) {
