@@ -1629,7 +1629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const existingGameKickoffTime = new Date(existingPick.game.gameTime);
         if (now > existingGameKickoffTime) {
           return res.status(400).json({ 
-            message: "Your pick is locked because your selected game has already started",
+            message: "Error: You cannot make a new pick. Your selected game has started and you are LOCKED IN",
             details: { 
               pickedGame: `${existingPick.game.awayTeam.name} @ ${existingPick.game.homeTeam.name}`,
               gameTime: existingPick.game.gameTime

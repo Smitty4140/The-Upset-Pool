@@ -157,7 +157,7 @@ export default function NFLGamesGrid({
         <div className="flex items-center p-3 bg-red-50 border border-red-200 rounded-lg">
           <Lock className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
           <span className="text-sm text-red-700">
-            Your pick is locked because your selected game has already started
+            Error: You cannot make a new pick. Your selected game has started and you are LOCKED IN
           </span>
         </div>
       )}
