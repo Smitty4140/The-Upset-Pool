@@ -388,10 +388,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Week not found" });
       }
       
-      // Update the lock time directly using SQL
+      // Calculate the correct Sunday for this NFL week
+      const weekStart = new Date(week.startDate);
+      const weekEnd = new Date(week.endDate);
+      
+      // Find the first Sunday within the week range (usually the only Sunday)
+      let sundayDate = new Date(weekStart);
+      while (sundayDate.getDay() !== 0 && sundayDate <= weekEnd) { // 0 = Sunday
+        sundayDate.setDate(sundayDate.getDate() + 1);
+      }
+      
+      // If no Sunday found in range, use the start date (shouldn't happen with proper NFL weeks)
+      if (sundayDate > weekEnd) {
+        sundayDate = new Date(weekStart);
+      }
+      
+      // Set lock time to 1:00 PM EST on the Sunday of this NFL week
       const picksLockAt = locked ? 
-        new Date(Date.now() - 60000) : // 1 minute in the past for locking
-        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days in the future for unlocking
+        new Date(Date.now() - 60000) : // 1 minute in the past for locking immediately
+        new Date(sundayDate.getFullYear(), sundayDate.getMonth(), sundayDate.getDate(), 18, 0, 0); // 1:00 PM EST = 6:00 PM UTC
       
       // Use direct SQL query to update the picksLockAt field
       await db.execute(sql`

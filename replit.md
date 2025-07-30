@@ -174,3 +174,5 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Admin Privilege Toggle API**: Created new `/api/admin/league/:leagueId/member/:userId/toggle-admin` endpoint with proper validation and error handling
 - **Deactivated User Experience Enhancement**: Added prominent red banner at top of league interface for deactivated users with same messaging as game card tooltips: "Your team is not activated. Contact your league admin to start picking upsets."
 - **Visual Status Indicators**: Enhanced admin interface with color-coded badges (Active/Inactive for activation status, Admin/Member for privilege levels) and contextual button styling
+- **Admin Dropdown Controls**: Replaced button-based admin controls with intuitive dropdown selectors for both user activation status and admin privileges, maintaining clear color-coded styling
+- **Week Lock Date Fix**: Corrected critical bug in admin week lock/unlock system that was setting lock dates relative to current date instead of the actual NFL week's Sunday at 1:00 PM EST
