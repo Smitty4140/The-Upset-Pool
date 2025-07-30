@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, MessageSquare, Trophy, Medal, Calendar, Loader2, Check, Lock } from "lucide-react";
+import { Shield, MessageSquare, Trophy, Medal, Calendar, Loader2, Check, Lock, Unlock } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
@@ -40,6 +40,7 @@ export default function Home() {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>("gameTime");
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
+  const [isToggling, setIsToggling] = useState(false);
 
   // Default league ID - in a real app we would fetch the user's leagues
   const leagueId = 1;
@@ -266,6 +267,38 @@ export default function Home() {
   // Loading state
   const isLoading = isLoadingWeek || isLoadingGames || isLoadingPick || isLoadingAuth;
 
+  // Handle toggle lock/unlock picks for a specific week
+  const handleToggleLock = async (weekId: number) => {
+    setIsToggling(true);
+    try {
+      const response = await fetch(`/api/admin/week/${weekId}/toggle-lock`, {
+        method: 'POST',
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Invalidate relevant queries to refresh the data
+        queryClient.invalidateQueries({ queryKey: ["/api/nfl-weeks/current"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/nfl-weeks"] });
+        
+        toast({
+          title: "Success",
+          description: data.message || "Pick lock status updated successfully",
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update pick lock status",
+        variant: "destructive",
+      });
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Helmet>
@@ -286,12 +319,41 @@ export default function Home() {
 
       {/* Week Selector - positioned above all tab content */}
       {(activeTab === "spreads" || activeTab === "weeklypicks" || activeTab === "results") && activeWeekId && (
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <WeekSelector 
             currentWeekId={selectedWeekId || activeWeekId} 
             onWeekChange={(weekId) => setSelectedWeekId(weekId)} 
             className=""
           />
+          
+          {/* Admin Lock/Unlock Controls - Only visible on Game Spreads tab */}
+          {activeTab === "spreads" && isAdmin && (
+            <div className="flex items-center space-x-2">
+              <Button
+                onClick={() => handleToggleLock(selectedWeekId || activeWeekId)}
+                variant={arePicksLocked ? "outline" : "default"}
+                size="sm"
+                disabled={isToggling}
+                className={`${
+                  arePicksLocked 
+                    ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" 
+                    : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                }`}
+              >
+                {isToggling ? (
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : arePicksLocked ? (
+                  <Unlock className="h-4 w-4 mr-1" />
+                ) : (
+                  <Lock className="h-4 w-4 mr-1" />
+                )}
+                {arePicksLocked ? "Unlock Picks" : "Lock Picks"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
