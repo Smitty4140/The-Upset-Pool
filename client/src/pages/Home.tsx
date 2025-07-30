@@ -370,8 +370,10 @@ export default function Home() {
                               selectedTeamId={selectedTeamId}
                               selectedGameId={selectedGameId}
                               onSelect={handleTeamSelection}
+                              onSubmit={handleSubmitPick}
                               disabled={!canMakePicks || !isAuthenticated}
                               isViewingFutureWeek={isViewingFutureWeek}
+                              isSubmitting={isSubmittingPick}
                             />
                           ))}
                         </div>
@@ -384,36 +386,21 @@ export default function Home() {
                           <div className="mt-8 bg-red-50 p-6 rounded-md shadow-sm border border-red-200">
                             <p className="text-center text-red-700 font-medium">Picks are locked - deadline has passed (1:00 PM EST Sunday)</p>
                           </div>
-                        ) : (
-                          <div className="mt-8 text-center">
-                            <Button 
-                              type="submit" 
-                              className="px-8 py-6 text-lg font-bold" 
-                              disabled={isSubmittingPick || !selectedTeamId || !canMakePicks}
-                              onClick={handleSubmitPick}
-                            >
-                              {isSubmittingPick ? (
-                                <span className="flex items-center">
-                                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                  Submitting...
-                                </span>
-                              ) : hasSubmittedPick ? "Update My Pick" : "Submit My Pick"}
-                            </Button>
-                            {selectedTeamId && canMakePicks && (
-                              <p className="mt-2 text-gray-600">
-                                {hasSubmittedPick ? "You can change your pick until the picks lock." : "Your pick will be locked at 1:00 PM EST on Sunday."}
-                              </p>
-                            )}
-                            {isViewingFutureWeek && (
-                              <p className="mt-2 text-amber-600 font-medium">
-                                You are viewing a future week. Picks will be available 12 hours before the first game.
-                              </p>
-                            )}
-                          </div>
-                        )}
+                        ) : null}
+                        
+                        {/* Information messages */}
+                        <div className="mt-8 text-center">
+                          {selectedTeamId && canMakePicks && (
+                            <p className="text-gray-600">
+                              {hasSubmittedPick ? "You can change your pick until the picks lock." : "Your pick will be locked at 1:00 PM EST on Sunday."}
+                            </p>
+                          )}
+                          {isViewingFutureWeek && (
+                            <p className="text-amber-600 font-medium">
+                              You are viewing a future week. Picks will be available 12 hours before the first game.
+                            </p>
+                          )}
+                        </div>
                       </form>
                     ) : (
                       <div className="text-center py-12 px-4">

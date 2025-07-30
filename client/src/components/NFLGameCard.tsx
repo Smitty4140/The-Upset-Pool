@@ -2,6 +2,7 @@ import { NFLGame } from "@/lib/types";
 import { getTeamLogo } from "@/lib/teamLogos";
 import { formatGameTime } from "@/lib/formatDate";
 import { Clock, Check, Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -14,11 +15,13 @@ type NFLGameCardProps = {
   selectedTeamId: number | null;
   selectedGameId: string | null;
   onSelect: (gameId: string, teamId: number) => void;
+  onSubmit?: () => void;
   disabled?: boolean;
   isViewingFutureWeek?: boolean;
+  isSubmitting?: boolean;
 };
 
-export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, disabled = false, isViewingFutureWeek = false }: NFLGameCardProps) {
+export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false }: NFLGameCardProps) {
   // Determine which teams are underdogs based on the spread
   const isHomeUnderdog = Number(game.spread) > 0;
   const isAwayUnderdog = Number(game.spread) < 0;
@@ -74,6 +77,14 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         ${disabled || isViewingFutureWeek ? 'opacity-75' : ''}
         ${isViewingFutureWeek ? 'cursor-not-allowed' : ''}`}
     >
+      {/* Selected Game indicator at the top */}
+      {isGameSelected && (
+        <div className="bg-green-600 text-white text-sm font-bold text-center py-2 flex items-center justify-center space-x-1">
+          <Check size={16} />
+          <span>Selected Game</span>
+        </div>
+      )}
+      
       {/* Game time header */}
       <div className="bg-white px-4 py-3 flex items-center text-sm text-blue-800 border-b border-gray-100">
         <div className="flex items-center">
@@ -151,11 +162,29 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         </div>
       </div>
       
-      {/* Selection indicator */}
-      {isGameSelected && (
-        <div className="bg-green-600 text-white text-sm font-bold text-center py-2 flex items-center justify-center space-x-1">
-          <Check size={16} />
-          <span>Selected Game</span>
+      {/* Submit button at the bottom when game is selected */}
+      {isGameSelected && onSubmit && !disabled && !isViewingFutureWeek && (
+        <div className="bg-gray-50 px-4 py-3 border-t border-gray-100">
+          <Button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onSubmit();
+            }}
+            className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-2 px-4 rounded"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <span className="flex items-center space-x-2">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Submitting...</span>
+              </span>
+            ) : (
+              "SUBMIT PICK"
+            )}
+          </Button>
         </div>
       )}
     </div>
