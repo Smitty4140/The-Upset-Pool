@@ -96,6 +96,14 @@ export default function Home() {
   // Get the user's pick for the selected week (for display purposes)
   const { data: selectedWeekPick, isLoading: isLoadingSelectedWeekPick } = useQuery<UserPick | null>({
     queryKey: ["/api/user/pick", { weekId: activeWeekId, leagueId }],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (activeWeekId) params.append('weekId', activeWeekId.toString());
+      params.append('leagueId', leagueId.toString());
+      return fetch(`/api/user/pick?${params.toString()}`, {
+        credentials: 'include'
+      }).then(res => res.json());
+    },
     enabled: !!activeWeekId && isAuthenticated,
   });
 

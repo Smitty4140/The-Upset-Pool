@@ -614,21 +614,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get a user's pick for the current week
+  // Get a user's pick for a specific week (or current week if not specified)
   app.get('/api/user/pick', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
       
-      // Get current week
-      const currentWeek = await storage.getCurrentNFLWeek();
-      if (!currentWeek) {
-        return res.status(404).json({ message: "No active NFL week found" });
-      }
-      
       // Default to NFL Upset Pool league (ID 1)
       const leagueId = parseInt(req.query.leagueId as string) || 1;
       
-      const pick = await storage.getUserPick(userId, currentWeek.id, leagueId);
+      // Check if weekId is provided in query params
+      let weekId: number;
+      if (req.query.weekId) {
+        weekId = parseInt(req.query.weekId as string);
+        if (isNaN(weekId)) {
+          return res.status(400).json({ message: "Invalid week ID" });
+        }
+      } else {
+        // Get current week as fallback
+        const currentWeek = await storage.getCurrentNFLWeek();
+        if (!currentWeek) {
+          return res.status(404).json({ message: "No active NFL week found" });
+        }
+        weekId = currentWeek.id;
+      }
+      
+      const pick = await storage.getUserPick(userId, weekId, leagueId);
       res.json(pick || null);
     } catch (error) {
       console.error("Error fetching user pick:", error);
