@@ -159,3 +159,5 @@ The application is designed for easy deployment on platforms like Replit, Vercel
 - **Complete NFL Season Coverage**: Verified and completed all 18 NFL regular season weeks (September 4, 2025 - January 7, 2026) with proper Thursday-Wednesday week structure
 - **Schedule Alignment**: All weeks properly aligned to official 2025 NFL season dates with standard Sunday 1:00 PM EST pick deadlines
 - **Scheduler Integration**: Full automation now covers entire NFL season with both data pulls and results processing scheduled for all 18 weeks
+- **Week Selector UI Improvement**: Moved week selector component above tab content for better visual hierarchy and accessibility across Game Spreads, Weekly Picks, and Results tabs
+- **Cross-Tab Week Selection**: Week selector now properly synchronizes across all relevant tabs, allowing users to view historical data for any NFL week

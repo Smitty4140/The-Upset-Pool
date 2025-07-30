@@ -276,10 +276,21 @@ export default function Home() {
         isAdmin={isAdmin}
       />
 
+      {/* Week Selector - positioned above all tab content */}
+      {(activeTab === "spreads" || activeTab === "weeklypicks" || activeTab === "results") && activeWeekId && (
+        <div className="mb-6">
+          <WeekSelector 
+            currentWeekId={selectedWeekId || activeWeekId} 
+            onWeekChange={(weekId) => setSelectedWeekId(weekId)} 
+            className=""
+          />
+        </div>
+      )}
+
       <div>
         {/* Weekly Picks - Only visible when picks are locked */}
         {activeTab === "weeklypicks" && activeWeekId && (
-          <WeeklyPicks leagueId={leagueId} weekId={activeWeekId} />
+          <WeeklyPicks leagueId={leagueId} weekId={selectedWeekId || activeWeekId} />
         )}
 
         {/* Results Tab - Only visible to admins */}
@@ -326,15 +337,6 @@ export default function Home() {
                     </Select>
                   </div>
                 </div>
-                
-                {/* Week Selector */}
-                {activeWeekId && (
-                  <WeekSelector 
-                    currentWeekId={activeWeekId} 
-                    onWeekChange={(weekId) => setSelectedWeekId(weekId)} 
-                    className="mt-4"
-                  />
-                )}
               </div>
 
               <div className="px-6 py-4">
