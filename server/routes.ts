@@ -597,7 +597,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Join a league
+  // Join a league by invite code
+  app.post('/api/leagues/join', isAuthenticated, async (req: any, res) => {
+    try {
+      const { inviteCode } = req.body;
+      const userId = req.user.id;
+      
+      if (!inviteCode || inviteCode.trim().length === 0) {
+        return res.status(400).json({ message: "Invite code is required" });
+      }
+      
+      // Find league by invite code
+      const league = await storage.getLeagueByInviteCode(inviteCode.trim().toUpperCase());
+      if (!league) {
+        return res.status(404).json({ message: "Invalid invite code" });
+      }
+      
+      // Check if user is already a member
+      const existingMember = await storage.getLeagueMember(league.id, userId);
+      if (existingMember) {
+        return res.status(400).json({ message: "You are already a member of this league" });
+      }
+      
+      // Add user to league
+      const newMember = await storage.addLeagueMember({
+        leagueId: league.id,
+        userId,
+        isAdmin: false,
+        isActive: true,
+      });
+      
+      res.json({
+        message: `Successfully joined ${league.name}`,
+        league,
+        member: newMember
+      });
+    } catch (error) {
+      console.error("Error joining league:", error);
+      res.status(500).json({ message: "Failed to join league" });
+    }
+  });
+
+  // Join a league (legacy endpoint)
   app.post('/api/leagues/:id/join', isAuthenticated, async (req: any, res) => {
     try {
       const leagueId = parseInt(req.params.id);

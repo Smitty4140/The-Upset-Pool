@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown } from "lucide-react";
+import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { formatWeeklyDate } from "@/lib/formatDate";
 import { NFLWeek, League, NFLGame, NFLTeam, User } from "@/lib/types";
@@ -565,6 +565,42 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
       </CardHeader>
       
       <CardContent>
+        {/* League Invite Code Section */}
+        {league?.inviteCode && (
+          <div className="mb-6">
+            <div className="text-sm font-medium mb-2">League Invite Code</div>
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4 flex items-center justify-between">
+              <div className="flex items-center">
+                <Share className="h-5 w-5 text-blue-600 mr-3" />
+                <div>
+                  <div className="text-sm text-blue-800 mb-1">
+                    Share this code for others to join your league:
+                  </div>
+                  <div className="font-mono text-lg font-bold text-blue-900 tracking-wider">
+                    {league.inviteCode}
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(league.inviteCode);
+                  toast({
+                    title: "Copied!",
+                    description: "Invite code copied to clipboard",
+                  });
+                }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy
+              </Button>
+            </div>
+          </div>
+        )}
+        
+        <Separator className="my-6" />
+        
         {/* Lock/Unlock Picks Section */}
         <div className="mb-6">
           <div className="text-sm font-medium mb-2">Lock/Unlock Picks</div>

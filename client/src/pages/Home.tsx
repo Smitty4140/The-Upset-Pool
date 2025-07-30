@@ -12,6 +12,7 @@ import WeeklyPicks from "@/components/WeeklyPicks";
 import NFLGamesGrid from "@/components/NFLGamesGrid";
 import GameResults from "@/components/GameResults";
 import CreateLeague from "@/components/CreateLeague";
+import JoinLeague from "@/components/JoinLeague";
 import { NFLWeek, NFLGame, UserPick, User } from "@/lib/types";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
@@ -357,14 +358,22 @@ export default function Home() {
                 </Select>
               )}
             </div>
-            <CreateLeague onLeagueCreated={(league) => {
-              toast({
-                title: "Success!",
-                description: `${league.name} has been created. You can now manage it from your leagues.`,
-              });
-              // Refetch user leagues to include the new league
-              queryClient.invalidateQueries({ queryKey: ["/api/user/leagues"] });
-            }} />
+            <div className="flex gap-2">
+              <CreateLeague onLeagueCreated={(league) => {
+                toast({
+                  title: "Success!",
+                  description: `${league.name} has been created. You can now manage it from your leagues.`,
+                });
+                // Refetch user leagues to include the new league
+                queryClient.invalidateQueries({ queryKey: ["/api/user/leagues"] });
+                // Switch to the newly created league
+                setSelectedLeagueId(league.id);
+              }} />
+              <JoinLeague onLeagueJoined={(league) => {
+                // Switch to the newly joined league
+                setSelectedLeagueId(league.id);
+              }} />
+            </div>
           </div>
         </div>
       )}

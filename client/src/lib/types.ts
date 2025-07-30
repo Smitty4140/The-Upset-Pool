@@ -27,6 +27,7 @@ export interface League {
   id: number;
   name: string;
   description: string | null;
+  inviteCode: string;
   createdAt: string;
   updatedAt: string;
 }

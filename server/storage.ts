@@ -1,4 +1,14 @@
 import { eq, and, sql, desc, asc, not, gte, lt, isNull } from "drizzle-orm";
+
+// Generate a unique 6-character invite code
+function generateInviteCode(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
 import { db, pool } from "./db";
 import { 
   users, 
@@ -44,6 +54,7 @@ export interface IStorage {
   // League operations
   getLeagues(): Promise<League[]>;
   getLeague(id: number): Promise<League | undefined>;
+  getLeagueByInviteCode(inviteCode: string): Promise<League | undefined>;
   createLeague(league: InsertLeague): Promise<League>;
 
   // League member operations
@@ -207,8 +218,35 @@ export class DatabaseStorage implements IStorage {
     return league;
   }
 
+  async getLeagueByInviteCode(inviteCode: string): Promise<League | undefined> {
+    const [league] = await db.select().from(leagues).where(eq(leagues.inviteCode, inviteCode));
+    return league;
+  }
+
   async createLeague(league: InsertLeague): Promise<League> {
-    const [createdLeague] = await db.insert(leagues).values(league).returning();
+    // Generate a unique invite code
+    let inviteCode = generateInviteCode();
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    // Keep trying until we get a unique code
+    while (attempts < maxAttempts) {
+      const existingLeague = await this.getLeagueByInviteCode(inviteCode);
+      if (!existingLeague) {
+        break;
+      }
+      inviteCode = generateInviteCode();
+      attempts++;
+    }
+    
+    if (attempts >= maxAttempts) {
+      throw new Error("Could not generate unique invite code");
+    }
+    
+    const [createdLeague] = await db.insert(leagues).values({
+      ...league,
+      inviteCode
+    }).returning();
     return createdLeague;
   }
 

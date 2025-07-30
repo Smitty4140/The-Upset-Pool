@@ -58,6 +58,7 @@ export const leagues = pgTable("leagues", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
   description: text("description"),
+  inviteCode: varchar("invite_code", { length: 6 }).notNull().unique(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
