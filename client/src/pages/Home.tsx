@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, MessageSquare, Trophy, Medal, Calendar, Loader2, Check, Lock, Unlock } from "lucide-react";
+import { Shield, MessageSquare, Trophy, Medal, Calendar, Loader2, Check, Lock } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
@@ -40,7 +40,6 @@ export default function Home() {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>("gameTime");
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
-  const [isToggling, setIsToggling] = useState(false);
 
   // Default league ID - in a real app we would fetch the user's leagues
   const leagueId = 1;
@@ -88,10 +87,10 @@ export default function Home() {
   
   const isLoadingGames = isLoadingDatabaseGames;
 
-  // Get the user's pick for the selected week
+  // Get the user's pick for the current week (picks only for current week)
   const { data: userPick, isLoading: isLoadingPick, refetch: refetchUserPick } = useQuery<UserPick | null>({
-    queryKey: ["/api/user/pick", { weekId: activeWeekId, leagueId }],
-    enabled: !!activeWeekId && isAuthenticated,
+    queryKey: ["/api/user/pick", { weekId: pickableWeekId, leagueId }],
+    enabled: !!pickableWeekId && isAuthenticated,
   });
   
   // Get the leaderboard data
@@ -194,7 +193,7 @@ export default function Home() {
 
   // Handle pick submission
   const handleSubmitPick = () => {
-    if (!selectedGameId || !selectedTeamId || !activeWeekId) {
+    if (!selectedGameId || !selectedTeamId || !pickableWeekId) {
       toast({
         title: "Error",
         description: "Please select a team",
@@ -212,7 +211,7 @@ export default function Home() {
       gameId: selectedGameId,
       pickedTeamId: selectedTeamId,
       leagueId,
-      weekId: activeWeekId,
+      weekId: pickableWeekId,
     });
     
     // Show a toast with the selected team to make it obvious
@@ -253,85 +252,19 @@ export default function Home() {
     }
   }) : [];
 
-  // Get the selected week for lock status check
-  const selectedWeek = allWeeks?.find(week => week.id === (selectedWeekId || activeWeekId));
+  // Determine if picks are locked for the current week
+  const arePicksLocked = currentWeek 
+    ? new Date() >= new Date(currentWeek.picksLockAt) 
+    : false;
   
-  // Determine if picks are locked for the selected week
-  // For admin UI: A week is "locked" if picks are not allowed
-  // - If picksLockAt is in the past = locked (admin locked it or natural deadline passed)
-  // - If picksLockAt is normal future deadline = locked (default state)
-  // - If picksLockAt is far future (admin unlocked) = unlocked
-  const arePicksLocked = selectedWeek ? (() => {
-    const now = new Date();
-    const lockTime = new Date(selectedWeek.picksLockAt);
-    
-    // If lockTime is in the past, definitely locked
-    if (now >= lockTime) return true;
-    
-    // If lockTime is far in the future (more than 1 year from now), it's unlocked by admin
-    const oneYearFromNow = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
-    if (lockTime > oneYearFromNow) return false;
-    
-    // Otherwise, it's locked (normal deadline state)
-    return true;
-  })() : false;
+  // Determine if the selected week allows picks (only current week + not locked)
+  const canMakePicks = activeWeekId === pickableWeekId && !arePicksLocked;
   
-  // Determine if the selected week allows picks
-  // Picks are allowed if: the week is not locked (regardless of which week it is)
-  const canMakePicks = !arePicksLocked;
-  
-  // Check if viewing a future week where picks are locked
-  // This is now only true for future weeks that haven't been unlocked by admin
-  const isViewingFutureWeek = activeWeekId !== pickableWeekId && arePicksLocked;
+  // Check if viewing a future week (picks not allowed yet)
+  const isViewingFutureWeek = activeWeekId !== pickableWeekId && selectedWeekId && selectedWeekId !== pickableWeekId;
 
   // Loading state
   const isLoading = isLoadingWeek || isLoadingGames || isLoadingPick || isLoadingAuth;
-
-  // Handle toggle lock/unlock picks for a specific week
-  const handleToggleLock = async (weekId: number) => {
-    setIsToggling(true);
-    try {
-      const response = await fetch(`/api/admin/week/${weekId}/toggle-lock`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          leagueId: leagueId,
-          locked: !arePicksLocked  // Toggle the current lock status
-        }),
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Invalidate relevant queries to refresh the data
-        queryClient.invalidateQueries({ queryKey: ["/api/nfl-weeks/current"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/nfl-weeks"] });
-        
-        toast({
-          title: "Success",
-          description: data.message || "Pick lock status updated successfully",
-          variant: "default",
-        });
-      } else {
-        const errorData = await response.json();
-        toast({
-          title: "Error",
-          description: errorData.message || "Failed to update pick lock status",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update pick lock status",
-        variant: "destructive",
-      });
-    } finally {
-      setIsToggling(false);
-    }
-  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -353,41 +286,12 @@ export default function Home() {
 
       {/* Week Selector - positioned above all tab content */}
       {(activeTab === "spreads" || activeTab === "weeklypicks" || activeTab === "results") && activeWeekId && (
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6">
           <WeekSelector 
             currentWeekId={selectedWeekId || activeWeekId} 
             onWeekChange={(weekId) => setSelectedWeekId(weekId)} 
             className=""
           />
-          
-          {/* Admin Lock/Unlock Controls - Only visible on Game Spreads tab */}
-          {activeTab === "spreads" && isAdmin && (
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={() => handleToggleLock(selectedWeekId || activeWeekId)}
-                variant={arePicksLocked ? "outline" : "default"}
-                size="sm"
-                disabled={isToggling}
-                className={`${
-                  arePicksLocked 
-                    ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" 
-                    : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                }`}
-              >
-                {isToggling ? (
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : arePicksLocked ? (
-                  <Unlock className="h-4 w-4 mr-1" />
-                ) : (
-                  <Lock className="h-4 w-4 mr-1" />
-                )}
-                {arePicksLocked ? "Unlock Picks" : "Lock Picks"}
-              </Button>
-            </div>
-          )}
         </div>
       )}
 
