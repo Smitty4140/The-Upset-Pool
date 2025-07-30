@@ -61,14 +61,16 @@ export default function Home() {
     }
   }, [currentWeek, selectedWeekId]);
 
-  // The active week is either the selected week or the current week
-  // BUT we will force it to be the current week for game selection
-  const activeWeekId = currentWeek?.id;
+  // The active week is the selected week (for viewing) or current week (fallback)
+  const activeWeekId = selectedWeekId || currentWeek?.id;
+  
+  // The week used for picks is always the current week (picks only allowed for current week)
+  const pickableWeekId = currentWeek?.id;
 
-  // Get NFL games from the database for the selected week
+  // Get NFL games from the database for the active week (selected or current)
   const { data: databaseGames, isLoading: isLoadingDatabaseGames } = useQuery<NFLGame[]>({
-    queryKey: [`/api/nfl-games/week/${currentWeek?.id}`],
-    enabled: !!currentWeek,
+    queryKey: [`/api/nfl-games/week/${activeWeekId}`],
+    enabled: !!activeWeekId,
   });
   
   // Set the games from the database
@@ -85,10 +87,10 @@ export default function Home() {
   
   const isLoadingGames = isLoadingDatabaseGames;
 
-  // Get the user's pick for this week
+  // Get the user's pick for the current week (picks only for current week)
   const { data: userPick, isLoading: isLoadingPick, refetch: refetchUserPick } = useQuery<UserPick | null>({
-    queryKey: ["/api/user/pick", { weekId: activeWeekId, leagueId }],
-    enabled: !!activeWeekId && isAuthenticated,
+    queryKey: ["/api/user/pick", { weekId: pickableWeekId, leagueId }],
+    enabled: !!pickableWeekId && isAuthenticated,
   });
   
   // Get the leaderboard data
@@ -191,7 +193,7 @@ export default function Home() {
 
   // Handle pick submission
   const handleSubmitPick = () => {
-    if (!selectedGameId || !selectedTeamId || !currentWeek) {
+    if (!selectedGameId || !selectedTeamId || !pickableWeekId) {
       toast({
         title: "Error",
         description: "Please select a team",
@@ -209,7 +211,7 @@ export default function Home() {
       gameId: selectedGameId,
       pickedTeamId: selectedTeamId,
       leagueId,
-      weekId: currentWeek.id,
+      weekId: pickableWeekId,
     });
     
     // Show a toast with the selected team to make it obvious
@@ -250,10 +252,16 @@ export default function Home() {
     }
   }) : [];
 
-  // Determine if picks are locked
+  // Determine if picks are locked for the current week
   const arePicksLocked = currentWeek 
     ? new Date() >= new Date(currentWeek.picksLockAt) 
     : false;
+  
+  // Determine if the selected week allows picks (only current week + not locked)
+  const canMakePicks = activeWeekId === pickableWeekId && !arePicksLocked;
+  
+  // Check if viewing a future week (picks not allowed yet)
+  const isViewingFutureWeek = activeWeekId !== pickableWeekId && selectedWeekId && selectedWeekId !== pickableWeekId;
 
   // Loading state
   const isLoading = isLoadingWeek || isLoadingGames || isLoadingPick || isLoadingAuth;
@@ -362,7 +370,8 @@ export default function Home() {
                               selectedTeamId={selectedTeamId}
                               selectedGameId={selectedGameId}
                               onSelect={handleTeamSelection}
-                              disabled={arePicksLocked || !isAuthenticated}
+                              disabled={!canMakePicks || !isAuthenticated}
+                              isViewingFutureWeek={isViewingFutureWeek}
                             />
                           ))}
                         </div>
@@ -380,7 +389,7 @@ export default function Home() {
                             <Button 
                               type="submit" 
                               className="px-8 py-6 text-lg font-bold" 
-                              disabled={isSubmittingPick || !selectedTeamId}
+                              disabled={isSubmittingPick || !selectedTeamId || !canMakePicks}
                               onClick={handleSubmitPick}
                             >
                               {isSubmittingPick ? (
@@ -393,9 +402,14 @@ export default function Home() {
                                 </span>
                               ) : hasSubmittedPick ? "Update My Pick" : "Submit My Pick"}
                             </Button>
-                            {selectedTeamId && (
+                            {selectedTeamId && canMakePicks && (
                               <p className="mt-2 text-gray-600">
                                 {hasSubmittedPick ? "You can change your pick until the picks lock." : "Your pick will be locked at 1:00 PM EST on Sunday."}
+                              </p>
+                            )}
+                            {isViewingFutureWeek && (
+                              <p className="mt-2 text-amber-600 font-medium">
+                                You are viewing a future week. Picks will be available 12 hours before the first game.
                               </p>
                             )}
                           </div>

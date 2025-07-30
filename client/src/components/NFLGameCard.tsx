@@ -1,7 +1,13 @@
 import { NFLGame } from "@/lib/types";
 import { getTeamLogo } from "@/lib/teamLogos";
 import { formatGameTime } from "@/lib/formatDate";
-import { Clock, Check } from "lucide-react";
+import { Clock, Check, Lock } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type NFLGameCardProps = {
   game: NFLGame;
@@ -9,9 +15,10 @@ type NFLGameCardProps = {
   selectedGameId: string | null;
   onSelect: (gameId: string, teamId: number) => void;
   disabled?: boolean;
+  isViewingFutureWeek?: boolean;
 };
 
-export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, disabled = false }: NFLGameCardProps) {
+export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, disabled = false, isViewingFutureWeek = false }: NFLGameCardProps) {
   // Determine which teams are underdogs based on the spread
   const isHomeUnderdog = Number(game.spread) > 0;
   const isAwayUnderdog = Number(game.spread) < 0;
@@ -37,7 +44,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   // Always select the underdog team regardless of which team is clicked
   const handleHomeTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (disabled) return;
+    if (disabled || isViewingFutureWeek) return;
     // Always select the underdog team
     if (underdogTeamId) {
       onSelect(game.id, underdogTeamId);
@@ -46,19 +53,26 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   
   const handleAwayTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (disabled) return;
+    if (disabled || isViewingFutureWeek) return;
     // Always select the underdog team
     if (underdogTeamId) {
       onSelect(game.id, underdogTeamId);
     }
   };
 
-  return (
+  const tooltipContent = isViewingFutureWeek 
+    ? "Picks are not allowed until 12 hours before the first game of the week. Spreads may change until that point."
+    : disabled 
+      ? "Picks are locked for this week"
+      : null;
+
+  const gameCard = (
     <div 
       className={`game-card transition-all duration-150 ease-in-out border rounded-lg mb-4 last:mb-0 overflow-hidden shadow-sm 
-        ${!disabled ? 'hover:shadow-md' : ''} 
+        ${!disabled && !isViewingFutureWeek ? 'hover:shadow-md' : ''} 
         ${isGameSelected ? 'border-primary border-2 shadow-md relative' : 'border-gray-200'}
-        ${disabled ? 'opacity-75' : ''}`}
+        ${disabled || isViewingFutureWeek ? 'opacity-75' : ''}
+        ${isViewingFutureWeek ? 'cursor-not-allowed' : ''}`}
     >
       {/* Game time header */}
       <div className="bg-white px-4 py-3 flex items-center text-sm text-blue-800 border-b border-gray-100">
@@ -71,8 +85,9 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       <div className="bg-white">
         {/* Away Team Row */}
         <div 
-          className={`px-4 py-4 flex items-center justify-between cursor-pointer hover:bg-blue-50 transition-colors ${
-            disabled ? 'opacity-60' : ''
+          className={`px-4 py-4 flex items-center justify-between transition-colors ${
+            !disabled && !isViewingFutureWeek ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
+          } ${disabled || isViewingFutureWeek ? 'opacity-60' : ''
           }`} 
           onClick={handleAwayTeamClick}
         >
@@ -106,8 +121,9 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         
         {/* Home Team Row */}
         <div 
-          className={`px-4 py-4 flex items-center justify-between cursor-pointer hover:bg-blue-50 transition-colors ${
-            disabled ? 'opacity-60' : ''
+          className={`px-4 py-4 flex items-center justify-between transition-colors ${
+            !disabled && !isViewingFutureWeek ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
+          } ${disabled || isViewingFutureWeek ? 'opacity-60' : ''
           }`} 
           onClick={handleHomeTeamClick}
         >
@@ -144,4 +160,22 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       )}
     </div>
   );
+
+  // Wrap with tooltip if there's content to show
+  if (tooltipContent) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {gameCard}
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <p>{tooltipContent}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return gameCard;
 }
