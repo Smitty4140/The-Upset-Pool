@@ -1,8 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { NFLWeek } from "@/lib/types";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { Calendar } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface WeekSelectorProps {
@@ -10,6 +16,22 @@ interface WeekSelectorProps {
   onWeekChange: (weekId: number) => void;
   className?: string;
 }
+
+// Helper function to format date range for display
+const formatDateRange = (startDate: string, endDate: string): string => {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  const options: Intl.DateTimeFormatOptions = { 
+    month: 'short', 
+    day: 'numeric' 
+  };
+  
+  const startFormatted = start.toLocaleDateString('en-US', options);
+  const endFormatted = end.toLocaleDateString('en-US', options);
+  
+  return `${startFormatted} - ${endFormatted}`;
+};
 
 export default function WeekSelector({ currentWeekId, onWeekChange, className }: WeekSelectorProps) {
   // Fetch all NFL weeks
@@ -19,105 +41,40 @@ export default function WeekSelector({ currentWeekId, onWeekChange, className }:
 
   // Get the current displayed week
   const currentWeek = weeks?.find(week => week.id === currentWeekId) || null;
-  
-  // Get previous and next week IDs if they exist
-  const currentIndex = weeks?.findIndex(week => week.id === currentWeekId) || -1;
-  const prevWeekId = currentIndex > 0 ? weeks?.[currentIndex - 1].id : null;
-  const nextWeekId = currentIndex < (weeks?.length || 0) - 1 ? weeks?.[currentIndex + 1].id : null;
 
-  // Handle navigation
-  const handlePrevWeek = () => {
-    if (prevWeekId) onWeekChange(prevWeekId);
-  };
-
-  const handleNextWeek = () => {
-    if (nextWeekId) onWeekChange(nextWeekId);
-  };
-
-  // Get the active week (from the current week in the database)
-  const { data: activeWeek } = useQuery<NFLWeek>({
-    queryKey: ["/api/nfl-weeks/current"],
-  });
-  
-  // Handle week selection - only allow selecting the current week
-  const handleSelectWeek = (weekId: number) => {
-    // If we have an active week, only allow selecting that week
-    if (activeWeek && weekId === activeWeek.id) {
-      onWeekChange(weekId);
-    } else if (!activeWeek) {
-      // If no active week is defined, allow any selection
-      onWeekChange(weekId);
-    }
+  const handleWeekChange = (value: string) => {
+    const weekId = parseInt(value);
+    onWeekChange(weekId);
   };
 
   if (isLoading) {
     return (
-      <div className={cn("flex items-center justify-between py-2", className)}>
-        <Skeleton className="h-10 w-20" />
-        <Skeleton className="h-10 w-32" />
-        <Skeleton className="h-10 w-20" />
+      <div className={cn("flex items-center space-x-2", className)}>
+        <Calendar className="h-4 w-4 text-gray-400" />
+        <Skeleton className="h-9 w-48" />
       </div>
     );
   }
 
-  if (!weeks || weeks.length === 0 || !currentWeek) {
+  if (!weeks || weeks.length === 0) {
     return null;
   }
 
   return (
-    <div className={cn("flex items-center justify-between py-2", className)}>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handlePrevWeek}
-        disabled={!prevWeekId}
-        className="flex items-center text-gray-600 hover:text-gray-900"
-      >
-        <ChevronLeft className="h-4 w-4 mr-1" />
-        Previous
-      </Button>
-      
-      <div className="flex items-center space-x-1">
-        <Calendar className="h-4 w-4 text-primary" />
-        <span className="font-medium">Week {currentWeek.weekNumber}</span>
-        <span className="hidden sm:inline text-sm text-gray-500">
-          ({new Date(currentWeek.startDate).toLocaleDateString()} - {new Date(currentWeek.endDate).toLocaleDateString()})
-        </span>
-        
-        {/* Week quick selector (mobile friendly) */}
-        <div className="ml-2 hidden md:flex space-x-1">
-          {weeks.map(week => (
-            <Button
-              key={week.id}
-              variant={week.id === currentWeekId ? "default" : "ghost"}
-              size="sm"
-              className={cn(
-                "w-9 h-9 p-0 text-xs",
-                week.id === currentWeekId 
-                  ? "bg-primary text-white" 
-                  : activeWeek && week.id !== activeWeek.id
-                    ? "text-gray-400 cursor-not-allowed" 
-                    : "text-gray-600 hover:bg-gray-100"
-              )}
-              disabled={activeWeek && week.id !== activeWeek.id}
-              onClick={() => handleSelectWeek(week.id)}
-            >
-              {week.weekNumber}
-            </Button>
+    <div className={cn("flex items-center space-x-2", className)}>
+      <Calendar className="h-4 w-4 text-primary" />
+      <Select value={currentWeekId?.toString() || ""} onValueChange={handleWeekChange}>
+        <SelectTrigger className="w-64">
+          <SelectValue placeholder="Select a week" />
+        </SelectTrigger>
+        <SelectContent>
+          {weeks.map((week) => (
+            <SelectItem key={week.id} value={week.id.toString()}>
+              Week {week.weekNumber} ({formatDateRange(week.startDate, week.endDate)})
+            </SelectItem>
           ))}
-        </div>
-      </div>
-      
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleNextWeek}
-        disabled={!nextWeekId}
-        className="flex items-center text-gray-600 hover:text-gray-900"
-      >
-        Next
-        <ChevronRight className="h-4 w-4 ml-1" />
-      </Button>
+        </SelectContent>
+      </Select>
     </div>
   );
 }
