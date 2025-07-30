@@ -1924,6 +1924,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Scheduler management endpoints (admin only)
+  app.get('/api/admin/scheduler/status', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is an admin
+      const userId = req.user.id;
+      const userLeagues = await storage.getUserLeagues(userId);
+      const isAdmin = userLeagues.some(ul => ul.isAdmin);
+      
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+
+      // Import scheduler and get status
+      const { gameScheduler } = await import("./scheduler.js");
+      const status = gameScheduler.getStatus();
+      
+      res.json(status);
+    } catch (error) {
+      console.error("Error getting scheduler status:", error);
+      res.status(500).json({ message: "Failed to get scheduler status" });
+    }
+  });
+
+  app.post('/api/admin/scheduler/manual-pull', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is an admin  
+      const userId = req.user.id;
+      const userLeagues = await storage.getUserLeagues(userId);
+      const isAdmin = userLeagues.some(ul => ul.isAdmin);
+      
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Unauthorized: Admin access required" });
+      }
+
+      // Import scheduler and trigger manual pull
+      const { gameScheduler } = await import("./scheduler.js");
+      const result = await gameScheduler.triggerManualPull();
+      
+      res.json({
+        message: "Manual data pull completed",
+        result
+      });
+    } catch (error) {
+      console.error("Error triggering manual pull:", error);
+      res.status(500).json({ message: "Failed to trigger manual pull" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

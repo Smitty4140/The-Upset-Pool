@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit } from "lucide-react";
+import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { formatWeeklyDate } from "@/lib/formatDate";
 import { NFLWeek, League, NFLGame, NFLTeam } from "@/lib/types";
@@ -241,6 +241,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoadingGames, setIsLoadingGames] = useState(false);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [isLoadingScheduler, setIsLoadingScheduler] = useState(false);
 
   // Get current NFL week
   const { 
@@ -275,6 +276,17 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
 
   // Check if picks are locked
   const arePicksLocked = currentWeek ? new Date() > new Date(currentWeek.picksLockAt) : false;
+
+  // Get scheduler status
+  const { 
+    data: schedulerStatus, 
+    isLoading: isLoadingSchedulerStatus,
+    refetch: refetchSchedulerStatus
+  } = useQuery({
+    queryKey: ["/api/admin/scheduler/status"],
+    enabled: !!isAdmin,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
 
   const togglePickLockStatus = async () => {
     if (!currentWeek || !user) return;
@@ -402,6 +414,47 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
     }
   };
 
+  const triggerManualSchedulerPull = async () => {
+    if (!user) return;
+    
+    setIsLoadingScheduler(true);
+    try {
+      const response = await fetch("/api/admin/scheduler/manual-pull", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to trigger manual pull: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      // Refetch all related data
+      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games/week/${currentWeek?.id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/week/${currentWeek?.id}/picks`] });
+      refetchSchedulerStatus();
+      
+      toast({
+        title: "Success",
+        description: result.message || "Manual data pull completed successfully",
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to trigger manual data pull",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingScheduler(false);
+    }
+  };
+
   if (isLoadingAuth || isLoadingWeek || isLoadingLeague || isLoadingMembers) {
     return null; // Don't show anything while loading
   }
@@ -489,6 +542,46 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
             >
               {isLoadingGames ? "Loading..." : (
                 <><RefreshCw className="h-4 w-4 mr-2" /> Pull NFL Games from API</>
+              )}
+            </Button>
+          </div>
+        </div>
+        
+        <Separator className="my-4" />
+        
+        {/* Scheduler Status Section */}
+        <div className="mb-6">
+          <div className="text-sm font-medium mb-2">Automated Data Scheduler</div>
+          <div className="bg-purple-50 border border-purple-200 rounded-md p-3 mb-4 flex items-start">
+            <Clock className="h-5 w-5 text-purple-500 mt-0.5 mr-2 flex-shrink-0" />
+            <div className="text-sm text-purple-800">
+              The scheduler automatically pulls game data 12 hours before the first NFL game of each week.
+              You can check the status and manually trigger a data pull if needed.
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
+            <div className="mb-3 sm:mb-0">
+              <div className="text-sm font-medium">
+                Scheduler Status: 
+                <span className={schedulerStatus?.isRunning ? " text-green-600" : " text-red-600"}>
+                  {isLoadingSchedulerStatus ? " Loading..." : (schedulerStatus?.isRunning ? " Running" : " Stopped")}
+                </span>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {schedulerStatus && `${schedulerStatus.jobCount || 0} scheduled job${schedulerStatus.jobCount !== 1 ? 's' : ''}`}
+              </div>
+            </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLoadingScheduler}
+              onClick={triggerManualSchedulerPull}
+              className="ml-auto"
+            >
+              {isLoadingScheduler ? "Pulling..." : (
+                <><Activity className="h-4 w-4 mr-2" /> Manual Data Pull</>
               )}
             </Button>
           </div>

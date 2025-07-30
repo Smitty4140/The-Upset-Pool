@@ -64,7 +64,16 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
+    
+    // Start the game scheduler after server is running
+    try {
+      const { gameScheduler } = await import("./scheduler.js");
+      gameScheduler.start();
+      log("NFL Game Data Scheduler started");
+    } catch (error) {
+      console.error("Failed to start game scheduler:", error);
+    }
   });
 })();
