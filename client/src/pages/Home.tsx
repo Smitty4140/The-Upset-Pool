@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, MessageSquare, Trophy, Medal, Calendar, Loader2, Check, Lock } from "lucide-react";
+import { Shield, MessageSquare, Trophy, Medal, Calendar, Loader2, Check, Lock, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
@@ -41,9 +41,27 @@ export default function Home() {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>("gameTime");
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<number>(1);
 
-  // Default league ID - in a real app we would fetch the user's leagues
-  const leagueId = 1;
+  // Dynamic league ID based on user selection
+  const leagueId = selectedLeagueId;
+
+  // Get user's leagues for the selector
+  const { data: userLeagues, isLoading: isLoadingUserLeagues } = useQuery({
+    queryKey: ["/api/user/leagues"],
+    enabled: isAuthenticated,
+  });
+
+  // Set default league when user leagues load
+  useEffect(() => {
+    if (userLeagues && userLeagues.length > 0 && selectedLeagueId === 1) {
+      // If user has leagues and we're still on default, switch to their first league
+      const firstLeague = userLeagues[0];
+      if (firstLeague.league?.id) {
+        setSelectedLeagueId(firstLeague.league.id);
+      }
+    }
+  }, [userLeagues, selectedLeagueId]);
 
   // Get all NFL weeks
   const { data: allWeeks, isLoading: isLoadingAllWeeks } = useQuery<NFLWeek[]>({
@@ -297,19 +315,55 @@ export default function Home() {
         <meta name="description" content="Select your underdog team for this week's NFL games. Earn points based on the spread when your team wins outright." />
       </Helmet>
       
+      {/* League Selector */}
+      {isAuthenticated && (
+        <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center">
+                <Users className="h-5 w-5 text-primary mr-2" />
+                <span className="text-sm font-medium text-gray-700">League:</span>
+              </div>
+              {isLoadingUserLeagues ? (
+                <Skeleton className="h-8 w-48" />
+              ) : (
+                <Select
+                  value={selectedLeagueId.toString()}
+                  onValueChange={(value) => setSelectedLeagueId(Number(value))}
+                >
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Select a league" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {userLeagues?.map((membership: any) => (
+                      <SelectItem key={membership.league.id} value={membership.league.id.toString()}>
+                        <div className="flex items-center gap-2">
+                          <span>{membership.league.name}</span>
+                          {membership.isAdmin && (
+                            <Trophy className="h-3 w-3 text-yellow-600" />
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <CreateLeague onLeagueCreated={(league) => {
+              toast({
+                title: "Success!",
+                description: `${league.name} has been created. You can now manage it from your leagues.`,
+              });
+              // Refetch user leagues to include the new league
+              queryClient.invalidateQueries({ queryKey: ["/api/user/leagues"] });
+            }} />
+          </div>
+        </div>
+      )}
+
       {/* League Header with countdown and user's current pick */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div className="flex-1">
-          <LeagueHeader leagueId={leagueId} hasSubmittedPick={hasSubmittedPick} userPick={userPick} />
-        </div>
-        <div className="flex-shrink-0">
-          <CreateLeague onLeagueCreated={(league) => {
-            toast({
-              title: "Success!",
-              description: `${league.name} has been created. You can now manage it from your leagues.`,
-            });
-          }} />
-        </div>
+      <div className="mb-6">
+        <LeagueHeader leagueId={leagueId} hasSubmittedPick={hasSubmittedPick} userPick={userPick} />
       </div>
 
       {/* Deactivated User Banner */}

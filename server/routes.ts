@@ -552,7 +552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's leagues
   app.get('/api/user/leagues', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const leagues = await storage.getUserLeagues(userId);
       res.json(leagues);
     } catch (error) {
@@ -605,7 +605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid league ID" });
       }
 
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       
       // Check if league exists
       const league = await storage.getLeague(leagueId);
