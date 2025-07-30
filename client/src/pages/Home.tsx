@@ -109,6 +109,14 @@ export default function Home() {
   // Get the user's pick for the current week (picks only for current week)
   const { data: userPick, isLoading: isLoadingPick, refetch: refetchUserPick } = useQuery<UserPick | null>({
     queryKey: ["/api/user/pick", { weekId: pickableWeekId, leagueId }],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (pickableWeekId) params.append('weekId', pickableWeekId.toString());
+      params.append('leagueId', leagueId.toString());
+      return fetch(`/api/user/pick?${params.toString()}`, {
+        credentials: 'include'
+      }).then(res => res.json());
+    },
     enabled: !!pickableWeekId && isAuthenticated,
   });
 
