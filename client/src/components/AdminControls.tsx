@@ -251,6 +251,11 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [isLoadingScheduler, setIsLoadingScheduler] = useState(false);
 
+  // Check if current user is super user
+  const { data: superUserStatus } = useQuery<{ isSuperUser: boolean }>({
+    queryKey: ["/api/auth/super-user-status"],
+  });
+
   // Get current NFL week
   const { 
     data: currentWeek, 
@@ -645,9 +650,13 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
           </div>
         </div>
         
-        <Separator className="my-4" />
         
-        {/* NFL Games Section */}
+        {/* Super User Only - System Admin Controls */}
+        {superUserStatus?.isSuperUser && (
+          <>
+            <Separator className="my-4" />
+            
+            {/* NFL Games Section */}
         <div className="mb-6">
           <div className="text-sm font-medium mb-2">Manage NFL Games</div>
           <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 flex items-start">
@@ -761,8 +770,10 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
             </Button>
           </div>
         </div>
-        
-        <Separator className="my-6" />
+            
+            <Separator className="my-6" />
+          </>
+        )}
         
         {/* User Management Section */}
         <UserManagement leagueId={leagueId} />

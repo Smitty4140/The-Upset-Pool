@@ -37,6 +37,12 @@ type SortOption = "spread" | "homeUnderdog" | "gameTime";
 export default function Home() {
   const { user, isAuthenticated, isLoading: isLoadingAuth } = useAuth();
   const { toast } = useToast();
+
+  // Check if current user is super user
+  const { data: superUserStatus } = useQuery<{ isSuperUser: boolean }>({
+    queryKey: ["/api/auth/super-user-status"],
+    enabled: isAuthenticated,
+  });
   const [activeTab, setActiveTab] = useState<Tab>("spreads");
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
@@ -403,6 +409,7 @@ export default function Home() {
         onTabChange={(tab) => setActiveTab(tab as Tab)} 
         isPicksLocked={arePicksLocked}
         isAdmin={isAdmin}
+        isSuperUser={superUserStatus?.isSuperUser}
       />
 
       {/* Week Selector - positioned above all tab content */}
@@ -422,8 +429,8 @@ export default function Home() {
           <WeeklyPicks leagueId={leagueId} weekId={selectedWeekId || activeWeekId} isPicksLocked={arePicksLocked} />
         )}
 
-        {/* Results Tab - Only visible to admins */}
-        {activeTab === "results" && isAdmin && (
+        {/* Results Tab - Only visible to super users */}
+        {activeTab === "results" && superUserStatus?.isSuperUser && (
           <GameResults weekId={selectedWeekId || currentWeek?.id} />
         )}
 

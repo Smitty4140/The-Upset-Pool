@@ -10,6 +10,22 @@ import { userPicks, nflGames, nflWeeks, users, nflTeams } from "@shared/schema";
 import emailRoutes from "./routes/email";
 import { sendWelcomeEmail } from "./email";
 
+// Super user configuration - only this account has access to system admin functions
+const SUPER_USER_ID = "user_1753731196994_qfjmyp5i2";
+
+// Middleware to check if user is super user
+function isSuperUser(req: any, res: any, next: any) {
+  if (!req.user) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+  
+  if (req.user.id !== SUPER_USER_ID) {
+    return res.status(403).json({ message: "Super user access required" });
+  }
+  
+  next();
+}
+
 // Helper function to ensure all NFL teams exist in the database
 async function ensureNFLTeamsExist() {
   // Get all teams from the database
@@ -1238,8 +1254,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Admin route to set game winner and calculate points
-  app.post('/api/games/:id/result', isAuthenticated, async (req: any, res) => {
+  // Super user only route to set game winner and calculate points
+  app.post('/api/games/:id/result', isAuthenticated, isSuperUser, async (req: any, res) => {
     try {
       const gameId = parseInt(req.params.id);
       const { winningTeamId } = req.body;
@@ -1250,15 +1266,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!winningTeamId || isNaN(parseInt(winningTeamId))) {
         return res.status(400).json({ message: "Valid winning team ID is required" });
-      }
-      
-      // Check if user is an admin for any league
-      const userId = req.user.id;
-      const userLeagues = await storage.getUserLeagues(userId);
-      const isAdmin = userLeagues.some(ul => ul.isAdmin);
-      
-      if (!isAdmin) {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
       }
       
       // Get the game to verify it exists and the team is valid
@@ -2183,17 +2190,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Scheduler management endpoints (admin only)
-  app.get('/api/admin/scheduler/status', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/scheduler/status', isAuthenticated, isSuperUser, async (req: any, res) => {
     try {
-      // Check if user is an admin
-      const userId = req.user.id;
-      const userLeagues = await storage.getUserLeagues(userId);
-      const isAdmin = userLeagues.some(ul => ul.isAdmin);
-      
-      if (!isAdmin) {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
-      }
-
       // Import scheduler and get status
       const { gameScheduler } = await import("./scheduler.js");
       const status = gameScheduler.getStatus();
@@ -2205,17 +2203,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/scheduler/manual-pull', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/scheduler/manual-pull', isAuthenticated, isSuperUser, async (req: any, res) => {
     try {
-      // Check if user is an admin  
-      const userId = req.user.id;
-      const userLeagues = await storage.getUserLeagues(userId);
-      const isAdmin = userLeagues.some(ul => ul.isAdmin);
-      
-      if (!isAdmin) {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
-      }
-
       // Import scheduler and trigger manual pull
       const { gameScheduler } = await import("./scheduler.js");
       const result = await gameScheduler.triggerManualPull();
@@ -2230,17 +2219,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/scheduler/test-job', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/scheduler/test-job', isAuthenticated, isSuperUser, async (req: any, res) => {
     try {
-      // Check if user is an admin  
-      const userId = req.user.id;
-      const userLeagues = await storage.getUserLeagues(userId);
-      const isAdmin = userLeagues.some(ul => ul.isAdmin);
-      
-      if (!isAdmin) {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
-      }
-
       // Import scheduler and test the scheduled job
       const { gameScheduler } = await import("./scheduler.js");
       const result = await gameScheduler.testScheduledJob();
@@ -2255,17 +2235,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/scheduler/test-results-job', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/scheduler/test-results-job', isAuthenticated, isSuperUser, async (req: any, res) => {
     try {
-      // Check if user is an admin  
-      const userId = req.user.id;
-      const userLeagues = await storage.getUserLeagues(userId);
-      const isAdmin = userLeagues.some(ul => ul.isAdmin);
-      
-      if (!isAdmin) {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
-      }
-
       // Import scheduler and test the results job
       const { gameScheduler } = await import("./scheduler.js");
       const result = await gameScheduler.testResultsJob();

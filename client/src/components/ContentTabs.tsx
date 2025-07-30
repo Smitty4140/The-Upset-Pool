@@ -7,9 +7,10 @@ type ContentTabsProps = {
   onTabChange: (tab: Tab) => void;
   isPicksLocked?: boolean;
   isAdmin?: boolean;
+  isSuperUser?: boolean;
 };
 
-export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = false, isAdmin = false }: ContentTabsProps) {
+export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = false, isAdmin = false, isSuperUser = false }: ContentTabsProps) {
   return (
     <div className="bg-gradient-to-r from-primary/5 to-secondary/5 rounded-lg shadow overflow-hidden mb-8 border border-gray-200">
       <div className="border-b border-gray-200">
@@ -50,7 +51,7 @@ export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = fa
             Leaderboard
           </button>
           
-          {isAdmin && (
+          {isSuperUser && (
             <button
               onClick={() => onTabChange("results")}
               className={`${

@@ -202,6 +202,18 @@ export function setupAuth(app: Express) {
       receiveNotifications: req.user.receiveNotifications,
     });
   });
+
+  // Check if current user is super user
+  app.get("/api/auth/super-user-status", (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const SUPER_USER_ID = "user_1753731196994_qfjmyp5i2";
+    res.json({
+      isSuperUser: req.user.id === SUPER_USER_ID
+    });
+  });
 }
 
 export const isAuthenticated = (req: any, res: any, next: any) => {
