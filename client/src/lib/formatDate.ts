@@ -15,7 +15,17 @@ export function formatWeeklyDate(dateStr: string): string {
  * @param dateStr Date string to format
  */
 export function formatGameTime(dateStr: string): string {
-  const date = new Date(dateStr);
+  // The database stores times in Eastern Time, but without timezone info
+  // If the string doesn't already have timezone info, add EST to treat it as Eastern
+  let date: Date;
+  if (dateStr.includes('Z') || dateStr.includes('+') || dateStr.includes('EST') || dateStr.includes('EDT')) {
+    // Already has timezone info, parse as-is
+    date = new Date(dateStr);
+  } else {
+    // No timezone info, assume it's Eastern Time
+    date = new Date(dateStr + ' EST');
+  }
+  
   return date.toLocaleTimeString('en-US', {
     weekday: 'short',
     month: 'short',
