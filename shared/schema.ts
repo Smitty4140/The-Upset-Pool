@@ -68,6 +68,7 @@ export const leagueMembers = pgTable("league_members", {
   leagueId: integer("league_id").notNull().references(() => leagues.id),
   userId: varchar("user_id").notNull().references(() => users.id),
   isAdmin: boolean("is_admin").default(false),
+  isActive: boolean("is_active").default(true), // Whether the member can make picks
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => {

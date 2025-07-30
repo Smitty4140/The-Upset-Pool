@@ -49,6 +49,7 @@ export interface IStorage {
   // League member operations
   getLeagueMembers(leagueId: number): Promise<(LeagueMember & { user: User })[]>;
   getUserLeagues(userId: string): Promise<(LeagueMember & { league: League })[]>;
+  getLeagueMember(leagueId: number, userId: string): Promise<LeagueMember | undefined>;
   addLeagueMember(member: InsertLeagueMember): Promise<LeagueMember>;
   addUserToLeague(leagueId: number, userId: string, isAdmin: boolean): Promise<LeagueMember>;
   updateLeagueMember(leagueId: number, userId: string, updates: Partial<InsertLeagueMember>): Promise<LeagueMember>;
@@ -236,6 +237,19 @@ export class DatabaseStorage implements IStorage {
       ...row.league_members,
       league: row.leagues
     })) as (LeagueMember & { league: League })[];
+  }
+
+  async getLeagueMember(leagueId: number, userId: string): Promise<LeagueMember | undefined> {
+    const [member] = await db
+      .select()
+      .from(leagueMembers)
+      .where(
+        and(
+          eq(leagueMembers.leagueId, leagueId),
+          eq(leagueMembers.userId, userId)
+        )
+      );
+    return member;
   }
 
   async addLeagueMember(member: InsertLeagueMember): Promise<LeagueMember> {

@@ -142,6 +142,12 @@ export default function Home() {
     queryKey: [`/api/leagues/${leagueId}/members`],
   });
 
+  // Check user's activation status in the league
+  const { data: memberStatus } = useQuery<{ isActive: boolean; isAdmin: boolean }>({
+    queryKey: [`/api/league/${leagueId}/member-status`],
+    enabled: !!user
+  });
+
   // Check if user is an admin for this league
   const isAdmin = user && leagueMembers && Array.isArray(leagueMembers) && 
     leagueMembers.some((member: any) => 
@@ -374,6 +380,7 @@ export default function Home() {
                               disabled={!canMakePicks || !isAuthenticated}
                               isViewingFutureWeek={isViewingFutureWeek}
                               isSubmitting={isSubmittingPick}
+                              isInactive={memberStatus ? !memberStatus.isActive : false}
                             />
                           ))}
                         </div>

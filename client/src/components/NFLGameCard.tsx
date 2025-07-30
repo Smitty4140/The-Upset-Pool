@@ -19,9 +19,10 @@ type NFLGameCardProps = {
   disabled?: boolean;
   isViewingFutureWeek?: boolean;
   isSubmitting?: boolean;
+  isInactive?: boolean;
 };
 
-export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false }: NFLGameCardProps) {
+export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false, isInactive = false }: NFLGameCardProps) {
   // Determine which teams are underdogs based on the spread
   const isHomeUnderdog = Number(game.spread) > 0;
   const isAwayUnderdog = Number(game.spread) < 0;
@@ -47,7 +48,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   // Always select the underdog team regardless of which team is clicked
   const handleHomeTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (disabled || isViewingFutureWeek) return;
+    if (disabled || isViewingFutureWeek || isInactive) return;
     // Always select the underdog team
     if (underdogTeamId) {
       onSelect(game.id, underdogTeamId);
@@ -56,26 +57,28 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   
   const handleAwayTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (disabled || isViewingFutureWeek) return;
+    if (disabled || isViewingFutureWeek || isInactive) return;
     // Always select the underdog team
     if (underdogTeamId) {
       onSelect(game.id, underdogTeamId);
     }
   };
 
-  const tooltipContent = isViewingFutureWeek 
-    ? "Picks are not allowed until 12 hours before the first game of the week. Spreads may change until that point."
-    : disabled 
-      ? "Picks are locked for this week"
-      : null;
+  const tooltipContent = isInactive
+    ? "Your team is not activated. Contact your league admin to start picking upsets."
+    : isViewingFutureWeek 
+      ? "Picks are not allowed until 12 hours before the first game of the week. Spreads may change until that point."
+      : disabled 
+        ? "Picks are locked for this week"
+        : null;
 
   const gameCard = (
     <div 
       className={`game-card transition-all duration-150 ease-in-out border rounded-lg mb-4 last:mb-0 overflow-hidden shadow-sm 
-        ${!disabled && !isViewingFutureWeek ? 'hover:shadow-md' : ''} 
+        ${!disabled && !isViewingFutureWeek && !isInactive ? 'hover:shadow-md' : ''} 
         ${isGameSelected ? 'border-primary border-2 shadow-md relative' : 'border-gray-200'}
-        ${disabled || isViewingFutureWeek ? 'opacity-75' : ''}
-        ${isViewingFutureWeek ? 'cursor-not-allowed' : ''}`}
+        ${disabled || isViewingFutureWeek || isInactive ? 'opacity-75' : ''}
+        ${isViewingFutureWeek || isInactive ? 'cursor-not-allowed' : ''}`}
     >
       {/* Selected Game indicator at the top */}
       {isGameSelected && (
@@ -97,8 +100,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         {/* Away Team Row */}
         <div 
           className={`px-4 py-4 flex items-center justify-between transition-colors ${
-            !disabled && !isViewingFutureWeek ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
-          } ${disabled || isViewingFutureWeek ? 'opacity-60' : ''
+            !disabled && !isViewingFutureWeek && !isInactive ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
+          } ${disabled || isViewingFutureWeek || isInactive ? 'opacity-60' : ''
           }`} 
           onClick={handleAwayTeamClick}
         >
@@ -133,8 +136,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         {/* Home Team Row */}
         <div 
           className={`px-4 py-4 flex items-center justify-between transition-colors ${
-            !disabled && !isViewingFutureWeek ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
-          } ${disabled || isViewingFutureWeek ? 'opacity-60' : ''
+            !disabled && !isViewingFutureWeek && !isInactive ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
+          } ${disabled || isViewingFutureWeek || isInactive ? 'opacity-60' : ''
           }`} 
           onClick={handleHomeTeamClick}
         >
@@ -163,7 +166,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       </div>
       
       {/* Submit button at the bottom when game is selected */}
-      {isGameSelected && onSubmit && !disabled && !isViewingFutureWeek && (
+      {isGameSelected && onSubmit && !disabled && !isViewingFutureWeek && !isInactive && (
         <div className="bg-gray-50 px-4 py-3 border-t border-gray-100">
           <Button 
             onClick={(e) => {

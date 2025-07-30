@@ -254,6 +254,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch NFL weeks" });
     }
   });
+
+  // Get user's league member status (activation status)
+  app.get('/api/league/:leagueId/member-status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const leagueId = parseInt(req.params.leagueId);
+      
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+      
+      const leagueMember = await storage.getLeagueMember(leagueId, userId);
+      if (!leagueMember) {
+        return res.status(404).json({ message: "Not a member of this league" });
+      }
+      
+      res.json({ 
+        isActive: leagueMember.isActive,
+        isAdmin: leagueMember.isAdmin 
+      });
+    } catch (error) {
+      console.error("Error fetching member status:", error);
+      res.status(500).json({ message: "Failed to fetch member status" });
+    }
+  });
+
+  // Admin-only route to toggle member activation status
+  app.post('/api/admin/league/:leagueId/member/:userId/toggle-active', isAuthenticated, async (req: any, res) => {
+    try {
+      const adminUserId = req.user.id;
+      const leagueId = parseInt(req.params.leagueId);
+      const targetUserId = req.params.userId;
+      
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+      
+      // Check if the requesting user is an admin of this league
+      const adminMember = await storage.getLeagueMember(leagueId, adminUserId);
+      if (!adminMember || !adminMember.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      // Get the target member
+      const targetMember = await storage.getLeagueMember(leagueId, targetUserId);
+      if (!targetMember) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+      
+      // Toggle activation status
+      const updatedMember = await storage.updateLeagueMember(leagueId, targetUserId, {
+        isActive: !targetMember.isActive
+      });
+      
+      res.json({ 
+        message: `Member ${updatedMember.isActive ? 'activated' : 'deactivated'} successfully`,
+        isActive: updatedMember.isActive 
+      });
+    } catch (error) {
+      console.error("Error toggling member activation:", error);
+      res.status(500).json({ message: "Failed to toggle member activation" });
+    }
+  });
   
   // Toggle lock status for picks in a week (admin only)
   app.post('/api/admin/week/:id/toggle-lock', isAuthenticated, async (req: any, res) => {
@@ -1257,6 +1320,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pickedTeamId = parseInt(req.body.pickedTeamId);
       const leagueId = parseInt(req.body.leagueId);
       const weekId = parseInt(req.body.weekId);
+      
+      // Check if user is an active member of the league
+      const leagueMember = await storage.getLeagueMember(leagueId, userId);
+      if (!leagueMember) {
+        return res.status(403).json({ message: "You are not a member of this league" });
+      }
+      
+      if (!leagueMember.isActive) {
+        return res.status(403).json({ message: "Your team is not activated. Contact your league admin to start picking upsets." });
+      }
       
       console.log(`Parsed pick data - Game ID: ${gameId}, Team ID: ${pickedTeamId}, League ID: ${leagueId}, Week ID: ${weekId}`);
       
