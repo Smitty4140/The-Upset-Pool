@@ -4,7 +4,7 @@ import { NFLGame, NFLTeam, NFLWeek } from "@/lib/types";
 import NFLGameCard from "./NFLGameCard";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, CheckCircle, Info } from "lucide-react";
+import { Calendar, CheckCircle, Info, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCountdown } from "@/hooks/useCountdown";
 import { apiRequest } from "@/lib/queryClient";
@@ -42,6 +42,10 @@ export default function NFLGamesGrid({
   // Calculate whether picks are locked based on the week's picksLockAt time
   const isLocked = week ? new Date(week.picksLockAt) < new Date() : false;
   
+  // Check if user's current pick is locked due to their selected game having started
+  const isPickLocked = userPick && userPick.game ? 
+    new Date(userPick.game.gameTime) < new Date() : false;
+  
   // Setup countdown to lock time
   const lockDate = week ? new Date(week.picksLockAt) : null;
   const countdown = useCountdown(lockDate);
@@ -72,11 +76,12 @@ export default function NFLGamesGrid({
       queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
       onPickSubmit();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Error submitting pick:", error);
+      const errorMessage = error?.response?.data?.message || "Failed to submit your pick. Please try again.";
       toast({
         title: "Error!",
-        description: "Failed to submit your pick. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -84,7 +89,7 @@ export default function NFLGamesGrid({
 
   // Handler for selecting a game and team
   const handleSelectGame = (gameId: string, teamId: number) => {
-    if (isLocked || hasSubmittedPick) return;
+    if (isLocked || hasSubmittedPick || isPickLocked) return;
     
     setSelectedGameId(gameId);
     setSelectedTeamId(teamId);
@@ -131,7 +136,7 @@ export default function NFLGamesGrid({
 
   return (
     <div className="space-y-6">
-      {!isLocked && !hasSubmittedPick && (
+      {!isLocked && !hasSubmittedPick && !isPickLocked && (
         <div className="flex items-center p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
           <Calendar className="h-5 w-5 text-yellow-500 mr-2 flex-shrink-0" />
           <span className="text-sm text-yellow-700">
@@ -148,7 +153,16 @@ export default function NFLGamesGrid({
         </div>
       )}
 
-      {hasSubmittedPick && (
+      {hasSubmittedPick && isPickLocked && (
+        <div className="flex items-center p-3 bg-red-50 border border-red-200 rounded-lg">
+          <Lock className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
+          <span className="text-sm text-red-700">
+            Your pick is locked because your selected game has already started
+          </span>
+        </div>
+      )}
+
+      {hasSubmittedPick && !isPickLocked && (
         <div className="flex items-center p-3 bg-green-50 border border-green-200 rounded-lg">
           <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
           <span className="text-sm text-green-700">
@@ -165,12 +179,12 @@ export default function NFLGamesGrid({
             selectedGameId={selectedGameId}
             selectedTeamId={selectedTeamId}
             onSelect={handleSelectGame}
-            disabled={isLocked || hasSubmittedPick}
+            disabled={isLocked || hasSubmittedPick || isPickLocked}
           />
         ))}
       </div>
 
-      {!isLocked && !hasSubmittedPick && (
+      {!isLocked && !hasSubmittedPick && !isPickLocked && (
         <div className="flex justify-center mt-6">
           <Button
             onClick={handleSubmitPick}

@@ -1624,6 +1624,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check for existing pick
       const existingPick = await storage.getUserPick(userId, weekId, leagueId);
       
+      // If user has an existing pick, check if their picked game has started
+      if (existingPick && existingPick.game) {
+        const existingGameKickoffTime = new Date(existingPick.game.gameTime);
+        if (now > existingGameKickoffTime) {
+          return res.status(400).json({ 
+            message: "Your pick is locked because your selected game has already started",
+            details: { 
+              pickedGame: `${existingPick.game.awayTeam.name} @ ${existingPick.game.homeTeam.name}`,
+              gameTime: existingPick.game.gameTime
+            }
+          });
+        }
+      }
+      
       if (existingPick) {
         console.log(`Updating existing pick for user ${userId}`);
         // Update existing pick with current spread
