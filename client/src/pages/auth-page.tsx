@@ -137,7 +137,7 @@ export default function AuthPage() {
             </h1>
             <p className="text-xl text-gray-600 max-w-md mx-auto lg:mx-0">
               Pick underdog teams to win outright and earn points based on the spread. 
-              Compete with friends in the ultimate NFL prediction challenge!
+              Compete with friends and enemies to earn a spot among the greatest heroes of our time.
             </p>
           </div>
 
@@ -148,7 +148,7 @@ export default function AuthPage() {
               </div>
               <div>
                 <div className="font-semibold text-gray-900">Compete</div>
-                <div className="text-sm text-gray-600">Weekly leaderboards</div>
+                <div className="text-sm text-gray-600">Pick underdog winners</div>
               </div>
             </div>
             
@@ -158,7 +158,7 @@ export default function AuthPage() {
               </div>
               <div>
                 <div className="font-semibold text-gray-900">Strategy</div>
-                <div className="text-sm text-gray-600">Pick smart underdogs</div>
+                <div className="text-sm text-gray-600">Near zero needed, but it helps</div>
               </div>
             </div>
             
@@ -168,7 +168,7 @@ export default function AuthPage() {
               </div>
               <div>
                 <div className="font-semibold text-gray-900">Community</div>
-                <div className="text-sm text-gray-600">Play with friends</div>
+                <div className="text-sm text-gray-600">Volatile message boards</div>
               </div>
             </div>
             
@@ -177,8 +177,8 @@ export default function AuthPage() {
                 <Star className="h-8 w-8 text-purple-500 mx-auto" />
               </div>
               <div>
-                <div className="font-semibold text-gray-900">Rewards</div>
-                <div className="text-sm text-gray-600">Points for wins</div>
+                <div className="font-semibold text-gray-900">Fame</div>
+                <div className="text-sm text-gray-600">Become insanely famous</div>
               </div>
             </div>
           </div>
