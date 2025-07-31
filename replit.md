@@ -1,194 +1,51 @@
-# NFL Upset Pool - Full Stack Application
+# NFL Upset Pool - Compressed
 
 ## Overview
-
-The NFL Upset Pool is a full-stack web application where users pick underdog NFL teams to win outright each week. Players earn points equal to the spread when their selected underdog wins. The application features user authentication, league management, real-time game tracking, and a comprehensive leaderboard system.
+The NFL Upset Pool is a full-stack web application enabling users to pick underdog NFL teams to win, earning points based on the spread. It features user authentication, league management, real-time game tracking, and a comprehensive leaderboard. The vision is to create an engaging platform for NFL fans to compete in a unique, strategy-focused fantasy game, offering real-time updates and a seamless user experience.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend Architecture
+### Frontend
 - **Framework**: React 18 with TypeScript
-- **Styling**: Tailwind CSS with shadcn/ui component library
-- **Routing**: Wouter for client-side routing
-- **State Management**: TanStack Query (React Query) for server state management
+- **Styling**: Tailwind CSS with shadcn/ui
+- **Routing**: Wouter
+- **State Management**: TanStack Query (React Query)
 - **Form Handling**: React Hook Form with Zod validation
-- **Build Tool**: Vite for development and production builds
+- **Build Tool**: Vite
+- **UI/UX Decisions**:
+    - Intuitive navigation with a dropdown week selector.
+    - Clear visual indicators for game status (e.g., "STARTED", locked games).
+    - User-friendly display of picks, spreads, and standings.
+    - Color-coded badges and improved contrast for readability (e.g., dark grey background with white text for navigation).
+    - Individual submit buttons for game card picks for improved clarity.
 
-### Backend Architecture
+### Backend
 - **Runtime**: Node.js with Express.js
 - **Language**: TypeScript with ES modules
-- **Authentication**: Dual authentication system supporting both email/password and Replit OAuth
-- **Session Management**: Express sessions with PostgreSQL storage
-- **API Design**: RESTful API with structured error handling
+- **Authentication**: Dual system (email/password and Replit OAuth) with scrypt hashing.
+- **Session Management**: Express sessions with PostgreSQL storage.
+- **API Design**: RESTful API with structured error handling.
+- **Key Features**:
+    - Automated user assignment to a default league.
+    - Server-side validation for pick submissions, ensuring underdog selection and enforcing deadlines.
+    - Automated game data and results pulling via scheduled jobs (e.g., 12 hours before first game for data, 5 hours after last game for results).
+    - Comprehensive tie handling in leaderboards.
+    - League management including unique invite codes and member management.
+    - Super user system for critical system-wide administrative functions.
+    - Game-specific pick locking based on kickoff times.
 
-### Database Architecture
+### Database
 - **Database**: PostgreSQL (configured for Neon serverless)
 - **ORM**: Drizzle ORM with type-safe queries
-- **Schema Management**: Drizzle Kit for migrations and schema management
-- **Connection**: Connection pooling with @neondatabase/serverless
-
-## Key Components
-
-### Authentication System
-- **Dual Auth Support**: Email/password authentication and Replit OAuth
-- **Session Storage**: PostgreSQL-backed session storage using connect-pg-simple
-- **Security**: Scrypt-based password hashing with salt
-- **User Management**: User profiles with customizable settings and avatars
-- **Auto-League Assignment**: All new users automatically join the default NFL Upset Pool league
-
-### NFL Game Management
-- **Live Data Integration**: Configured for external sports odds API integration
-- **Game Tracking**: Comprehensive game state management with spreads and results
-- **Week Management**: NFL season week structure with configurable pick deadlines
-- **Team Data**: Complete NFL team database with logos and branding
-
-### League System
-- **Multi-League Support**: Users can participate in multiple leagues
-- **Leaderboard**: Real-time point calculations and rankings
-- **Pick Management**: Weekly pick submission with deadline enforcement
-- **Admin Controls**: League administration tools for game management
-
-### Email Integration
-- **SendGrid Integration**: Transactional email support for notifications
-- **Welcome Emails**: Automated user onboarding emails
-- **Pick Reminders**: Configurable notification system
-
-## Data Flow
-
-### Pick Submission Flow
-1. User selects an underdog team from the weekly games grid
-2. Client validates pick against deadline and game status
-3. API processes pick submission with spread calculation
-4. Database stores pick with metadata (spread at time of pick, underdog status)
-5. Real-time UI updates reflect the submitted pick
-
-### Scoring Flow
-1. Admin updates game results through admin panel
-2. System calculates points for all picks based on game outcomes
-3. User totals are recalculated automatically
-4. Leaderboard updates reflect new standings
-5. Email notifications sent for significant events
-
-### Data Synchronization
-1. External odds API provides game spreads and schedules
-2. Admin triggers data sync through admin controls
-3. System updates game information while preserving existing picks
-4. Conflict resolution ensures data integrity
+- **Schema Management**: Drizzle Kit
+- **Connection**: @neondatabase/serverless for connection pooling
+- **Data Integrity**: Ensures picks are isolated by league and points are calculated per league.
 
 ## External Dependencies
-
-### Required Services
-- **PostgreSQL Database**: Primary data storage (configured for Neon)
-- **SendGrid**: Email delivery service (optional, graceful degradation)
-- **Sports Odds API**: External game data and spreads (configurable)
-
-### Required Environment Variables
-- `DATABASE_URL`: PostgreSQL connection string
-- `SESSION_SECRET`: Session encryption key
-- `SENDGRID_API_KEY`: Email service API key (optional)
-- `NODE_ENV`: Environment configuration
-- `REPL_ID`: Replit integration identifier (optional)
-
-### NPM Dependencies
-- **UI Framework**: @radix-ui components, @tanstack/react-query
-- **Database**: drizzle-orm, @neondatabase/serverless
-- **Authentication**: passport, express-session
-- **Utilities**: zod, date-fns, clsx
-
-## Deployment Strategy
-
-### Development Environment
-- **Hot Reload**: Vite development server with HMR
-- **Database**: Local PostgreSQL or development Neon instance
-- **Authentication**: Both auth methods available for testing
-- **Email**: Development mode with console logging
-
-### Production Build
-- **Frontend**: Vite production build with asset optimization
-- **Backend**: ESBuild compilation to single JavaScript bundle
-- **Static Assets**: Served from Express with proper caching headers
-- **Database**: Production PostgreSQL with connection pooling
-
-### Deployment Configuration
-- **Start Command**: `npm start` runs the production Express server
-- **Health Checks**: Built-in API health endpoints
-- **Error Handling**: Comprehensive error catching with user-friendly responses
-- **Logging**: Structured logging for API requests and database operations
-
-The application is designed for easy deployment on platforms like Replit, Vercel, or traditional VPS hosting, with environment-based configuration for different deployment targets.
-
-## Recent Changes
-
-### July 28, 2025
-- **Pick Locking Logic**: Fixed inverted pick locking - picks are now correctly unlocked before 1:00 PM EST Sunday and locked after
-- **Week Date Filtering**: Games now properly filter by week date ranges to show only relevant games
-- **Game Chronological Ordering**: Games within each week now display in kickoff time order (earliest first)
-- **Deadline Configuration**: Updated all NFL weeks to lock picks at 1:00 PM EST on the Sunday within each week
-- **Auto-League Membership**: Implemented automatic assignment of all new users to the default NFL Upset Pool league
-- **Leaderboard Fix**: Ensured all users appear on the leaderboard by adding them to league membership
-
-### July 29, 2025
-- **Underdog Selection Logic**: Fixed and enforced proper underdog-only selection logic with server-side validation
-- **Game Card UI Enhancement**: Removed "FAVORITE" labels and made entire game cards clickable while maintaining underdog-only selection
-- **Smart Pick Selection**: System automatically selects underdog team regardless of which team user clicks on game card
-- **Pick Display Component**: Corrected "Your Selected Pick" component to accurately show underdog spread values with proper +/- formatting
-- **Spread Convention**: Confirmed and documented spread logic - positive spread = home team underdog, negative spread = away team underdog
-- **Server-Side Auto-Switch**: Backend automatically converts any favorite team selections to corresponding underdog teams before database storage
-- **UI Consistency**: Green badges continue to indicate underdog teams while both teams remain visually clickable for better UX
-- **Admin Controls Fix**: Fixed authentication issue in lock/unlock picks functionality - admin users can now properly toggle pick deadlines
-- **Weekly Picks Enhancement**: Added Season Total column to weekly picks table showing each player's cumulative points for the season
-- **Game Results Management**: Implemented comprehensive Results tab for admin users with game winner selection and automatic point calculation
-- **Editable Results**: Game results can be changed by admins even after being set, automatically recalculating all affected user points and season totals
-- **Cache Synchronization Fix**: Fixed critical cache invalidation issues where pick changes and game result updates weren't immediately reflected in the Weekly Picks table
-- **Real-time UI Updates**: All components now properly invalidate related query caches for immediate UI synchronization when picks are submitted or game results are updated
-- **Pull NFL Game Results API**: Added automated game results fetching from ESPN's free API with admin "Pull Game Results from API" button for real-time score updates and point calculation
-- **Proper Tie Handling in Leaderboards**: Implemented comprehensive tie handling across all leaderboard views - users with same points share identical rankings with proper gap handling (e.g., 1st, 2nd, 2nd, 4th)
-- **Weekly Picks Standings**: Added "Standing" column to Weekly Picks table showing each player's current season position (1st, 2nd, 3rd, etc.) with table ordered by standings
-- **Navigation Accessibility Fix**: Updated top navigation from blue gradient background with grey text to dark grey background (bg-gray-800) with white text for improved readability and contrast
-- **Admin Controls Reorganization**: Moved league admin controls from standalone section to dedicated "Admin" tab within main content tabs, visible only to league administrators for better organization and cleaner UI
-- **Automated Game Data Scheduler**: Implemented comprehensive scheduling system using node-cron that automatically pulls NFL game data 12 hours before the first game of each week
-- **Scheduler Management Interface**: Added admin UI controls to monitor scheduler status, view scheduled jobs, and trigger manual data pulls for testing
-- **Game Data Flow Clarification**: Games are first created via odds API pull (appearing on selection tab), then later updated with results via ESPN API pull (affecting only existing games)
-- **Automated Results Scheduler**: Implemented comprehensive dual scheduling system - game data pulls 12 hours before first game AND results pulls 5 hours after last game of each NFL week
-- **Results Pull Automation**: System automatically processes game results on Monday nights (5 hours after typical MNF completion) to calculate final points and update leaderboards
-- **Dual Test Interface**: Added separate test buttons for both data pulls and results pulls with proper UI feedback and cache invalidation
-- **Complete NFL Season Coverage**: Verified and completed all 18 NFL regular season weeks (September 4, 2025 - January 7, 2026) with proper Thursday-Wednesday week structure
-- **Schedule Alignment**: All weeks properly aligned to official 2025 NFL season dates with standard Sunday 1:00 PM EST pick deadlines
-- **Scheduler Integration**: Full automation now covers entire NFL season with both data pulls and results processing scheduled for all 18 weeks
-- **Week Selector UI Improvement**: Moved week selector component above tab content for better visual hierarchy and accessibility across Game Spreads, Weekly Picks, and Results tabs
-- **Cross-Tab Week Selection**: Week selector now properly synchronizes across all relevant tabs, allowing users to view historical data for any NFL week
-- **Dropdown Week Selector**: Converted week selector from pagination-style to dropdown format showing "Week x (date - date)" for easy identification and access to all weeks
-- **Future Week Viewing**: Users can now select and view any NFL week spreads while picks remain locked for future weeks with informative hover tooltips
-- **Database Week Assignment Fix**: Corrected critical database issue where all 273 games were incorrectly assigned to week 1; games now properly distributed across all 18 NFL weeks based on game dates
-- **Enhanced Pick Restrictions**: Implemented comprehensive future week pick locking with visual indicators and hover messages explaining "Picks are not allowed until 12 hours before the first game of the week. Spreads may change until that point."
-- **Individual Game Card Submit Buttons**: Redesigned pick submission UX - "Selected Game" indicator now appears at top of cards with individual "SUBMIT PICK" buttons at bottom, replacing centralized submit button for improved user clarity
-
-### July 30, 2025
-- **Complete Admin User Management Interface**: Added comprehensive user management section to admin tab displaying all league members with names, emails, activation status badges, and admin privilege indicators
-- **Dual Admin Controls**: Implemented toggle buttons for both user activation (Activate/Deactivate) and admin privileges (Make Admin/Remove Admin) with proper authentication and security measures
-- **Self-Protection Safeguards**: Added backend protection preventing admins from removing their own admin privileges to avoid system lockout scenarios
-- **Admin Privilege Toggle API**: Created new `/api/admin/league/:leagueId/member/:userId/toggle-admin` endpoint with proper validation and error handling
-- **Deactivated User Experience Enhancement**: Added prominent red banner at top of league interface for deactivated users with same messaging as game card tooltips: "Your team is not activated. Contact your league admin to start picking upsets."
-- **Visual Status Indicators**: Enhanced admin interface with color-coded badges (Active/Inactive for activation status, Admin/Member for privilege levels) and contextual button styling
-- **Admin Dropdown Controls**: Replaced button-based admin controls with intuitive dropdown selectors for both user activation status and admin privileges, maintaining clear color-coded styling
-- **Week Lock Date Fix**: Corrected critical bug in admin week lock/unlock system that was setting lock dates relative to current date instead of the actual NFL week's Sunday at 1:00 PM EST
-- **Enhanced Pick Display Component**: Redesigned "Your Selected Pick" component to match game card format with centered layout, game time display, away team on top, home team on bottom, and proper spread indicators
-- **Streamlined Pick Display Layout**: Simplified selected pick component by removing redundant text labels and status messages, keeping only "SELECTED GAME" indicator and game card, horizontally aligned with header elements for compact design
-- **League-Specific Pick Selection**: Fixed critical bug where user picks were not properly isolated by league - picks are now correctly filtered by selected league ID, ensuring each league maintains separate pick selections
-- **Top Navigation League Selector**: Moved league selector from leaderboard page to main navigation with dropdown showing all user leagues and admin crown icons for leagues where user has admin privileges
-- **Dynamic League Content**: All application content (picks, leaderboard, admin controls, weekly picks) now updates automatically based on selected league from top navigation dropdown
-- **Invite Code System Implementation**: Added comprehensive league joining system with unique 6-character invite codes for each league, JoinLeague dialog component, and backend API validation
-- **League Independence Fix**: Resolved critical leaderboard bug where points were calculated globally across all leagues - implemented league-specific point aggregation ensuring complete data isolation between leagues
-- **Admin Invite Code Display**: Added invite code section in Admin Controls with copy-to-clipboard functionality for league administrators to share with potential members
-- **Super User Security System**: Implemented comprehensive super user access control restricting system-wide admin functions to specific user account "user_1753731196994_qfjmyp5i2"
-- **System vs League Admin Separation**: Separated league-level admin functions (user management, activation control, member removal) from system-level admin functions requiring super user status
-- **Results Tab Access Control**: Restricted Results tab and game winner selection capabilities exclusively to super user to prevent unauthorized game result manipulation
-- **System Admin Function Protection**: Protected NFL data pulling, game results processing, and scheduler management with super user authentication middleware
-- **Individual Game Kickoff Locking**: Implemented game-specific pick restrictions where games become unselectable once their kickoff time has passed, even before the overall Sunday 1pm deadline
-- **Real-time Game Status Display**: Added visual indicators showing "STARTED" status with lock icons for games that have begun, preventing pick submission attempts
-- **User Pick Locking**: Implemented game-specific user pick restrictions where users cannot change their pick once their selected game has started, displaying "Error: You cannot make a new pick. Your selected game has started and you are LOCKED IN" message
-- **Server-Side Time Security**: All time-based validations use server time exclusively and cannot be bypassed by manipulating client clock settings - includes week locks, individual game kickoffs, and user pick restrictions
+- **PostgreSQL Database**: Primary data storage (e.g., Neon).
+- **SendGrid**: Email delivery service for notifications (optional).
+- **Sports Odds API**: External service for NFL game data and spreads.
+- **ESPN API**: Used for pulling NFL game results.
