@@ -286,7 +286,7 @@ export default function AuthPage() {
                         name="username"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Username</FormLabel>
+                            <FormLabel>Leaderboard Name</FormLabel>
                             <FormControl>
                               <Input 
                                 placeholder="Choose a username" 
