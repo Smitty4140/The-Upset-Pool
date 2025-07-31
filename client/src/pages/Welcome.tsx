@@ -1,7 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FaTrophy, FaFootballBall, FaChartLine, FaUsers } from "react-icons/fa";
-import { ArrowRight, CalendarDays, TrendingUp, Award, AlertTriangle } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarDays,
+  TrendingUp,
+  Award,
+  AlertTriangle,
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
@@ -9,7 +15,7 @@ import { useLocation } from "wouter";
 export default function Welcome() {
   const { user, isLoading } = useAuth();
   const [_, navigate] = useLocation();
-  
+
   // Redirect to home if already logged in
   useEffect(() => {
     if (user && !isLoading) {
@@ -29,13 +35,17 @@ export default function Welcome() {
                 <span className="block text-primary">Upset Pool</span>
               </h1>
               <p className="mt-3 text-base text-gray-500 sm:mt-5 sm:text-xl lg:text-lg xl:text-xl">
-                Test your NFL knowledge by picking underdogs to win outright each week. 
-                Earn points equal to the spread when your selected team wins.
+                Test your NFL knowledge by picking underdogs to win outright
+                each week. Earn points equal to the spread when your selected
+                team wins.
               </p>
               <div className="mt-8 sm:max-w-lg sm:mx-auto sm:text-center lg:text-left lg:mx-0">
                 <div className="space-y-4 sm:space-y-0 sm:flex sm:justify-center lg:justify-start sm:space-x-4">
                   <Button asChild size="lg" className="w-full sm:w-auto">
-                    <a href="/api/login" className="flex items-center justify-center">
+                    <a
+                      href="/api/login"
+                      className="flex items-center justify-center"
+                    >
                       Sign Up Now
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </a>
@@ -67,7 +77,7 @@ export default function Welcome() {
               Simple rules, exciting gameplay, big rewards
             </p>
           </div>
-          
+
           <div className="mt-10">
             <div className="grid gap-6 md:grid-cols-2">
               <Card>
@@ -78,10 +88,13 @@ export default function Welcome() {
                     </div>
                     <h3 className="text-lg font-medium">Weekly Selections</h3>
                   </div>
-                  <p>Select one underdog team each week to win outright. Picks lock at 1 PM EST on Sundays.</p>
+                  <p>
+                    Select one underdog team each week to win outright. Picks
+                    lock at 1 PM EST on Sundays.
+                  </p>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center mb-4">
@@ -90,10 +103,13 @@ export default function Welcome() {
                     </div>
                     <h3 className="text-lg font-medium">Scoring</h3>
                   </div>
-                  <p>If your selected underdog wins, you earn points equal to the point spread. No points for losses.</p>
+                  <p>
+                    If your selected underdog wins, you earn points equal to the
+                    point spread. No points for losses.
+                  </p>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center mb-4">
@@ -102,10 +118,13 @@ export default function Welcome() {
                     </div>
                     <h3 className="text-lg font-medium">Underdogs Only</h3>
                   </div>
-                  <p>You can only select teams with a positive point spread (the team not favored to win).</p>
+                  <p>
+                    You can only select teams with a positive point spread (the
+                    team not favored to win).
+                  </p>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center mb-4">
@@ -114,14 +133,17 @@ export default function Welcome() {
                     </div>
                     <h3 className="text-lg font-medium">Winning</h3>
                   </div>
-                  <p>The player with the most total points at the end of the NFL regular season wins the pool!</p>
+                  <p>
+                    The player with the most total points at the end of the NFL
+                    regular season wins the pool!
+                  </p>
                 </CardContent>
               </Card>
             </div>
           </div>
         </div>
       </section>
-      
+
       {/* Features Section */}
       <section className="py-12 bg-white px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
@@ -133,44 +155,53 @@ export default function Welcome() {
               Experience the excitement of NFL season in a whole new way
             </p>
           </div>
-          
+
           <div className="mt-10">
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
               <div className="text-center">
                 <div className="flex items-center justify-center h-12 w-12 rounded-md bg-primary text-white mx-auto">
                   <FaFootballBall className="h-6 w-6" />
                 </div>
-                <h3 className="mt-4 text-lg font-medium text-gray-900">NFL Action</h3>
+                <h3 className="mt-4 text-lg font-medium text-gray-900">
+                  NFL Action
+                </h3>
                 <p className="mt-2 text-base text-gray-500">
-                  Makes every game more exciting, not just your hometown team
+                  Makes every game more exciting without becoming low-stakes fun
                 </p>
               </div>
-              
+
               <div className="text-center">
                 <div className="flex items-center justify-center h-12 w-12 rounded-md bg-primary text-white mx-auto">
                   <FaChartLine className="h-6 w-6" />
                 </div>
-                <h3 className="mt-4 text-lg font-medium text-gray-900">Live Odds</h3>
+                <h3 className="mt-4 text-lg font-medium text-gray-900">
+                  Live Odds
+                </h3>
                 <p className="mt-2 text-base text-gray-500">
-                  Real-time betting lines from DraftKings updated throughout the week
+                  Real-time betting lines from DraftKings updated throughout the
+                  week
                 </p>
               </div>
-              
+
               <div className="text-center">
                 <div className="flex items-center justify-center h-12 w-12 rounded-md bg-primary text-white mx-auto">
                   <FaUsers className="h-6 w-6" />
                 </div>
-                <h3 className="mt-4 text-lg font-medium text-gray-900">Community</h3>
+                <h3 className="mt-4 text-lg font-medium text-gray-900">
+                  Community
+                </h3>
                 <p className="mt-2 text-base text-gray-500">
-                  Compete against friends, family, and colleagues throughout the season
+                  Compete against friends and enemies to find the bad beats
                 </p>
               </div>
-              
+
               <div className="text-center">
                 <div className="flex items-center justify-center h-12 w-12 rounded-md bg-primary text-white mx-auto">
                   <FaTrophy className="h-6 w-6" />
                 </div>
-                <h3 className="mt-4 text-lg font-medium text-gray-900">Leaderboard</h3>
+                <h3 className="mt-4 text-lg font-medium text-gray-900">
+                  Leaderboard
+                </h3>
                 <p className="mt-2 text-base text-gray-500">
                   Track your performance on our dynamic weekly leaderboard
                 </p>
@@ -179,7 +210,7 @@ export default function Welcome() {
           </div>
         </div>
       </section>
-      
+
       {/* CTA Section */}
       <section className="bg-primary">
         <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8 lg:py-16">
@@ -189,12 +220,16 @@ export default function Welcome() {
                 Ready to join the action?
               </h2>
               <p className="mt-3 max-w-3xl text-lg text-primary-foreground">
-                Sign up now to join our NFL Upset Pool. It's free to play and you'll be automatically enrolled in this season's pool.
+                Sign up now to join our NFL Upset Pool. It's free to play and
+                you'll be automatically enrolled in this season's pool.
               </p>
               <div className="mt-8">
                 <div className="inline-flex rounded-md shadow">
                   <Button asChild size="lg" variant="secondary">
-                    <a href="/api/login" className="flex items-center justify-center">
+                    <a
+                      href="/api/login"
+                      className="flex items-center justify-center"
+                    >
                       Sign In / Sign Up
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </a>
@@ -210,25 +245,44 @@ export default function Welcome() {
                       Season 2025
                     </h3>
                   </div>
-                  <div className="mt-4 text-lg text-gray-900">Join our NFL Upset Pool</div>
-                  <div className="mt-1"><span className="text-4xl font-extrabold text-gray-900">Free</span></div>
+                  <div className="mt-4 text-lg text-gray-900">
+                    Join our NFL Upset Pool
+                  </div>
+                  <div className="mt-1">
+                    <span className="text-4xl font-extrabold text-gray-900">
+                      Free
+                    </span>
+                  </div>
                 </div>
                 <div className="px-6 pt-6 pb-8 sm:p-10 sm:pt-6">
                   <ul className="space-y-3">
                     {[
-                      'Full NFL regular season coverage',
-                      'Weekly underdog picks',
-                      'Live leaderboard updates',
-                      'Mobile-friendly interface',
-                      'Automatic enrollment'
+                      "Full NFL regular season coverage",
+                      "Weekly underdog picks",
+                      "Live leaderboard updates",
+                      "Mobile-friendly interface",
+                      "Automatic enrollment",
                     ].map((feature, i) => (
                       <li key={i} className="flex items-start">
                         <div className="flex-shrink-0">
-                          <svg className="h-6 w-6 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                          <svg
+                            className="h-6 w-6 text-green-500"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M5 13l4 4L19 7"
+                            />
                           </svg>
                         </div>
-                        <p className="ml-3 text-base text-gray-700">{feature}</p>
+                        <p className="ml-3 text-base text-gray-700">
+                          {feature}
+                        </p>
                       </li>
                     ))}
                   </ul>
@@ -238,13 +292,14 @@ export default function Welcome() {
           </div>
         </div>
       </section>
-      
+
       {/* Footer */}
       <footer className="bg-gray-900">
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 md:flex md:items-center md:justify-between lg:px-8">
           <div className="mt-8 md:mt-0 md:order-1">
             <p className="text-center text-base text-gray-400">
-              &copy; {new Date().getFullYear()} NFL Upset Pool. All rights reserved.
+              &copy; {new Date().getFullYear()} NFL Upset Pool. All rights
+              reserved.
             </p>
           </div>
         </div>
