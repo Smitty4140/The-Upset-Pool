@@ -140,7 +140,7 @@ export default function Landing() {
               Why Join Our Upset Pool?
             </h2>
             <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-              Experience the excitement of NFL season in a whole new way
+              Minimal effort, a ton of fun, and a chance to be the biggest loser
             </p>
           </div>
           
@@ -152,7 +152,7 @@ export default function Landing() {
                 </div>
                 <h3 className="mt-4 text-lg font-medium text-gray-900">NFL Action</h3>
                 <p className="mt-2 text-base text-gray-500">
-                  Makes every game more exciting, not just your hometown team
+                  Makes every game more exciting without having to make real bets
                 </p>
               </div>
               
@@ -160,9 +160,9 @@ export default function Landing() {
                 <div className="flex items-center justify-center h-12 w-12 rounded-md bg-primary text-white mx-auto">
                   <FaChartLine className="h-6 w-6" />
                 </div>
-                <h3 className="mt-4 text-lg font-medium text-gray-900">Live Odds</h3>
+                <h3 className="mt-4 text-lg font-medium text-gray-900">Insane Fame</h3>
                 <p className="mt-2 text-base text-gray-500">
-                  Real-time betting lines from DraftKings updated throughout the week
+                  Become famous beyond your wildest dreams by picking every week
                 </p>
               </div>
               
@@ -172,7 +172,7 @@ export default function Landing() {
                 </div>
                 <h3 className="mt-4 text-lg font-medium text-gray-900">Community</h3>
                 <p className="mt-2 text-base text-gray-500">
-                  Compete against friends, family, and colleagues throughout the season
+                  With a history of public disputes, the league messageb oard keeps you on your toes
                 </p>
               </div>
               
