@@ -38,6 +38,7 @@ Preferred communication style: Simple, everyday language.
     - Game-specific pick locking based on kickoff times.
     - Fixed logout functionality to properly terminate sessions using correct POST method.
     - Fixed game time display inconsistencies to show all times correctly in Eastern Time (EDT/EST).
+    - Updated picks lock time calculation to properly handle daylight saving time transitions (EST/EDT).
 
 ### Database
 - **Database**: PostgreSQL (configured for Neon serverless)

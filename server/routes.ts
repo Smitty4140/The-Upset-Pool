@@ -460,9 +460,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Set lock time to 1:00 PM Eastern Time on the Sunday of this NFL week
-      const picksLockAt = locked ? 
-        new Date(Date.now() - 60000) : // 1 minute in the past for locking immediately
-        new Date(sundayDate.getFullYear(), sundayDate.getMonth(), sundayDate.getDate(), 17, 0, 0); // 1:00 PM EDT = 5:00 PM UTC (during daylight saving)
+      let picksLockAt: Date;
+      if (locked) {
+        picksLockAt = new Date(Date.now() - 60000); // 1 minute in the past for locking immediately
+      } else {
+        // Create 1:00 PM Eastern Time on the Sunday, properly accounting for DST
+        // We'll use a more reliable method that handles EST/EDT transitions automatically
+        
+        // Create the target date string for 1 PM Eastern
+        const year = sundayDate.getFullYear();
+        const month = String(sundayDate.getMonth() + 1).padStart(2, '0');
+        const day = String(sundayDate.getDate()).padStart(2, '0');
+        
+        // Try both possible UTC offsets and see which one gives us 1 PM Eastern
+        const edtTime = new Date(`${year}-${month}-${day}T17:00:00.000Z`); // 1 PM EDT = 5 PM UTC
+        const estTime = new Date(`${year}-${month}-${day}T18:00:00.000Z`); // 1 PM EST = 6 PM UTC
+        
+        // Test which one actually displays as 1 PM in America/New_York timezone
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          hour: 'numeric',
+          hour12: false
+        });
+        
+        const edtHour = parseInt(formatter.format(edtTime));
+        const estHour = parseInt(formatter.format(estTime));
+        
+        // Use whichever gives us 13 (1 PM in 24-hour format)
+        if (edtHour === 13) {
+          picksLockAt = edtTime;
+        } else if (estHour === 13) {
+          picksLockAt = estTime;
+        } else {
+          // Fallback - this shouldn't happen, but just in case
+          picksLockAt = edtTime;
+        }
+      }
       
       // Use direct SQL query to update the picksLockAt field
       await db.execute(sql`
