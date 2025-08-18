@@ -1157,8 +1157,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               gameTime: gameTime.toISOString(),
               spread: spread,
               completed: false,
-              createdAt: new Date(),
-              updatedAt: new Date()
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
             }).returning();
             
             console.log(`[Testing] Created preseason game: ${dbAwayTeam.name} @ ${dbHomeTeam.name} (${gameTime.toLocaleString()})`);
