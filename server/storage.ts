@@ -408,8 +408,6 @@ export class DatabaseStorage implements IStorage {
         JOIN nfl_teams at ON g.away_team_id = at.id
         JOIN nfl_weeks w ON g.week_id = w.id
         WHERE g.week_id = ${weekId}
-          AND g.game_time >= w.start_date
-          AND g.game_time <= (w.end_date + INTERVAL '1 day')
         ORDER BY g.game_time ASC
       `);
       
