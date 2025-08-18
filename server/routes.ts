@@ -1209,8 +1209,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Parse game time
           const gameTime = new Date(competition.date);
           
-          // Create a simple spread for testing (alternate between +3.5 and -3.5)
-          const spread = (results.gamesCreated % 2 === 0) ? "3.5" : "-3.5";
+          // Create more realistic test spreads instead of real betting data
+          // This is a placeholder until Sports Odds API is available
+          const testSpreads = ["-5.5", "3.0", "-7.0", "2.5", "-3.5", "6.5", "-4.0", "1.5"];
+          const spread = testSpreads[results.gamesCreated % testSpreads.length];
           
           // Check if game already exists
           const existingGame = await db.select().from(nflGames).where(
