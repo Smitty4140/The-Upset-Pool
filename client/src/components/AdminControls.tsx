@@ -551,6 +551,77 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
     }
   };
 
+  const testWeeklyEmails = async () => {
+    if (!user) return;
+    
+    setIsLoadingScheduler(true);
+    try {
+      const response = await fetch("/api/admin/scheduler/test-weekly-emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to test weekly emails: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      toast({
+        title: "Success",
+        description: result.message || "Weekly email test completed successfully",
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to test weekly emails",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingScheduler(false);
+    }
+  };
+
+  const testPicksUnlockedEmails = async () => {
+    if (!user) return;
+    
+    setIsLoadingScheduler(true);
+    try {
+      const response = await fetch("/api/admin/scheduler/test-picks-unlocked", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ weekNumber: 1 }),
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to test picks unlocked emails: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      toast({
+        title: "Success",
+        description: result.message || "Picks unlocked email test completed successfully",
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to test picks unlocked emails",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingScheduler(false);
+    }
+  };
+
   const fetchPreseasonGames = async () => {
     if (!user) return;
     
@@ -783,7 +854,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
               </div>
             </div>
             
-            <div className="flex space-x-2 ml-auto">
+            <div className="flex flex-wrap gap-2 ml-auto">
               <Button
                 variant="outline"
                 size="sm"
@@ -815,6 +886,36 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
                 )}
               </Button>
             </div>
+          </div>
+        </div>
+
+        {/* Email Testing Section */}
+        <div className="mb-6">
+          <div className="text-sm font-medium mb-2">Email System Testing</div>
+          <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-4 flex items-start">
+            <Users className="h-5 w-5 text-green-500 mt-0.5 mr-2 flex-shrink-0" />
+            <div className="text-sm text-green-800">
+              Test email notifications. For safety, test emails are only sent to league admins.
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLoadingScheduler}
+              onClick={testWeeklyEmails}
+            >
+              {isLoadingScheduler ? "Sending..." : "Test Weekly Reminders"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLoadingScheduler}
+              onClick={testPicksUnlockedEmails}
+            >
+              {isLoadingScheduler ? "Sending..." : "Test Picks Unlocked"}
+            </Button>
           </div>
         </div>
         
