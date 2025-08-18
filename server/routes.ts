@@ -1096,9 +1096,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[Testing] Using Sports Odds API for preseason games...`);
       
-      // Get NFL preseason games from Sports Odds API
+      // Get current NFL games from Sports Odds API (will be mostly regular season in August)
       const oddsUrl = `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${apiKey}&regions=us&markets=spreads&oddsFormat=american&bookmakers=draftkings`;
-      console.log(`[Testing] Fetching from Sports Odds API...`);
+      console.log(`[Testing] Fetching current NFL games from Sports Odds API for testing...`);
       
       let sportsOddsData;
       try {
