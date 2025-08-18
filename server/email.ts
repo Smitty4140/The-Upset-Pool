@@ -235,3 +235,59 @@ export async function sendWeeklyPickReminderEmail(
     `
   });
 }
+
+/**
+ * Send a picks unlocked notification email
+ */
+export async function sendPicksUnlockedEmail(
+  email: string,
+  username: string,
+  weekNumber: number
+): Promise<boolean> {
+  return sendEmail({
+    to: email,
+    subject: `🏈 Upset Pool Picks Are Live! - Week ${weekNumber}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #1a365d 0%, #2d5a87 100%); color: white; padding: 30px 20px; text-align: center; border-radius: 12px; margin-bottom: 24px;">
+          <h1 style="margin: 0; font-size: 28px; font-weight: bold;">🏈 Picks Are Live!</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">NFL Week ${weekNumber} is ready for your predictions</p>
+        </div>
+        
+        <div style="background-color: #ffffff; padding: 30px 20px; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 20px;">
+          <div style="background-color: #f0f8ff; border-left: 4px solid #2d5a87; padding: 20px; margin-bottom: 25px; border-radius: 0 8px 8px 0;">
+            <h2 style="color: #1a365d; margin: 0 0 10px 0; font-size: 24px;">Upset Pool Picks Are Live!</h2>
+            <p style="color: #4a5568; margin: 0; font-size: 16px; line-height: 1.5;">Hello ${username}! The picks for NFL Week ${weekNumber} have been unlocked and are now available. Time to make your upset predictions and compete for the top of the leaderboard!</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.REPLIT_DEV_DOMAIN || 'https://your-app.replit.app'}" style="display: inline-block; background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; box-shadow: 0 4px 12px rgba(229, 62, 62, 0.3);">
+              Make Your Picks Now
+            </a>
+          </div>
+          
+          <p style="color: #718096; font-size: 14px; text-align: center; margin-top: 30px;">
+            Remember: Pick the underdog teams you think will win straight up. Points are awarded based on the spread!
+          </p>
+        </div>
+        
+        <div style="background-color: #2d3748; color: #a0aec0; padding: 20px; text-align: center; font-size: 14px; border-radius: 8px;">
+          <p style="margin: 0;">NFL Upset Pool</p>
+        </div>
+      </div>
+    `,
+    text: `🏈 Upset Pool Picks Are Live! - Week ${weekNumber}
+
+Hello ${username}!
+
+The picks for NFL Week ${weekNumber} have been unlocked and are now available. Time to make your upset predictions and compete for the top of the leaderboard!
+
+Log in to make your picks: ${process.env.REPLIT_DEV_DOMAIN || 'https://your-app.replit.app'}
+
+Remember: Pick the underdog teams you think will win straight up. Points are awarded based on the spread!
+
+Good luck!
+
+NFL Upset Pool`
+  });
+}

@@ -2739,6 +2739,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test the weekly email reminders
+  app.post('/api/admin/scheduler/test-weekly-emails', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const { gameScheduler } = await import("./scheduler.js");
+      await gameScheduler.sendWeeklyEmailReminders();
+      res.json({ 
+        success: true,
+        message: 'Weekly email reminders sent successfully'
+      });
+    } catch (error) {
+      console.error('[Admin] Failed to send test weekly emails:', error);
+      res.status(500).json({ 
+        error: 'Failed to send test weekly emails',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Test the picks unlocked notifications
+  app.post('/api/admin/scheduler/test-picks-unlocked', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const weekNumber = req.body.weekNumber || 1; // Default to week 1 for testing
+      const { gameScheduler } = await import("./scheduler.js");
+      await gameScheduler.sendPicksUnlockedNotifications(weekNumber);
+      res.json({ 
+        success: true,
+        message: `Picks unlocked notifications sent successfully for Week ${weekNumber}`
+      });
+    } catch (error) {
+      console.error('[Admin] Failed to send picks unlocked notifications:', error);
+      res.status(500).json({ 
+        error: 'Failed to send picks unlocked notifications',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   app.post('/api/admin/scheduler/test-results-job', isAuthenticated, isSuperUser, async (req: any, res) => {
     try {
       // Import scheduler and test the results job

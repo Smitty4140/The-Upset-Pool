@@ -66,3 +66,9 @@ Preferred communication style: Simple, everyday language.
   - Features responsive HTML templates with modern design and clear call-to-action buttons
   - Admin endpoints for testing and manually triggering email campaigns
   - Automatically skips preseason and other non-regular season weeks
+- **Picks Unlocked Notifications**: Automated email system that triggers when game data is pulled (picks become available).
+  - Sends "Upset Pool Picks Are Live!" emails to active league members with notifications enabled
+  - Only sends during NFL regular season weeks (1-18)
+  - Features engaging email template with clear call-to-action to make picks
+  - Automatically triggered when weekly game data pull completes successfully
+  - Admin test endpoint available for manual testing

@@ -1,7 +1,7 @@
 import * as cron from 'node-cron';
 import { db } from './db.js';
 import { nflWeeks, nflGames, users, leagueMembers, leagues, userPicks, nflTeams } from '../shared/schema.js';
-import { sendWeeklyPickConfirmationEmail, sendWeeklyPickReminderEmail } from './email.js';
+import { sendWeeklyPickConfirmationEmail, sendWeeklyPickReminderEmail, sendPicksUnlockedEmail } from './email.js';
 // Import functionality will be handled through internal API calls
 import { eq, and, gte, lte, asc } from 'drizzle-orm';
 
@@ -236,6 +236,9 @@ class GameScheduler {
       // In a real implementation, we'd call the odds API logic directly
       console.log(`[Scheduler] Successfully completed scheduled data pull for week ${week.weekNumber}`);
       
+      // After successful data pull, send picks unlocked notifications to active members
+      await this.sendPicksUnlockedNotifications(week.weekNumber);
+      
     } catch (error) {
       console.error(`[Scheduler] Error executing data pull for week ${week.weekNumber}:`, error);
     }
@@ -326,6 +329,64 @@ class GameScheduler {
     } catch (error) {
       console.error('[Scheduler] Results test failed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Send picks unlocked notifications to active league members
+   */
+  async sendPicksUnlockedNotifications(weekNumber: number) {
+    try {
+      console.log(`[Scheduler] Sending picks unlocked notifications for Week ${weekNumber}...`);
+      
+      // Only send for regular season weeks (1-18)
+      if (weekNumber < 1 || weekNumber > 18) {
+        console.log(`[Scheduler] Week ${weekNumber} is not a regular season week (1-18), skipping picks unlocked notifications`);
+        return;
+      }
+      
+      // Get all active league members who want notifications
+      const activeMembers = await db
+        .select({
+          userId: users.id,
+          username: users.username,
+          email: users.email,
+        })
+        .from(users)
+        .innerJoin(leagueMembers, eq(users.id, leagueMembers.userId))
+        .where(and(
+          eq(leagueMembers.isActive, true),
+          eq(users.receiveNotifications, true)
+        ));
+
+      console.log(`[Scheduler] Found ${activeMembers.length} active members to notify about picks being live`);
+
+      let emailsSent = 0;
+      let emailsFailed = 0;
+
+      // Send picks unlocked email to each active member
+      for (const member of activeMembers) {
+        try {
+          const success = await sendPicksUnlockedEmail(
+            member.email,
+            member.username,
+            weekNumber
+          );
+          
+          if (success) {
+            emailsSent++;
+          } else {
+            emailsFailed++;
+          }
+        } catch (error) {
+          console.error(`[Scheduler] Failed to send picks unlocked email to ${member.email}:`, error);
+          emailsFailed++;
+        }
+      }
+
+      console.log(`[Scheduler] Picks unlocked notifications completed: ${emailsSent} sent, ${emailsFailed} failed`);
+    } catch (error) {
+      console.error('[Scheduler] Error sending picks unlocked notifications:', error);
     }
   }
 
