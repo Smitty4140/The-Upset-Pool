@@ -39,6 +39,7 @@ Preferred communication style: Simple, everyday language.
     - Fixed logout functionality to properly terminate sessions using correct POST method.
     - Fixed game time display inconsistencies to show all times correctly in Eastern Time (EDT/EST).
     - Updated picks lock time calculation to properly handle daylight saving time transitions (EST/EDT).
+    - Payment tracking system: admins can mark users as paid/unpaid, new members default to unpaid.
 
 ### Database
 - **Database**: PostgreSQL (configured for Neon serverless)
