@@ -36,6 +36,7 @@ Preferred communication style: Simple, everyday language.
     - League management including unique invite codes and member management.
     - Super user system for critical system-wide administrative functions.
     - Game-specific pick locking based on kickoff times.
+    - Fixed logout functionality to properly terminate sessions using correct POST method.
 
 ### Database
 - **Database**: PostgreSQL (configured for Neon serverless)
