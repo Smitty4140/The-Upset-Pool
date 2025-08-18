@@ -255,6 +255,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
   const { data: superUserStatus } = useQuery<{ isSuperUser: boolean }>({
     queryKey: ["/api/auth/super-user-status"],
   });
+  const isSuperUser = superUserStatus?.isSuperUser || false;
 
   // Get current NFL week
   const { 
@@ -550,6 +551,80 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
     }
   };
 
+  const fetchPreseasonGames = async () => {
+    if (!user) return;
+    
+    setIsLoadingScheduler(true);
+    try {
+      const response = await fetch("/api/admin/testing/fetch-preseason-games", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch preseason games: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      // Refetch all related data to show the new test week
+      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/nfl-weeks`] });
+      
+      toast({
+        title: "Success",
+        description: result.message || `Fetched ${result.created} preseason games for testing`,
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fetch preseason games",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingScheduler(false);
+    }
+  };
+
+  const schedulePreseasonResults = async () => {
+    if (!user) return;
+    
+    setIsLoadingScheduler(true);
+    try {
+      const response = await fetch("/api/admin/testing/schedule-preseason-results", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to schedule preseason results: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      toast({
+        title: "Success",
+        description: result.message || "Preseason results scheduled for tomorrow at 7 AM",
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to schedule preseason results",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingScheduler(false);
+    }
+  };
+
   if (isLoadingAuth || isLoadingWeek || isLoadingLeague || isLoadingMembers) {
     return null; // Don't show anything while loading
   }
@@ -770,6 +845,47 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
             </Button>
           </div>
         </div>
+            
+            <Separator className="my-6" />
+          </>
+        )}
+
+        {/* Preseason Testing Section - Super User Only */}
+        {isSuperUser && (
+          <>
+            <div>
+              <div className="text-sm font-medium mb-2">Preseason Testing (Super User Only)</div>
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 flex items-start">
+                <Activity className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+                <div className="text-sm text-blue-800">
+                  Test the complete game workflow using preseason games. This will pull today's preseason games 
+                  and schedule results to be pulled tomorrow at 7 AM Eastern Time.
+                </div>
+              </div>
+              
+              <div className="flex flex-col space-y-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isLoadingScheduler}
+                  onClick={fetchPreseasonGames}
+                >
+                  {isLoadingScheduler ? "Loading..." : (
+                    <><Database className="h-4 w-4 mr-2" /> Pull Preseason Games for Today</>
+                  )}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={isLoadingScheduler}
+                  onClick={schedulePreseasonResults}
+                >
+                  {isLoadingScheduler ? "Loading..." : (
+                    <><Clock className="h-4 w-4 mr-2" /> Schedule Results for Tomorrow 7 AM</>
+                  )}
+                </Button>
+              </div>
+            </div>
             
             <Separator className="my-6" />
           </>
