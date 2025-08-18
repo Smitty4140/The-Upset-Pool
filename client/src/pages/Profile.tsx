@@ -101,7 +101,7 @@ export default function Profile() {
   const { mutate: logout, isPending: isLoggingOut } = useMutation({
     mutationFn: async () => {
       const response = await fetch('/api/logout', {
-        method: 'GET',
+        method: 'POST',
         credentials: 'include',
       });
       if (!response.ok) {

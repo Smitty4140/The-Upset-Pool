@@ -15,17 +15,15 @@ export default function Rules() {
             <h3>Basic Rules</h3>
             <ol>
               <li>Each week of the NFL regular season, you select one underdog team to win outright.</li>
-              <li>If your selected underdog wins, you earn points equal to the spread value at the time of your pick.</li>
-              <li>The point spread is fixed at the time you make your pick.</li>
-              <li>In the event of a push (spread met exactly), no points are awarded.</li>
-              <li>You can only pick one game per week.</li>
-              <li>Each week is independent (you can pick the same team multiple times across weeks).</li>
+              <li>If your selected underdog wins, you earn points equal to the spread value.</li>
+              <li>You pick only one game per week, though that pick can be updated until 1 pm EST Sunday or until your selected game starts, whichever comes first.</li>
+              <li>Each week is independent - you can pick the same team multiple times across weeks.</li>
             </ol>
 
             <h3>Pick Deadlines</h3>
             <p>
               All picks must be submitted by 1:00 PM Eastern Time on Sunday of that NFL week.
-              Once a game starts, that pick is locked and can no longer be changed.
+              If a game starts before that time (e.g. Thursday night), picks for that game are locked at kickoff and can not be updated.
             </p>
 
             <h3>Scoring</h3>
@@ -38,7 +36,7 @@ export default function Rules() {
               <p className="font-medium">Week 1: Chiefs (+4.5) at Giants</p>
               <p>You pick the Chiefs (the underdog with a +4.5 spread).</p>
               <p>If the Chiefs win the game outright, you earn 4.5 points.</p>
-              <p>If the Giants win, you earn 0 points.</p>
+              <p>If the Giants win or the game ends in a tie, you earn 0 points.</p>
             </div>
 
             <h3>Tips for Success</h3>
