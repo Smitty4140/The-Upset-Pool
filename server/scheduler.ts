@@ -349,6 +349,13 @@ class GameScheduler {
       }
 
       const week = currentWeek[0];
+      
+      // Only send emails for regular season weeks (1-18)
+      if (week.weekNumber < 1 || week.weekNumber > 18) {
+        console.log(`[Scheduler] Week ${week.weekNumber} is not a regular season week (1-18), skipping email reminders`);
+        return;
+      }
+
       console.log(`[Scheduler] Sending reminders for Week ${week.weekNumber}`);
 
       // Get all users with their league memberships
