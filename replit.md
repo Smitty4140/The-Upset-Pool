@@ -40,6 +40,9 @@ Preferred communication style: Simple, everyday language.
     - Fixed game time display inconsistencies to show all times correctly in Eastern Time (EDT/EST).
     - Updated picks lock time calculation to properly handle daylight saving time transitions (EST/EDT).
     - Payment tracking system: admins can mark users as paid/unpaid, new members default to unpaid.
+    - Weekly email reminder system: automated stylized emails sent every Sunday at noon to all league members.
+    - Smart email differentiation: confirmation emails for users who made all picks, reminder emails for those missing picks.
+    - Comprehensive email templates with responsive design, league-specific information, and clear CTAs.
 
 ### Database
 - **Database**: PostgreSQL (configured for Neon serverless)
@@ -50,6 +53,14 @@ Preferred communication style: Simple, everyday language.
 
 ## External Dependencies
 - **PostgreSQL Database**: Primary data storage (e.g., Neon).
-- **SendGrid**: Email delivery service for notifications (optional).
+- **SendGrid**: Email delivery service for notifications and weekly reminders.
 - **Sports Odds API**: External service for NFL game data and spreads.
 - **ESPN API**: Used for pulling NFL game results.
+
+## Recent Updates (August 2025)
+- **Weekly Email Reminders**: Implemented automated email system that runs every Sunday at noon (Eastern Time).
+  - Sends stylized confirmation emails to users who completed all picks across their leagues
+  - Sends urgent reminder emails to users missing picks in any of their leagues
+  - Includes league-specific information, team details, and spreads in confirmation emails
+  - Features responsive HTML templates with modern design and clear call-to-action buttons
+  - Admin endpoints for testing and manually triggering email campaigns

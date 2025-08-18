@@ -2755,6 +2755,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Weekly email reminder endpoints (admin only)
+  app.post('/api/admin/scheduler/test-weekly-emails', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      // Import scheduler and test the weekly email reminders
+      const { gameScheduler } = await import("./scheduler.js");
+      const result = await gameScheduler.testWeeklyEmails();
+      
+      res.json({
+        message: "Weekly email reminder test completed",
+        result
+      });
+    } catch (error) {
+      console.error("Error testing weekly email reminders:", error);
+      res.status(500).json({ message: "Failed to test weekly email reminders" });
+    }
+  });
+
+  app.post('/api/admin/scheduler/send-weekly-emails', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      // Import scheduler and manually trigger weekly email reminders
+      const { gameScheduler } = await import("./scheduler.js");
+      await gameScheduler.sendWeeklyEmailReminders();
+      
+      res.json({
+        message: "Weekly email reminders sent successfully"
+      });
+    } catch (error) {
+      console.error("Error sending weekly email reminders:", error);
+      res.status(500).json({ message: "Failed to send weekly email reminders" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
