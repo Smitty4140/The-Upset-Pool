@@ -340,11 +340,6 @@ export default function Profile() {
                   />
                   
                   <div className="space-y-4">
-                    <div>
-                      <h4 className="font-medium text-sm text-gray-500 uppercase tracking-wider mb-1">Total Points</h4>
-                      <p className="text-2xl font-bold text-primary">{user?.totalPoints || "0"}</p>
-                    </div>
-                    
                     <div className="mt-6 flex space-x-4">
                       <Button type="submit" disabled={isPending}>
                         {isPending ? "Saving..." : "Save Changes"}
@@ -382,11 +377,6 @@ export default function Profile() {
                 </div>
                 
                 <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium text-sm text-gray-500 uppercase tracking-wider mb-1">Total Points</h4>
-                    <p className="text-2xl font-bold text-primary">{user?.totalPoints || "0"}</p>
-                  </div>
-                  
                   <div className="mt-6 flex space-x-4">
                     <Button 
                       variant="outline" 
