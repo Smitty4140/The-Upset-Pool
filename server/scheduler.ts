@@ -346,6 +346,7 @@ class GameScheduler {
       }
       
       // Get all active league members who want notifications
+      // For testing, only send to admins
       const activeMembers = await db
         .select({
           userId: users.id,
@@ -356,7 +357,8 @@ class GameScheduler {
         .innerJoin(leagueMembers, eq(users.id, leagueMembers.userId))
         .where(and(
           eq(leagueMembers.isActive, true),
-          eq(users.receiveNotifications, true)
+          eq(users.receiveNotifications, true),
+          eq(leagueMembers.isAdmin, true) // Only send to admins for testing
         ));
 
       console.log(`[Scheduler] Found ${activeMembers.length} active members to notify about picks being live`);
