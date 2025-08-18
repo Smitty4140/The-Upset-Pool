@@ -1118,12 +1118,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let weekId;
       
       if (testWeek.length === 0) {
-        // Create test week
+        // Create test week with a broader date range to capture preseason games
+        const oneWeekFromNow = new Date(today.getTime() + (7 * 24 * 60 * 60 * 1000));
         const newWeek = await db.insert(nflWeeks).values({
           weekNumber: 999,
           season: currentYear,
           startDate: today.toISOString().split('T')[0],
-          endDate: today.toISOString().split('T')[0],
+          endDate: oneWeekFromNow.toISOString().split('T')[0],
           active: true,
           picksLockAt: new Date(today.getTime() + (24 * 60 * 60 * 1000)) // Tomorrow
         }).returning();
