@@ -1125,9 +1125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           startDate: today.toISOString().split('T')[0],
           endDate: today.toISOString().split('T')[0],
           active: true,
-          picksLockAt: new Date(today.getTime() + (24 * 60 * 60 * 1000)), // Tomorrow
-          createdAt: new Date(),
-          updatedAt: new Date()
+          picksLockAt: new Date(today.getTime() + (24 * 60 * 60 * 1000)) // Tomorrow
         }).returning();
         weekId = newWeek[0].id;
         console.log(`[Testing] Created test week ${weekId} for preseason games`);
@@ -1190,11 +1188,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               weekId: weekId,
               homeTeamId: dbHomeTeam.id,
               awayTeamId: dbAwayTeam.id,
-              gameTime: gameTime.toISOString(),
+              gameTime: gameTime,
               spread: spread,
-              completed: false,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
+              completed: false
             }).returning();
             
             console.log(`[Testing] Created preseason game: ${dbAwayTeam.name} @ ${dbHomeTeam.name} (${gameTime.toLocaleString()})`);
