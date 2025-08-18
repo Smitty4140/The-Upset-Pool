@@ -37,6 +37,7 @@ Preferred communication style: Simple, everyday language.
     - Super user system for critical system-wide administrative functions.
     - Game-specific pick locking based on kickoff times.
     - Fixed logout functionality to properly terminate sessions using correct POST method.
+    - Fixed game time display inconsistencies to show all times correctly in Eastern Time (EDT/EST).
 
 ### Database
 - **Database**: PostgreSQL (configured for Neon serverless)
