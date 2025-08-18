@@ -7,7 +7,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Trophy, Clock, CheckCircle } from "lucide-react";
+import { Loader2, Trophy, Clock, CheckCircle, X } from "lucide-react";
 
 interface GameResultsProps {
   weekId?: number;
@@ -60,6 +60,44 @@ export default function GameResults({ weekId }: GameResultsProps) {
 
   const handleSetResult = (gameId: number, winningTeamId: number) => {
     setResultMutation.mutate({ gameId, winningTeamId });
+  };
+
+  // Clear game result mutation
+  const clearResultMutation = useMutation({
+    mutationFn: async (gameId: number) => {
+      return apiRequest("DELETE", `/api/games/${gameId}/result`);
+    },
+    onSuccess: (data, gameId) => {
+      const game = games?.find(g => Number(g.id) === gameId);
+      
+      toast({
+        title: "Game Result Cleared",
+        description: `Result for ${game?.awayTeam?.name} @ ${game?.homeTeam?.name} has been cleared.`,
+      });
+      
+      // Refetch games to update the UI immediately
+      refetchGames();
+      
+      // Also invalidate the leaderboard to reflect updated points
+      queryClient.invalidateQueries({ queryKey: [`/api/league/1/leaderboard`] });
+      
+      // Invalidate weekly picks to update the status column immediately
+      queryClient.invalidateQueries({ queryKey: [`/api/league/1/week/${weekId}/picks`] });
+      
+      // Invalidate all related queries for good measure
+      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games`] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to clear game result",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleClearResult = (gameId: number) => {
+    clearResultMutation.mutate(gameId);
   };
 
   if (isLoadingGames) {
@@ -176,7 +214,7 @@ export default function GameResults({ weekId }: GameResultsProps) {
                     <Button
                       size="sm"
                       variant={game.winningTeamId === game.awayTeamId ? "default" : "outline"}
-                      disabled={setResultMutation.isPending}
+                      disabled={setResultMutation.isPending || clearResultMutation.isPending}
                       onClick={() => handleSetResult(Number(game.id), game.awayTeamId)}
                       className={`w-full ${game.winningTeamId === game.awayTeamId ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
                     >
@@ -192,7 +230,7 @@ export default function GameResults({ weekId }: GameResultsProps) {
                     <Button
                       size="sm"
                       variant={game.winningTeamId === game.homeTeamId ? "default" : "outline"}
-                      disabled={setResultMutation.isPending}
+                      disabled={setResultMutation.isPending || clearResultMutation.isPending}
                       onClick={() => handleSetResult(Number(game.id), game.homeTeamId)}
                       className={`w-full ${game.winningTeamId === game.homeTeamId ? 'bg-green-600 hover:bg-green-700 text-white' : ''}`}
                     >
@@ -205,6 +243,24 @@ export default function GameResults({ weekId }: GameResultsProps) {
                         </>
                       )}
                     </Button>
+                    {game.winningTeamId && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={setResultMutation.isPending || clearResultMutation.isPending}
+                        onClick={() => handleClearResult(Number(game.id))}
+                        className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+                      >
+                        {clearResultMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <X className="h-4 w-4 mr-1" />
+                            Clear Result
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                   
                   {game.winningTeamId && (

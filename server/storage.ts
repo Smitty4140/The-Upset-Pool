@@ -573,6 +573,52 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async clearGameResult(gameId: number): Promise<NFLGame | undefined> {
+    try {
+      // Clear the game result
+      const [updatedGame] = await db
+        .update(nflGames)
+        .set({ 
+          winningTeamId: null,
+          completed: false,
+          homeTeamScore: null,
+          awayTeamScore: null,
+          updatedAt: new Date()
+        })
+        .where(eq(nflGames.id, gameId))
+        .returning();
+
+      // If we successfully cleared the game result, we should also clear user pick results
+      if (updatedGame) {
+        await this.clearUserPickResults(gameId);
+      }
+
+      return updatedGame;
+    } catch (error) {
+      console.error("Error clearing game result:", error);
+      return undefined;
+    }
+  }
+
+  // Helper method to clear user pick results when a game result is cleared
+  async clearUserPickResults(gameId: number): Promise<void> {
+    try {
+      // Get all user picks for this game and reset their results
+      await db
+        .update(userPicks)
+        .set({
+          won: null,
+          pointsEarned: "0",
+          updatedAt: new Date()
+        })
+        .where(eq(userPicks.gameId, gameId));
+
+      console.log(`Cleared results for all user picks on game ${gameId}`);
+    } catch (error) {
+      console.error("Error clearing user pick results:", error);
+    }
+  }
+
   // Helper method to calculate user pick results when a game result is set
   async calculateUserPickResults(gameId: number, winningTeamId: number): Promise<void> {
     try {

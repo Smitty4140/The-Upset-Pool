@@ -1594,6 +1594,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to update game result" });
     }
   });
+
+  // Clear/delete game result
+  app.delete('/api/games/:id/result', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const gameId = parseInt(req.params.id);
+      
+      if (isNaN(gameId)) {
+        return res.status(400).json({ message: "Invalid game ID" });
+      }
+      
+      // Get the game to verify it exists
+      const game = await storage.getNFLGame(gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+      
+      // Clear the game result
+      const clearedGame = await storage.clearGameResult(gameId);
+      
+      if (!clearedGame) {
+        return res.status(500).json({ message: "Failed to clear game result" });
+      }
+      
+      res.json({
+        message: "Game result cleared successfully and user points recalculated",
+        gameId,
+        completed: false,
+        winningTeamId: null
+      });
+    } catch (error) {
+      console.error("Error clearing game result:", error);
+      res.status(500).json({ message: "Failed to clear game result" });
+    }
+  });
   
   // Auto-add new users to the default league (NFL Upset Pool)
   // This is triggered when a new user is created during auth setup
