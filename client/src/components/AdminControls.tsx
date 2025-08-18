@@ -1063,7 +1063,6 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-center">Role</TableHead>
               <TableHead className="text-center">Payment</TableHead>
-              <TableHead className="text-center">Updates</TableHead>
               <TableHead className="text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -1181,11 +1180,6 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                </TableCell>
-                <TableCell className="text-center">
-                  {(toggleActivationMutation.isPending || toggleAdminMutation.isPending || togglePaymentMutation.isPending) && (
-                    <div className="text-sm text-gray-500">Updating...</div>
-                  )}
                 </TableCell>
                 <TableCell className="text-center">
                   <Button
