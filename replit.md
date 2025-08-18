@@ -59,6 +59,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates (August 2025)
 - **Weekly Email Reminders**: Implemented automated email system that runs every Sunday at noon (Eastern Time) during NFL weeks 1-18.
+  - Only sends emails to active league members who have notifications enabled
   - Sends stylized confirmation emails to users who completed all picks across their leagues
   - Sends urgent reminder emails to users missing picks in any of their leagues
   - Includes league-specific information, team details, and spreads in confirmation emails

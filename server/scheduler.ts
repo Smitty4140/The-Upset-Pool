@@ -358,7 +358,7 @@ class GameScheduler {
 
       console.log(`[Scheduler] Sending reminders for Week ${week.weekNumber}`);
 
-      // Get all users with their league memberships
+      // Get all users with their league memberships (only active members who want notifications)
       const usersWithLeagues = await db
         .select({
           userId: users.id,
@@ -373,9 +373,11 @@ class GameScheduler {
         .innerJoin(leagueMembers, eq(users.id, leagueMembers.userId))
         .innerJoin(leagues, eq(leagueMembers.leagueId, leagues.id))
         .where(and(
-          eq(leagueMembers.isActive, true),
-          eq(users.receiveNotifications, true)
+          eq(leagueMembers.isActive, true), // Only active league members
+          eq(users.receiveNotifications, true) // Only users who want notifications
         ));
+
+      console.log(`[Scheduler] Found ${usersWithLeagues.length} active league members with notifications enabled`);
 
       // Group users by their ID to process each user's leagues together
       const userMap = new Map<string, {
@@ -390,7 +392,10 @@ class GameScheduler {
             leagues: []
           });
         }
-        userMap.get(row.userId)!.leagues.push({ id: row.leagueId, name: row.leagueName });
+        // Only add leagues where the user is an active member
+        if (row.isActive) {
+          userMap.get(row.userId)!.leagues.push({ id: row.leagueId, name: row.leagueName });
+        }
       }
 
       let emailsSent = 0;
