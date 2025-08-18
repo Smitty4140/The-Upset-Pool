@@ -459,10 +459,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sundayDate = new Date(weekStart);
       }
       
-      // Set lock time to 1:00 PM EST on the Sunday of this NFL week
+      // Set lock time to 1:00 PM Eastern Time on the Sunday of this NFL week
       const picksLockAt = locked ? 
         new Date(Date.now() - 60000) : // 1 minute in the past for locking immediately
-        new Date(sundayDate.getFullYear(), sundayDate.getMonth(), sundayDate.getDate(), 18, 0, 0); // 1:00 PM EST = 6:00 PM UTC
+        new Date(sundayDate.getFullYear(), sundayDate.getMonth(), sundayDate.getDate(), 17, 0, 0); // 1:00 PM EDT = 5:00 PM UTC (during daylight saving)
       
       // Use direct SQL query to update the picksLockAt field
       await db.execute(sql`
