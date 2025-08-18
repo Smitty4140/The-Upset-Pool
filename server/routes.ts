@@ -1042,6 +1042,268 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Testing endpoint: Pull preseason games for today
+  app.post('/api/admin/testing/fetch-preseason-games', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is a super user
+      const userId = req.user.id;
+      if (userId !== "user_1753731196994_qfjmyp5i2") {
+        return res.status(403).json({ message: "Unauthorized: Super user access required" });
+      }
+
+      const currentYear = new Date().getFullYear();
+      const today = new Date();
+      const todayFormatted = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD format
+      
+      // Fetch preseason games from ESPN API for today
+      const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${todayFormatted}&seasontype=1`; // seasontype=1 for preseason
+      console.log(`[Testing] Fetching preseason games from: ${espnUrl}`);
+      
+      const response = await fetch(espnUrl);
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ 
+          message: `Failed to fetch from ESPN API: ${response.statusText}` 
+        });
+      }
+      
+      const espnData = await response.json();
+      
+      // Get NFL teams for mapping
+      const teams = await storage.getNFLTeams();
+      const teamNameMap = new Map();
+      teams.forEach(team => {
+        teamNameMap.set(team.name.toLowerCase(), team);
+        teamNameMap.set(team.abbreviation?.toLowerCase(), team);
+      });
+      
+      // Create a test week for preseason games
+      const testWeek = await db.select().from(nflWeeks).where(eq(nflWeeks.weekNumber, 999)); // Use week 999 for testing
+      let weekId;
+      
+      if (testWeek.length === 0) {
+        // Create test week
+        const newWeek = await db.insert(nflWeeks).values({
+          weekNumber: 999,
+          season: currentYear,
+          startDate: today.toISOString().split('T')[0],
+          endDate: today.toISOString().split('T')[0],
+          active: true,
+          picksLockAt: new Date(today.getTime() + (24 * 60 * 60 * 1000)), // Tomorrow
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }).returning();
+        weekId = newWeek[0].id;
+        console.log(`[Testing] Created test week ${weekId} for preseason games`);
+      } else {
+        weekId = testWeek[0].id;
+        console.log(`[Testing] Using existing test week ${weekId}`);
+      }
+      
+      // Track results
+      const results = {
+        gamesFound: espnData.events?.length || 0,
+        gamesCreated: 0,
+        gamesUpdated: 0,
+        errors: 0
+      };
+      
+      // Process each game from ESPN
+      for (const event of espnData.events || []) {
+        try {
+          const competition = event.competitions[0];
+          const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
+          const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+          
+          if (!homeTeam || !awayTeam) {
+            console.log(`[Testing] Missing team data for game: ${event.name}`);
+            results.errors++;
+            continue;
+          }
+          
+          // Find teams in our database
+          const dbHomeTeam = teamNameMap.get(homeTeam.team.displayName.toLowerCase()) || 
+                           teamNameMap.get(homeTeam.team.abbreviation.toLowerCase());
+          const dbAwayTeam = teamNameMap.get(awayTeam.team.displayName.toLowerCase()) || 
+                           teamNameMap.get(awayTeam.team.abbreviation.toLowerCase());
+          
+          if (!dbHomeTeam || !dbAwayTeam) {
+            console.log(`[Testing] Teams not found: ${homeTeam.team.displayName} vs ${awayTeam.team.displayName}`);
+            results.errors++;
+            continue;
+          }
+          
+          // Parse game time
+          const gameTime = new Date(competition.date);
+          
+          // Create a simple spread for testing (alternate between +3.5 and -3.5)
+          const spread = (results.gamesCreated % 2 === 0) ? "3.5" : "-3.5";
+          
+          // Check if game already exists
+          const existingGame = await db.select().from(nflGames).where(
+            and(
+              eq(nflGames.weekId, weekId),
+              eq(nflGames.homeTeamId, dbHomeTeam.id),
+              eq(nflGames.awayTeamId, dbAwayTeam.id)
+            )
+          );
+          
+          if (existingGame.length === 0) {
+            // Create new game
+            const newGame = await db.insert(nflGames).values({
+              weekId: weekId,
+              homeTeamId: dbHomeTeam.id,
+              awayTeamId: dbAwayTeam.id,
+              gameTime: gameTime.toISOString(),
+              spread: spread,
+              completed: false,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }).returning();
+            
+            console.log(`[Testing] Created preseason game: ${dbAwayTeam.name} @ ${dbHomeTeam.name} (${gameTime.toLocaleString()})`);
+            results.gamesCreated++;
+          } else {
+            console.log(`[Testing] Game already exists: ${dbAwayTeam.name} @ ${dbHomeTeam.name}`);
+            results.gamesUpdated++;
+          }
+          
+        } catch (error) {
+          console.error(`[Testing] Error processing game:`, error);
+          results.errors++;
+        }
+      }
+      
+      return res.json({
+        message: `Successfully processed preseason games for testing`,
+        weekId: weekId,
+        weekNumber: 999,
+        created: results.gamesCreated,
+        updated: results.gamesUpdated,
+        found: results.gamesFound,
+        errors: results.errors
+      });
+    } catch (error) {
+      console.error("[Testing] Error fetching preseason games:", error);
+      return res.status(500).json({ message: "Failed to fetch preseason games" });
+    }
+  });
+
+  // Testing endpoint: Schedule preseason results pull for tomorrow 7am
+  app.post('/api/admin/testing/schedule-preseason-results', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is a super user
+      const userId = req.user.id;
+      if (userId !== "user_1753731196994_qfjmyp5i2") {
+        return res.status(403).json({ message: "Unauthorized: Super user access required" });
+      }
+      
+      // Calculate tomorrow at 7 AM Eastern Time
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(11, 0, 0, 0); // 11 AM UTC = 7 AM EDT (during DST)
+      
+      // Schedule the job
+      const cronExpression = `0 11 ${tomorrow.getDate()} ${tomorrow.getMonth() + 1} *`; // 11:00 UTC tomorrow
+      
+      const cron = require('node-cron');
+      const scheduledJob = cron.schedule(cronExpression, async () => {
+        console.log('[Testing] Executing scheduled preseason results pull...');
+        
+        try {
+          // Pull results for test week (999)
+          const testWeek = await db.select().from(nflWeeks).where(eq(nflWeeks.weekNumber, 999));
+          
+          if (testWeek.length > 0) {
+            const weekId = testWeek[0].id;
+            const todayFormatted = new Date().toISOString().split('T')[0].replace(/-/g, '');
+            
+            // Fetch preseason results
+            const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${todayFormatted}&seasontype=1`;
+            const response = await fetch(espnUrl);
+            
+            if (response.ok) {
+              const espnData = await response.json();
+              
+              // Process results (similar to regular results processing)
+              const teams = await storage.getNFLTeams();
+              const teamNameMap = new Map();
+              teams.forEach(team => {
+                teamNameMap.set(team.name.toLowerCase(), team);
+                teamNameMap.set(team.abbreviation?.toLowerCase(), team);
+              });
+              
+              let gamesUpdated = 0;
+              
+              for (const event of espnData.events || []) {
+                const competition = event.competitions[0];
+                const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
+                const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+                
+                if (homeTeam && awayTeam && competition.status.type.completed) {
+                  const dbHomeTeam = teamNameMap.get(homeTeam.team.displayName.toLowerCase()) || 
+                                   teamNameMap.get(homeTeam.team.abbreviation.toLowerCase());
+                  const dbAwayTeam = teamNameMap.get(awayTeam.team.displayName.toLowerCase()) || 
+                                   teamNameMap.get(awayTeam.team.abbreviation.toLowerCase());
+                  
+                  if (dbHomeTeam && dbAwayTeam) {
+                    const homeScore = parseInt(homeTeam.score);
+                    const awayScore = parseInt(awayTeam.score);
+                    const winningTeamId = homeScore > awayScore ? dbHomeTeam.id : dbAwayTeam.id;
+                    
+                    const existingGames = await db.select().from(nflGames).where(
+                      and(
+                        eq(nflGames.weekId, weekId),
+                        eq(nflGames.homeTeamId, dbHomeTeam.id),
+                        eq(nflGames.awayTeamId, dbAwayTeam.id)
+                      )
+                    );
+                    
+                    if (existingGames.length > 0) {
+                      const gameId = existingGames[0].id;
+                      
+                      await db.update(nflGames)
+                        .set({
+                          homeTeamScore: homeScore,
+                          awayTeamScore: awayScore,
+                          completed: true,
+                          winningTeamId: winningTeamId,
+                          updatedAt: new Date()
+                        })
+                        .where(eq(nflGames.id, gameId));
+                      
+                      // Process user picks
+                      await storage.processGameResults(gameId);
+                      gamesUpdated++;
+                      
+                      console.log(`[Testing] Updated preseason game result: ${dbAwayTeam.name} @ ${dbHomeTeam.name} (${awayScore}-${homeScore})`);
+                    }
+                  }
+                }
+              }
+              
+              console.log(`[Testing] Preseason results pull completed. Updated ${gamesUpdated} games.`);
+            }
+          }
+        } catch (error) {
+          console.error('[Testing] Error in scheduled preseason results pull:', error);
+        }
+      }, {
+        timezone: 'America/New_York'
+      });
+      
+      return res.json({
+        message: `Scheduled preseason results pull for tomorrow at 7:00 AM Eastern Time`,
+        scheduledTime: tomorrow.toISOString(),
+        cronExpression: cronExpression
+      });
+      
+    } catch (error) {
+      console.error("[Testing] Error scheduling preseason results:", error);
+      return res.status(500).json({ message: "Failed to schedule preseason results" });
+    }
+  });
+
   // Admin route to fetch NFL game results from ESPN API
   app.post('/api/admin/games/fetch-results', isAuthenticated, async (req: any, res) => {
     try {
