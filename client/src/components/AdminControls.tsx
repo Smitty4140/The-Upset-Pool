@@ -858,8 +858,8 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
               <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 flex items-start">
                 <Activity className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
                 <div className="text-sm text-blue-800">
-                  Test the complete game workflow using preseason games. This will pull today's preseason games 
-                  and schedule results to be pulled tomorrow at 7 AM Eastern Time.
+                  Test the complete game workflow using preseason games. This will pull preseason games 
+                  for the next 4 days and schedule results to be pulled tomorrow at 7 AM Eastern Time.
                 </div>
               </div>
               
@@ -871,7 +871,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
                   onClick={fetchPreseasonGames}
                 >
                   {isLoadingScheduler ? "Loading..." : (
-                    <><Database className="h-4 w-4 mr-2" /> Pull Preseason Games for Today</>
+                    <><Database className="h-4 w-4 mr-2" /> Pull Preseason Games (Next 4 Days)</>
                   )}
                 </Button>
                 <Button

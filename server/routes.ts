@@ -1053,21 +1053,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const currentYear = new Date().getFullYear();
       const today = new Date();
-      const todayFormatted = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD format
       
-      // Fetch preseason games from ESPN API for today
-      const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${todayFormatted}&seasontype=1`; // seasontype=1 for preseason
-      console.log(`[Testing] Fetching preseason games from: ${espnUrl}`);
+      // Track results across all days
+      let allEvents = [];
+      let daysChecked = 0;
       
-      const response = await fetch(espnUrl);
-      
-      if (!response.ok) {
-        return res.status(response.status).json({ 
-          message: `Failed to fetch from ESPN API: ${response.statusText}` 
-        });
+      // Get games for the next 4 days
+      for (let dayOffset = 0; dayOffset < 4; dayOffset++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(today.getDate() + dayOffset);
+        const dateFormatted = checkDate.toISOString().split('T')[0].replace(/-/g, '');
+        
+        const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${dateFormatted}&seasontype=1`;
+        console.log(`[Testing] Day ${dayOffset + 1}/4 - Checking ${checkDate.toDateString()}`);
+        console.log(`[Testing] Fetching from: ${espnUrl}`);
+        
+        try {
+          const response = await fetch(espnUrl);
+          if (!response.ok) {
+            console.log(`[Testing] ESPN API error for ${dateFormatted}: ${response.status}`);
+            continue;
+          }
+          
+          const dayData = await response.json();
+          daysChecked++;
+          
+          if (dayData.events && dayData.events.length > 0) {
+            console.log(`[Testing] Found ${dayData.events.length} games for ${checkDate.toDateString()}`);
+            allEvents.push(...dayData.events);
+          } else {
+            console.log(`[Testing] No games found for ${checkDate.toDateString()}`);
+          }
+        } catch (error) {
+          console.log(`[Testing] Error fetching games for ${checkDate.toDateString()}:`, error.message);
+        }
       }
       
-      const espnData = await response.json();
+      // Create combined ESPN data structure  
+      const espnData = { events: allEvents };
+      console.log(`[Testing] Total games found across ${daysChecked} days: ${allEvents.length}`);
+      
+      if (allEvents.length === 0) {
+        return res.json({
+          message: "No preseason games found for the next 4 days",
+          weekId: null,
+          weekNumber: 999,
+          created: 0,
+          updated: 0,
+          found: 0,
+          errors: 0
+        });
+      }
       
       // Get NFL teams for mapping
       const teams = await storage.getNFLTeams();
@@ -2240,8 +2276,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               awayTeamRecord: "0-0",
               gameTime: game.commence_time,
               completed: false,
-              createdAt: new Date(),
-              updatedAt: new Date()
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
             }).returning();
             
             console.log(`Created game ID ${newGame.id}: ${homeTeam.name} vs ${awayTeam.name}`);
