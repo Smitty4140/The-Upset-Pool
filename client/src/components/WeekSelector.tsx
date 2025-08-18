@@ -68,17 +68,11 @@ export default function WeekSelector({ currentWeekId, onWeekChange, className }:
           <SelectValue placeholder="Select a week" />
         </SelectTrigger>
         <SelectContent>
-          {weeks.map((week) => {
-            const displayWeek = week.weekNumber < 0 
-              ? `Preseason Week ${Math.abs(week.weekNumber)}`
-              : `Week ${week.weekNumber}`;
-            
-            return (
-              <SelectItem key={week.id} value={week.id.toString()}>
-                {displayWeek} ({formatDateRange(week.startDate, week.endDate)})
-              </SelectItem>
-            );
-          })}
+          {weeks.map((week) => (
+            <SelectItem key={week.id} value={week.id.toString()}>
+              Week {week.weekNumber} ({formatDateRange(week.startDate, week.endDate)})
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>

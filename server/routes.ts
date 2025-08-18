@@ -1080,7 +1080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Testing endpoint: Pull preseason games using Sports Odds API
+  // Testing endpoint: Pull preseason games for today
   app.post('/api/admin/testing/fetch-preseason-games', isAuthenticated, async (req: any, res) => {
     try {
       // Check if user is a super user
@@ -1089,76 +1089,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized: Super user access required" });
       }
 
-      const apiKey = process.env.THE_ODDS_API_KEY || process.env.ODDS_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ message: "Sports Odds API key not configured" });
-      }
-
-      console.log(`[Testing] Using Sports Odds API for preseason games...`);
+      const currentYear = new Date().getFullYear();
+      const today = new Date();
       
-      // Get current NFL games from Sports Odds API (will be mostly regular season in August)
-      const oddsUrl = `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=${apiKey}&regions=us&markets=spreads&oddsFormat=american&bookmakers=draftkings`;
-      console.log(`[Testing] Fetching current NFL games from Sports Odds API for testing...`);
+      // Track results across all days
+      let allEvents = [];
+      let daysChecked = 0;
       
-      let sportsOddsData;
-      try {
-        const response = await fetch(oddsUrl);
-        if (!response.ok) {
-          console.log(`[Testing] Sports Odds API error: ${response.status}`);
-          throw new Error(`Sports Odds API returned ${response.status}`);
-        }
+      // Get games for the next 4 days
+      for (let dayOffset = 0; dayOffset < 4; dayOffset++) {
+        const checkDate = new Date(today);
+        checkDate.setDate(today.getDate() + dayOffset);
+        const dateFormatted = checkDate.toISOString().split('T')[0].replace(/-/g, '');
         
-        sportsOddsData = await response.json();
-        console.log(`[Testing] Sports Odds API returned ${sportsOddsData.length} games with betting lines`);
-      } catch (error) {
-        console.log(`[Testing] Error fetching from Sports Odds API:`, error.message);
-        console.log(`[Testing] Falling back to ESPN data without betting lines...`);
+        const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${dateFormatted}&seasontype=1`;
+        console.log(`[Testing] Day ${dayOffset + 1}/4 - Checking ${checkDate.toDateString()}`);
+        console.log(`[Testing] Fetching from: ${espnUrl}`);
         
-        // Fallback to ESPN data if Sports Odds API fails
-        const currentYear = new Date().getFullYear();
-        const today = new Date();
-        let allEvents = [];
-        let daysChecked = 0;
-        
-        // Get games for the next 4 days from ESPN
-        for (let dayOffset = 0; dayOffset < 4; dayOffset++) {
-          const checkDate = new Date(today);
-          checkDate.setDate(today.getDate() + dayOffset);
-          const dateFormatted = checkDate.toISOString().split('T')[0].replace(/-/g, '');
-          
-          const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${dateFormatted}&seasontype=1`;
-          
-          try {
-            const response = await fetch(espnUrl);
-            if (!response.ok) continue;
-            
-            const dayData = await response.json();
-            daysChecked++;
-            
-            if (dayData.events && dayData.events.length > 0) {
-              allEvents.push(...dayData.events);
-            }
-          } catch (error) {
-            console.log(`[Testing] Error fetching ESPN games for ${checkDate.toDateString()}:`, error.message);
+        try {
+          const response = await fetch(espnUrl);
+          if (!response.ok) {
+            console.log(`[Testing] ESPN API error for ${dateFormatted}: ${response.status}`);
+            continue;
           }
+          
+          const dayData = await response.json();
+          daysChecked++;
+          
+          if (dayData.events && dayData.events.length > 0) {
+            console.log(`[Testing] Found ${dayData.events.length} games for ${checkDate.toDateString()}`);
+            allEvents.push(...dayData.events);
+          } else {
+            console.log(`[Testing] No games found for ${checkDate.toDateString()}`);
+          }
+        } catch (error) {
+          console.log(`[Testing] Error fetching games for ${checkDate.toDateString()}:`, error.message);
         }
-        
-        sportsOddsData = allEvents.map(event => ({
-          id: event.id,
-          sport_key: 'americanfootball_nfl',
-          sport_title: 'NFL',
-          commence_time: event.competitions[0].date,
-          home_team: event.competitions[0].competitors.find(c => c.homeAway === 'home').team.displayName,
-          away_team: event.competitions[0].competitors.find(c => c.homeAway === 'away').team.displayName,
-          bookmakers: [] // No betting data from ESPN
-        }));
       }
       
-      console.log(`[Testing] Processing ${sportsOddsData.length} games...`);
+      // Create combined ESPN data structure  
+      const espnData = { events: allEvents };
+      console.log(`[Testing] Total games found across ${daysChecked} days: ${allEvents.length}`);
       
-      if (sportsOddsData.length === 0) {
+      if (allEvents.length === 0) {
         return res.json({
-          message: "No preseason games found from Sports Odds API or ESPN",
+          message: "No preseason games found for the next 4 days",
           weekId: null,
           weekNumber: 999,
           created: 0,
@@ -1174,16 +1149,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       teams.forEach(team => {
         teamNameMap.set(team.name.toLowerCase(), team);
         teamNameMap.set(team.abbreviation?.toLowerCase(), team);
-        // Add additional mappings for team name variations
-        if (team.name.includes(' ')) {
-          const parts = team.name.split(' ');
-          teamNameMap.set(parts[parts.length - 1].toLowerCase(), team); // Last word (e.g., "Patriots")
-        }
       });
       
       // Create a test week for preseason games
-      const currentYear = new Date().getFullYear();
-      const today = new Date();
       const testWeek = await db.select().from(nflWeeks).where(eq(nflWeeks.weekNumber, 999)); // Use week 999 for testing
       let weekId;
       
@@ -1207,72 +1175,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Track results
       const results = {
-        gamesFound: sportsOddsData.length,
+        gamesFound: espnData.events?.length || 0,
         gamesCreated: 0,
         gamesUpdated: 0,
         errors: 0
       };
       
-      // Process each game from Sports Odds API
-      for (const game of sportsOddsData) {
+      // Process each game from ESPN
+      for (const event of espnData.events || []) {
         try {
-          // Find teams in our database
-          const dbHomeTeam = teamNameMap.get(game.home_team.toLowerCase()) || 
-                           (() => {
-                             // Try partial matches for home team
-                             for (const [key, team] of teamNameMap.entries()) {
-                               if (key.includes(game.home_team.toLowerCase()) || game.home_team.toLowerCase().includes(key)) {
-                                 return team;
-                               }
-                             }
-                             return null;
-                           })();
+          const competition = event.competitions[0];
+          const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
+          const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
           
-          const dbAwayTeam = teamNameMap.get(game.away_team.toLowerCase()) || 
-                           (() => {
-                             // Try partial matches for away team
-                             for (const [key, team] of teamNameMap.entries()) {
-                               if (key.includes(game.away_team.toLowerCase()) || game.away_team.toLowerCase().includes(key)) {
-                                 return team;
-                               }
-                             }
-                             return null;
-                           })();
+          if (!homeTeam || !awayTeam) {
+            console.log(`[Testing] Missing team data for game: ${event.name}`);
+            results.errors++;
+            continue;
+          }
+          
+          // Find teams in our database
+          const dbHomeTeam = teamNameMap.get(homeTeam.team.displayName.toLowerCase()) || 
+                           teamNameMap.get(homeTeam.team.abbreviation.toLowerCase());
+          const dbAwayTeam = teamNameMap.get(awayTeam.team.displayName.toLowerCase()) || 
+                           teamNameMap.get(awayTeam.team.abbreviation.toLowerCase());
           
           if (!dbHomeTeam || !dbAwayTeam) {
-            console.log(`[Testing] Teams not found: ${game.away_team} @ ${game.home_team}`);
+            console.log(`[Testing] Teams not found: ${homeTeam.team.displayName} vs ${awayTeam.team.displayName}`);
             results.errors++;
             continue;
           }
           
           // Parse game time
-          const gameTime = new Date(game.commence_time);
+          const gameTime = new Date(competition.date);
           
-          // Extract spread from DraftKings bookmaker if available
-          let spread = null;
-          if (game.bookmakers && game.bookmakers.length > 0) {
-            const draftkings = game.bookmakers.find(book => book.key === 'draftkings');
-            if (draftkings && draftkings.markets) {
-              const spreadsMarket = draftkings.markets.find(market => market.key === 'spreads');
-              if (spreadsMarket && spreadsMarket.outcomes) {
-                // Find home team outcome to get home spread
-                const homeOutcome = spreadsMarket.outcomes.find(outcome => 
-                  outcome.name.toLowerCase().includes(game.home_team.toLowerCase())
-                );
-                if (homeOutcome && homeOutcome.point !== undefined) {
-                  spread = homeOutcome.point;
-                  console.log(`[Testing] Found DraftKings spread: ${game.home_team} ${spread}`);
-                }
-              }
-            }
-          }
-          
-          // Use test spread if no real betting data available
-          if (spread === null) {
-            const testSpreads = ["-5.5", "3.0", "-7.0", "2.5", "-3.5", "6.5", "-4.0", "1.5"];
-            spread = testSpreads[results.gamesCreated % testSpreads.length];
-            console.log(`[Testing] Using test spread: ${spread} (no betting data available)`);
-          }
+          // Create a simple spread for testing (alternate between +3.5 and -3.5)
+          const spread = (results.gamesCreated % 2 === 0) ? "3.5" : "-3.5";
           
           // Check if game already exists
           const existingGame = await db.select().from(nflGames).where(
@@ -1291,26 +1229,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               awayTeamId: dbAwayTeam.id,
               gameTime: gameTime,
               spread: spread,
-              homeTeamRecord: "0-0",
-              awayTeamRecord: "0-0",
-              completed: false,
-              createdAt: new Date(),
-              updatedAt: new Date()
+              completed: false
             }).returning();
             
-            console.log(`[Testing] Created game: ${dbAwayTeam.name} @ ${dbHomeTeam.name} (spread: ${spread})`);
+            console.log(`[Testing] Created preseason game: ${dbAwayTeam.name} @ ${dbHomeTeam.name} (${gameTime.toLocaleString()})`);
             results.gamesCreated++;
           } else {
-            // Update existing game with current spread
-            await db.update(nflGames)
-              .set({
-                spread: spread,
-                gameTime: gameTime,
-                updatedAt: new Date()
-              })
-              .where(eq(nflGames.id, existingGame[0].id));
-            
-            console.log(`[Testing] Updated game: ${dbAwayTeam.name} @ ${dbHomeTeam.name} (spread: ${spread})`);
+            console.log(`[Testing] Game already exists: ${dbAwayTeam.name} @ ${dbHomeTeam.name}`);
             results.gamesUpdated++;
           }
           
