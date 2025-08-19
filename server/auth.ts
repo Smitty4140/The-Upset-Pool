@@ -131,6 +131,20 @@ export function setupAuth(app: Express) {
             lastName: lastName || existingUser.lastName,
             profileImageUrl: profileImageUrl || existingUser.profileImageUrl,
           });
+          console.log('Linked Google account to existing user:', user.id);
+          
+          // Check if user is in any leagues, if not add to default
+          try {
+            const userLeagues = await storage.getUserLeagues(user.id);
+            if (userLeagues.length === 0) {
+              await storage.addUserToLeague(1, user.id); // League 1 is default
+              console.log('Added linked Google user to default league:', user.id);
+            } else {
+              console.log('Linked user already in leagues:', userLeagues.length);
+            }
+          } catch (error) {
+            console.error('Error checking/adding linked user to default league:', error);
+          }
         } else {
           // Create new user
           const userId = `google_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -146,10 +160,12 @@ export function setupAuth(app: Express) {
             totalPoints: "0"
           });
 
+          console.log('Created new Google user:', user.id);
+
           // Add user to default league
           try {
             await storage.addUserToLeague(1, userId); // League 1 is default
-            console.log('Added Google user to default league');
+            console.log('Added Google user to default league:', userId);
           } catch (error) {
             console.error('Error adding Google user to default league:', error);
           }
