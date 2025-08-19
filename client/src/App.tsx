@@ -27,13 +27,19 @@ function Router() {
     return <div className="flex h-screen w-screen items-center justify-center">Processing login...</div>;
   }
   
+  // Check for OAuth success/failure in URL params
+  const urlParams = new URLSearchParams(location.split('?')[1] || '');
+  const authResult = urlParams.get('auth');
+  
   // Show auth pages for non-authenticated users
   if (!user && !isLoading) {
     return (
       <Switch>
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
-        <Route component={AuthPage} />
+        <Route>
+          <AuthPage authResult={authResult} />
+        </Route>
       </Switch>
     );
   }

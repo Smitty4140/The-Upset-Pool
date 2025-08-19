@@ -97,11 +97,11 @@ export async function setupGoogleAuth(app: Express) {
       next();
     },
     passport.authenticate('google', { 
-      failureRedirect: 'https://upsetpool.com/?auth=failed'
+      failureRedirect: '/?auth=failed'
     }),
     (req, res) => {
-      console.log('Google OAuth successful, redirecting to custom domain');
-      res.redirect('https://upsetpool.com/?auth=success');
+      console.log('Google OAuth successful, user authenticated');
+      res.redirect('/?auth=success');
     }
   );
 }

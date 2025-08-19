@@ -33,11 +33,35 @@ const registerSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 type RegisterFormData = z.infer<typeof registerSchema>;
 
-export default function AuthPage() {
+interface AuthPageProps {
+  authResult?: string | null;
+}
+
+export default function AuthPage({ authResult }: AuthPageProps) {
   const [, setLocation] = useLocation();
   const { user, isLoading: isAuthLoading } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("login");
+
+  // Handle OAuth results
+  useEffect(() => {
+    if (authResult === 'failed') {
+      toast({
+        title: "Login Failed",
+        description: "Google login was cancelled or failed. Please try again.",
+        variant: "destructive",
+      });
+      // Clean URL
+      window.history.replaceState({}, '', '/');
+    } else if (authResult === 'success') {
+      toast({
+        title: "Login Successful",
+        description: "Welcome! You are now logged in.",
+      });
+      // Clean URL
+      window.history.replaceState({}, '', '/');
+    }
+  }, [authResult, toast]);
 
   // Redirect if already logged in
   useEffect(() => {

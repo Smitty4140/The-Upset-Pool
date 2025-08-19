@@ -49,6 +49,7 @@ export function setupAuth(app: Express) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: sessionTtl,
+      sameSite: 'lax', // Allow cross-site requests
     },
   };
 
@@ -383,14 +384,14 @@ export function setupAuth(app: Express) {
       next();
     },
     passport.authenticate('google', { 
-      failureRedirect: 'https://upsetpool.com/?auth=failed'
+      failureRedirect: '/?auth=failed'
     }),
     (req, res) => {
       console.log('Google OAuth successful, user:', req.user ? 'authenticated' : 'NO USER');
       if (req.user) {
         console.log('User ID:', req.user.id);
       }
-      res.redirect('https://upsetpool.com/?auth=success');
+      res.redirect('/?auth=success');
     }
   );
 
