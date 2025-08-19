@@ -388,7 +388,12 @@ export default function Home() {
 
       {/* League Header with countdown and user's current pick */}
       <div className="mb-6">
-        <LeagueHeader leagueId={leagueId} hasSubmittedPick={hasSubmittedPick} userPick={userPick} />
+        <LeagueHeader 
+          leagueId={leagueId} 
+          hasSubmittedPick={hasSubmittedPick} 
+          userPick={userPick} 
+          selectedWeekId={selectedWeekId}
+        />
       </div>
 
       {/* Deactivated User Banner */}

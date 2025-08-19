@@ -11,12 +11,18 @@ type LeagueHeaderProps = {
   leagueId: number;
   hasSubmittedPick: boolean;
   userPick?: any; // User's current pick information
+  selectedWeekId?: number; // The week being viewed (can be different from current week)
 };
 
-export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: LeagueHeaderProps) {
+export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick, selectedWeekId }: LeagueHeaderProps) {
   // Get current NFL week
   const { data: currentWeek, isLoading: isLoadingWeek } = useQuery<NFLWeek>({
     queryKey: ["/api/nfl-weeks/current"],
+  });
+
+  // Get all weeks to find selected week details
+  const { data: allWeeks, isLoading: isLoadingAllWeeks } = useQuery<NFLWeek[]>({
+    queryKey: ["/api/nfl-weeks"],
   });
 
   // Get league info
@@ -24,10 +30,14 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
     queryKey: [`/api/leagues/${leagueId}`],
   });
 
-  // Get games for current week to check if spreads are available
+  // Determine which week to display (selected week or current week)
+  const displayWeekId = selectedWeekId || currentWeek?.id;
+  const displayWeek = allWeeks?.find(week => week.id === displayWeekId) || currentWeek;
+
+  // Get games for the display week to check if spreads are available
   const { data: weekGames, isLoading: isLoadingGames } = useQuery<NFLGame[]>({
-    queryKey: [`/api/nfl-games/week/${currentWeek?.id}`],
-    enabled: !!currentWeek?.id,
+    queryKey: [`/api/nfl-games/week/${displayWeekId}`],
+    enabled: !!displayWeekId,
   });
 
   // Check if spreads are available (any game has non-zero spread)
@@ -45,10 +55,10 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
     return new Date(firstGameTime.getTime() - (12 * 60 * 60 * 1000)); // 12 hours before
   }, [weekGames]);
 
-  // Countdown to picks lock (Sunday 1 PM EST)
+  // Countdown to picks lock for the display week
   const lockDate = useMemo(() => 
-    currentWeek?.picksLockAt ? new Date(currentWeek.picksLockAt) : null, 
-    [currentWeek?.picksLockAt]
+    displayWeek?.picksLockAt ? new Date(displayWeek.picksLockAt) : null, 
+    [displayWeek?.picksLockAt]
   );
   
   // Use appropriate countdown based on spreads availability
@@ -84,11 +94,14 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
               </h2>
             </div>
             
-            {currentWeek && (
+            {displayWeek && (
               <div className="flex items-center text-gray-600 mb-3">
                 <Calendar className="h-4 w-4 mr-1" />
                 <p className="text-sm">
-                  Week {currentWeek.weekNumber} ({formatWeeklyDate(currentWeek.startDate)} - {formatWeeklyDate(currentWeek.endDate)})
+                  Week {displayWeek.weekNumber} ({formatWeeklyDate(displayWeek.startDate)} - {formatWeeklyDate(displayWeek.endDate)})
+                  {selectedWeekId && selectedWeekId !== currentWeek?.id && (
+                    <span className="ml-2 text-amber-600 font-medium">(Viewing different week)</span>
+                  )}
                 </p>
               </div>
             )}
