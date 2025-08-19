@@ -175,19 +175,7 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
     value: count
   }));
   
-  // Count underdog vs favorite picks
-  const pickTypeData = [
-    { name: 'Underdog', value: 0 },
-    { name: 'Favorite', value: 0 }
-  ];
-  
-  weeklyPicks?.forEach(pick => {
-    if (pick.isUnderdog) {
-      pickTypeData[0].value++;
-    } else {
-      pickTypeData[1].value++;
-    }
-  });
+
   
   // Colors for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
@@ -442,38 +430,7 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
           </CardContent>
         </Card>
 
-        {/* Underdog vs Favorite Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <PieChart className="mr-2 h-5 w-5" />
-              Underdog vs Favorite Picks
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsPieChart>
-                  <Pie
-                    data={pickTypeData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  >
-                    <Cell fill="#82ca9d" />
-                    <Cell fill="#8884d8" />
-                  </Pie>
-                  <Tooltip formatter={(value) => [`${value} picks`, 'Count']} />
-                  <Legend />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+
       </div>
     </div>
   );
