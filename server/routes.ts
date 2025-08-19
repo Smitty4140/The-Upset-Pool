@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
+import { setupGoogleAuth } from "./googleAuth";
 import { z } from "zod";
 import { userPickFormSchema } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
@@ -207,6 +208,7 @@ async function getOddsGamesData() {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+  await setupGoogleAuth(app);
 
   // Auth routes are now handled in setupAuth
   
