@@ -72,3 +72,9 @@ Preferred communication style: Simple, everyday language.
   - Features engaging email template with clear call-to-action to make picks
   - Automatically triggered when weekly game data pull completes successfully
   - Admin test endpoint available for manual testing
+- **Email Service Migration**: Switched from SendGrid to Brevo (Sendinblue) for improved email delivery reliability
+- **League Navigation Fix**: Resolved TypeScript errors causing league switching issues
+  - Fixed automatic league switching behavior that was reverting user selections
+  - Improved type safety for league data handling
+  - Removed problematic preseason data (week 999) from database
+- **Data Cleanup**: Removed all week 999 preseason data to improve system performance and data integrity
