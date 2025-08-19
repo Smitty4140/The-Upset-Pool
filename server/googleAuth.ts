@@ -22,18 +22,24 @@ export async function setupGoogleAuth(app: Express) {
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
+      console.log('Google OAuth callback received for profile:', profile.id);
+      
       // Extract user information from Google profile
       const googleEmail = profile.emails?.[0]?.value;
       const firstName = profile.name?.givenName;
       const lastName = profile.name?.familyName;
       const profileImageUrl = profile.photos?.[0]?.value;
 
+      console.log('Google profile email:', googleEmail);
+
       if (!googleEmail) {
+        console.error('No email found in Google profile');
         return done(new Error('No email found in Google profile'), false);
       }
 
       // Check if user already exists by Google ID first
       let user = await storage.getUserByGoogleId(profile.id);
+      console.log('Existing user by Google ID:', user ? 'found' : 'not found');
       
       if (user) {
         // User exists with this Google ID, update if needed
@@ -91,6 +97,8 @@ export async function setupGoogleAuth(app: Express) {
     }),
     (req, res) => {
       // Successful authentication
+      console.log('Google OAuth success, user:', req.user ? 'authenticated' : 'no user');
+      console.log('Session ID:', req.sessionID);
       res.redirect('/?auth=success');
     }
   );
