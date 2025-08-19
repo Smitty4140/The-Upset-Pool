@@ -11,6 +11,8 @@ import LeaderboardPage from "@/pages/Leaderboard";
 import AdminDashboard from "@/pages/Admin";
 import Welcome from "@/pages/Welcome";
 import AuthPage from "@/pages/auth-page";
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,9 +26,20 @@ function Router() {
     return <div className="flex h-screen w-screen items-center justify-center">Processing login...</div>;
   }
   
-  // Show auth page for non-authenticated users
-  if (!user) {
-    return <AuthPage />;
+  // Show auth pages for non-authenticated users
+  if (!user && !isLoading) {
+    return (
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route path="/register" component={Register} />
+        <Route component={AuthPage} />
+      </Switch>
+    );
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return <div className="flex h-screen w-screen items-center justify-center">Loading...</div>;
   }
   
   // If user is logged in, show regular app layout
