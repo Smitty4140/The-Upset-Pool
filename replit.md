@@ -93,3 +93,6 @@ Preferred communication style: Simple, everyday language.
   - Removed duplicate and incorrect matchups from Week 1
   - Set all spreads to 0.0 to disable picks until automated spread pulls occur
   - Picks will be available 12 hours before Week 1 begins when the scheduler pulls real spreads
+- **Custom Domain Integration**: Configured OAuth redirects to use upsetpool.com custom domain
+  - Updated Google OAuth callback to redirect to https://upsetpool.com after authentication
+  - Users now see upsetpool.com URL instead of Replit app domain after login

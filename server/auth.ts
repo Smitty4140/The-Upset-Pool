@@ -383,14 +383,14 @@ export function setupAuth(app: Express) {
       next();
     },
     passport.authenticate('google', { 
-      failureRedirect: '/?auth=failed'
+      failureRedirect: 'https://upsetpool.com/?auth=failed'
     }),
     (req, res) => {
       console.log('Google OAuth successful, user:', req.user ? 'authenticated' : 'NO USER');
       if (req.user) {
         console.log('User ID:', req.user.id);
       }
-      res.redirect('/?auth=success');
+      res.redirect('https://upsetpool.com/?auth=success');
     }
   );
 
