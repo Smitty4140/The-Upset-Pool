@@ -122,6 +122,8 @@ export default function AuthPage() {
   };
 
   const handleGoogleSignIn = () => {
+    console.log('Starting Google OAuth flow...');
+    // Use simple redirect - most reliable method
     window.location.href = '/api/auth/google';
   };
 

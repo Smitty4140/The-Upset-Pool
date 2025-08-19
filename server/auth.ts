@@ -82,6 +82,8 @@ export function setupAuth(app: Express) {
   const callbackURL = `${protocol}://${domain}/api/auth/google/callback`;
 
   console.log('Google OAuth callback URL:', callbackURL);
+  console.log('Google Client ID:', process.env.GOOGLE_CLIENT_ID ? 'Set' : 'NOT SET');
+  console.log('Google Client Secret:', process.env.GOOGLE_CLIENT_SECRET ? 'Set' : 'NOT SET');
 
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID!,
@@ -303,22 +305,46 @@ export function setupAuth(app: Express) {
   });
 
   // Google OAuth routes
-  app.get('/api/auth/google',
-    passport.authenticate('google', { 
-      scope: ['profile', 'email'] 
-    })
-  );
+  app.get('/api/auth/google', (req, res, next) => {
+    console.log('Starting Google OAuth flow');
+    console.log('Request headers:', {
+      'user-agent': req.get('user-agent'),
+      'referer': req.get('referer'),
+      'host': req.get('host')
+    });
+    next();
+  }, passport.authenticate('google', { 
+    scope: ['profile', 'email'] 
+  }));
 
   app.get('/api/auth/google/callback',
     (req, res, next) => {
-      console.log('Google callback route hit, query params:', req.query);
+      console.log('Google callback route hit');
+      console.log('Query params:', req.query);
+      console.log('Session ID:', req.sessionID);
       next();
     },
     passport.authenticate('google', { 
-      failureRedirect: '/?auth=failed',
-      successRedirect: '/?auth=success'
-    })
+      failureRedirect: '/?auth=failed'
+    }),
+    (req, res) => {
+      console.log('Google OAuth successful, user:', req.user ? 'authenticated' : 'NO USER');
+      if (req.user) {
+        console.log('User ID:', req.user.id);
+      }
+      res.redirect('/?auth=success');
+    }
   );
+
+  // Test endpoint for debugging Google OAuth
+  app.get('/api/auth/google/test', (req, res) => {
+    res.json({
+      clientIdSet: !!process.env.GOOGLE_CLIENT_ID,
+      clientSecretSet: !!process.env.GOOGLE_CLIENT_SECRET,
+      callbackUrl: callbackURL,
+      domain: domain
+    });
+  });
 }
 
 export const isAuthenticated = (req: any, res: any, next: any) => {
