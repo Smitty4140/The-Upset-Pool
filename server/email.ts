@@ -1,14 +1,11 @@
-import { MailService } from '@sendgrid/mail';
+import * as SibApiV3Sdk from '@sendinblue/client';
 
-if (!process.env.SENDGRID_API_KEY) {
-  console.warn("SENDGRID_API_KEY environment variable is not set. Email functionality will be disabled.");
+if (!process.env.BREVO_API_KEY) {
+  console.warn("BREVO_API_KEY environment variable is not set. Email functionality will be disabled.");
 }
 
-const mailService = new MailService();
-
-if (process.env.SENDGRID_API_KEY) {
-  mailService.setApiKey(process.env.SENDGRID_API_KEY);
-}
+const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY || '');
 
 interface EmailParams {
   to: string;
@@ -18,27 +15,37 @@ interface EmailParams {
 }
 
 /**
- * Send an email using SendGrid
+ * Send an email using Brevo (Sendinblue)
  * @param params Email parameters
  * @returns Success status
  */
 export async function sendEmail(params: EmailParams): Promise<boolean> {
-  if (!process.env.SENDGRID_API_KEY) {
-    console.warn("Cannot send email: SENDGRID_API_KEY is not set");
+  if (!process.env.BREVO_API_KEY) {
+    console.warn("Cannot send email: BREVO_API_KEY is not set");
     return false;
   }
 
   try {
-    await mailService.send({
-      to: params.to,
-      from: process.env.SENDGRID_FROM_EMAIL || 'notifications@nflupsetpool.com', // Change to your verified sender
-      subject: params.subject,
-      text: params.text || '',
-      html: params.html || params.text || '',
-    });
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    
+    sendSmtpEmail.sender = {
+      name: 'NFL Upset Pool',
+      email: process.env.BREVO_FROM_EMAIL || 'notifications@nflupsetpool.com'
+    };
+    
+    sendSmtpEmail.to = [{
+      email: params.to
+    }];
+    
+    sendSmtpEmail.subject = params.subject;
+    sendSmtpEmail.textContent = params.text || '';
+    sendSmtpEmail.htmlContent = params.html || params.text || '';
+
+    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
+    console.log(`[Email] Brevo response:`, result.body);
     return true;
   } catch (error) {
-    console.error('SendGrid email error:', error);
+    console.error('Brevo email error:', error);
     return false;
   }
 }
