@@ -17,8 +17,9 @@ import { Trophy } from "lucide-react";
 const usernameSchema = z.object({
   username: z.string()
     .min(3, "Username must be at least 3 characters long")
-    .max(20, "Username must be less than 20 characters")
-    .regex(/^[a-zA-Z0-9_-]+$/, "Username can only contain letters, numbers, hyphens, and underscores")
+    .max(25, "Username must be less than 25 characters")
+    .regex(/^[a-zA-Z0-9_\-\s]+$/, "Username can only contain letters, numbers, spaces, hyphens, and underscores")
+    .refine(name => name.trim().length > 0, "Username cannot be only spaces")
 });
 
 type UsernameFormData = z.infer<typeof usernameSchema>;
@@ -74,7 +75,10 @@ export default function SetupUsername() {
   });
 
   const onSubmit = (data: UsernameFormData) => {
-    setupUsernameMutation.mutate(data);
+    // Trim whitespace from username before submitting
+    setupUsernameMutation.mutate({
+      username: data.username.trim()
+    });
   };
 
   // Don't render anything while checking auth status
@@ -120,7 +124,7 @@ export default function SetupUsername() {
                       </FormControl>
                       <FormMessage />
                       <p className="text-sm text-gray-600">
-                        3-20 characters, letters, numbers, hyphens, and underscores only
+                        3-25 characters, letters, numbers, spaces, hyphens, and underscores
                       </p>
                     </FormItem>
                   )}
