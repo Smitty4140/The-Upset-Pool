@@ -59,16 +59,18 @@ export default function Home() {
     enabled: isAuthenticated,
   });
 
-  // Set default league when user leagues load
+  // Set default league when user leagues load (only on initial load)
   useEffect(() => {
-    if (userLeagues && Array.isArray(userLeagues) && userLeagues.length > 0 && selectedLeagueId === 1) {
-      // If user has leagues and we're still on default, switch to their first league
-      const firstLeague = userLeagues[0];
-      if (firstLeague?.league?.id) {
-        setSelectedLeagueId(firstLeague.league.id);
+    if (userLeagues && Array.isArray(userLeagues) && userLeagues.length > 0) {
+      // Only set default if we're still on the initial default (1) and haven't made a selection yet
+      if (selectedLeagueId === 1) {
+        const firstLeague = userLeagues[0];
+        if (firstLeague?.league?.id) {
+          setSelectedLeagueId(firstLeague.league.id);
+        }
       }
     }
-  }, [userLeagues, selectedLeagueId]);
+  }, [userLeagues]); // Remove selectedLeagueId dependency to prevent re-triggering
 
   // Get all NFL weeks
   const { data: allWeeks, isLoading: isLoadingAllWeeks } = useQuery<NFLWeek[]>({
