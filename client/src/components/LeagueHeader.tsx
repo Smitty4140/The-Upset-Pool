@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { NFLWeek, League } from "@/lib/types";
+import { NFLWeek, League, NFLGame } from "@/lib/types";
 import { formatWeeklyDate } from "@/lib/formatDate";
-import { Clock, Trophy, Calendar, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Clock, Trophy, Calendar, AlertTriangle, CheckCircle2, Database } from "lucide-react";
 import SubmittedPickDisplay from "@/components/SubmittedPickDisplay";
 
 type LeagueHeaderProps = {
@@ -24,14 +24,36 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
     queryKey: [`/api/leagues/${leagueId}`],
   });
 
+  // Get games for current week to check if spreads are available
+  const { data: weekGames, isLoading: isLoadingGames } = useQuery<NFLGame[]>({
+    queryKey: [`/api/nfl-games/week/${currentWeek?.id}`],
+    enabled: !!currentWeek?.id,
+  });
+
+  // Check if spreads are available (any game has non-zero spread)
+  const spreadsAvailable = useMemo(() => {
+    if (!weekGames || weekGames.length === 0) return false;
+    return weekGames.some(game => parseFloat(game.spread || '0') !== 0);
+  }, [weekGames]);
+
+  // Calculate data pull time (12 hours before first game)
+  const dataPullTime = useMemo(() => {
+    if (!weekGames || weekGames.length === 0) return null;
+    const firstGame = weekGames.sort((a, b) => new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime())[0];
+    if (!firstGame) return null;
+    const firstGameTime = new Date(firstGame.gameTime);
+    return new Date(firstGameTime.getTime() - (12 * 60 * 60 * 1000)); // 12 hours before
+  }, [weekGames]);
+
   // Countdown to picks lock (Sunday 1 PM EST)
-  // Memoize the lock date to prevent infinite renders
   const lockDate = useMemo(() => 
     currentWeek?.picksLockAt ? new Date(currentWeek.picksLockAt) : null, 
     [currentWeek?.picksLockAt]
   );
   
-  const { days, hours, minutes, isExpired } = useCountdown(lockDate);
+  // Use appropriate countdown based on spreads availability
+  const countdownTarget = spreadsAvailable ? lockDate : dataPullTime;
+  const { days, hours, minutes, isExpired } = useCountdown(countdownTarget);
 
   if (isLoadingWeek || isLoadingLeague) {
     return (
@@ -99,19 +121,42 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick }: L
             <div className={`rounded-lg px-5 py-4 shadow-md flex items-center 
               ${isExpired 
                 ? "bg-red-100 border border-red-200" 
-                : "bg-gradient-to-r from-blue-100 to-purple-100 border border-blue-200"}`
+                : spreadsAvailable 
+                  ? "bg-gradient-to-r from-blue-100 to-purple-100 border border-blue-200"
+                  : "bg-gradient-to-r from-amber-100 to-yellow-100 border border-amber-200"}`
             }>
-              <Clock className={`h-6 w-6 ${isExpired ? "text-red-500" : "text-blue-500"} mr-3`} />
+              {spreadsAvailable ? (
+                <Clock className={`h-6 w-6 ${isExpired ? "text-red-500" : "text-blue-500"} mr-3`} />
+              ) : (
+                <Database className="h-6 w-6 text-amber-600 mr-3" />
+              )}
               <div>
-                <div className="text-sm font-medium text-gray-700">Picks lock:</div>
-                {isExpired ? (
-                  <div className="countdown-timer font-bold text-red-600 text-lg">
-                    Picks are locked
-                  </div>
+                {spreadsAvailable ? (
+                  <>
+                    <div className="text-sm font-medium text-gray-700">Picks lock:</div>
+                    {isExpired ? (
+                      <div className="countdown-timer font-bold text-red-600 text-lg">
+                        Picks are locked
+                      </div>
+                    ) : (
+                      <div className="countdown-timer font-bold text-blue-800 text-lg">
+                        {days}d {hours}h {minutes}m
+                      </div>
+                    )}
+                  </>
                 ) : (
-                  <div className="countdown-timer font-bold text-blue-800 text-lg">
-                    {days}d {hours}h {minutes}m
-                  </div>
+                  <>
+                    <div className="text-sm font-medium text-gray-700">Spreads available:</div>
+                    {isExpired ? (
+                      <div className="countdown-timer font-bold text-green-600 text-lg">
+                        Data pull scheduled
+                      </div>
+                    ) : (
+                      <div className="countdown-timer font-bold text-amber-800 text-lg">
+                        {days}d {hours}h {minutes}m
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
