@@ -89,3 +89,7 @@ Preferred communication style: Simple, everyday language.
   - Fixed leaderboard API to include profileImageUrl in response data
   - Updated username validation to allow spaces in leaderboard names (3-25 characters)
   - Implemented complete username setup flow for new Google OAuth users
+- **NFL Schedule Accuracy**: Fixed Week 1 to have exactly 16 games with accurate 2025 NFL schedule
+  - Removed duplicate and incorrect matchups from Week 1
+  - Set all spreads to 0.0 to disable picks until automated spread pulls occur
+  - Picks will be available 12 hours before Week 1 begins when the scheduler pulls real spreads

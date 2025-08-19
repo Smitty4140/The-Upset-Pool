@@ -2051,6 +2051,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Found game: ${dbGame.id} - ${dbGame.homeTeam.name} vs ${dbGame.awayTeam.name}`);
       
+      // Check if spreads are available (spreads are 0.0 until pulled by scheduler)
+      if (Number(dbGame.spread) === 0.0) {
+        return res.status(400).json({ 
+          message: "Picks are not yet available for this week. Spreads will be updated 12 hours before the first game.",
+          details: { 
+            gameTime: dbGame.gameTime,
+            homeTeam: dbGame.homeTeam.name,
+            awayTeam: dbGame.awayTeam.name
+          }
+        });
+      }
+      
       // Validate that picked team is part of the game
       if (dbGame.homeTeamId !== pickedTeamId && dbGame.awayTeamId !== pickedTeamId) {
         return res.status(400).json({ 
