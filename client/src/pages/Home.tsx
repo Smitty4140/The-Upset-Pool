@@ -54,17 +54,17 @@ export default function Home() {
   const leagueId = selectedLeagueId;
 
   // Get user's leagues for the selector
-  const { data: userLeagues, isLoading: isLoadingUserLeagues } = useQuery({
+  const { data: userLeagues, isLoading: isLoadingUserLeagues } = useQuery<any[]>({
     queryKey: ["/api/user/leagues"],
     enabled: isAuthenticated,
   });
 
   // Set default league when user leagues load
   useEffect(() => {
-    if (userLeagues && userLeagues.length > 0 && selectedLeagueId === 1) {
+    if (userLeagues && Array.isArray(userLeagues) && userLeagues.length > 0 && selectedLeagueId === 1) {
       // If user has leagues and we're still on default, switch to their first league
       const firstLeague = userLeagues[0];
-      if (firstLeague.league?.id) {
+      if (firstLeague?.league?.id) {
         setSelectedLeagueId(firstLeague.league.id);
       }
     }
@@ -155,8 +155,8 @@ export default function Home() {
     
     // Sort users by points (descending)
     const sortedUsers = [...users].sort((a, b) => {
-      const aPoints = parseFloat(a.totalPoints || '0');
-      const bPoints = parseFloat(b.totalPoints || '0');
+      const aPoints = parseFloat(String(a.totalPoints || '0'));
+      const bPoints = parseFloat(String(b.totalPoints || '0'));
       return bPoints - aPoints;
     });
     
@@ -166,11 +166,11 @@ export default function Home() {
     
     for (let i = 0; i < sortedUsers.length; i++) {
       const user = sortedUsers[i];
-      const currentPoints = parseFloat(user.totalPoints || '0');
+      const currentPoints = parseFloat(String(user.totalPoints || '0'));
       
       // If this isn't the first user and points are different from previous user
       if (i > 0) {
-        const previousPoints = parseFloat(sortedUsers[i - 1].totalPoints || '0');
+        const previousPoints = parseFloat(String(sortedUsers[i - 1].totalPoints || '0'));
         if (currentPoints !== previousPoints) {
           currentRank = i + 1; // Set rank to position + 1
         }
@@ -350,10 +350,10 @@ export default function Home() {
                     <SelectValue placeholder="Select a league" />
                   </SelectTrigger>
                   <SelectContent>
-                    {userLeagues?.map((membership: any) => (
-                      <SelectItem key={membership.league.id} value={membership.league.id.toString()}>
+                    {userLeagues && Array.isArray(userLeagues) && userLeagues.map((membership: any) => (
+                      <SelectItem key={membership.league?.id || membership.id} value={(membership.league?.id || membership.id).toString()}>
                         <div className="flex items-center gap-2">
-                          <span>{membership.league.name}</span>
+                          <span>{membership.league?.name || membership.name}</span>
                           {membership.isAdmin && (
                             <Trophy className="h-3 w-3 text-yellow-600" />
                           )}
@@ -408,8 +408,8 @@ export default function Home() {
         activeTab={activeTab} 
         onTabChange={(tab) => setActiveTab(tab as Tab)} 
         isPicksLocked={arePicksLocked}
-        isAdmin={isAdmin}
-        isSuperUser={superUserStatus?.isSuperUser}
+        isAdmin={Boolean(isAdmin)}
+        isSuperUser={Boolean(superUserStatus?.isSuperUser)}
       />
 
       {/* Week Selector - positioned above all tab content */}
@@ -430,8 +430,8 @@ export default function Home() {
         )}
 
         {/* Results Tab - Only visible to super users */}
-        {activeTab === "results" && superUserStatus?.isSuperUser && (
-          <GameResults weekId={selectedWeekId || currentWeek?.id} />
+        {activeTab === "results" && Boolean(superUserStatus?.isSuperUser) && (
+          <GameResults weekId={selectedWeekId || currentWeek?.id || 0} />
         )}
 
         {/* Admin Tab - Only visible to admins */}
@@ -502,7 +502,7 @@ export default function Home() {
                               disabled={!canMakePicks || !isAuthenticated}
                               isViewingFutureWeek={isViewingFutureWeek}
                               isSubmitting={isSubmittingPick}
-                              isInactive={memberStatus ? !memberStatus.isActive : false}
+                              isInactive={memberStatus ? !memberStatus.isActive : null}
                             />
                           ))}
                         </div>
