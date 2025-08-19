@@ -85,3 +85,7 @@ Preferred communication style: Simple, everyday language.
   - Improved type safety for league data handling
   - Removed problematic preseason data (week 999) from database
 - **Data Cleanup**: Removed all week 999 preseason data to improve system performance and data integrity
+- **Google Profile Images**: Enhanced leaderboard display to show user's Google profile images instead of default avatars
+  - Fixed leaderboard API to include profileImageUrl in response data
+  - Updated username validation to allow spaces in leaderboard names (3-25 characters)
+  - Implemented complete username setup flow for new Google OAuth users

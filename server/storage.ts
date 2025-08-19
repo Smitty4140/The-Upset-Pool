@@ -882,6 +882,13 @@ export class DatabaseStorage implements IStorage {
         id: users.id,
         username: users.username,
         email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profileImageUrl: users.profileImageUrl,
+        emailVerified: users.emailVerified,
+        receiveNotifications: users.receiveNotifications,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
         totalPoints: sql<string>`COALESCE(SUM(${userPicks.pointsEarned}), 0)`.as('totalPoints')
       })
       .from(users)
@@ -891,7 +898,7 @@ export class DatabaseStorage implements IStorage {
         eq(userPicks.leagueId, leagueId)
       ))
       .where(eq(leagueMembers.leagueId, leagueId))
-      .groupBy(users.id, users.username, users.email)
+      .groupBy(users.id, users.username, users.email, users.firstName, users.lastName, users.profileImageUrl, users.emailVerified, users.receiveNotifications, users.createdAt, users.updatedAt)
       .orderBy(desc(sql`COALESCE(SUM(${userPicks.pointsEarned}), 0)`));
     
     return result as User[];
