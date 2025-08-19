@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Trophy, Users, TrendingUp, Star, LogIn, UserPlus } from "lucide-react";
+import { Trophy, Users, TrendingUp, Star, LogIn, UserPlus, Chrome } from "lucide-react";
 
 // Login form schema
 const loginSchema = z.object({
@@ -121,6 +121,10 @@ export default function AuthPage() {
     registerMutation.mutate(data);
   };
 
+  const handleGoogleSignIn = () => {
+    window.location.href = '/api/auth/google';
+  };
+
   // Don't render anything while checking auth status
   if (isAuthLoading) {
     return null;
@@ -206,6 +210,30 @@ export default function AuthPage() {
                     Sign Up
                   </TabsTrigger>
                 </TabsList>
+
+                {/* Google Sign-In Button - appears on both tabs */}
+                <div className="space-y-4 mb-6">
+                  <Button
+                    onClick={handleGoogleSignIn}
+                    variant="outline"
+                    className="w-full flex items-center justify-center gap-2 hover:bg-gray-50"
+                    size="lg"
+                  >
+                    <Chrome className="h-5 w-5 text-red-500" />
+                    Continue with Google
+                  </Button>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white px-2 text-muted-foreground">
+                        Or continue with email
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
                 <TabsContent value="login" className="space-y-4">
                   <Form {...loginForm}>
