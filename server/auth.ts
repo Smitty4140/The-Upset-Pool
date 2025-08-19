@@ -146,12 +146,12 @@ export function setupAuth(app: Express) {
             console.error('Error checking/adding linked user to default league:', error);
           }
         } else {
-          // Create new user
+          // Create new user without username - they'll need to set it
           const userId = `google_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           user = await storage.createUser({
             id: userId,
             email: googleEmail,
-            username: googleEmail, // Use email as username for Google users
+            username: null, // No username initially - user must set it
             googleId: profile.id,
             firstName: firstName || null,
             lastName: lastName || null,
@@ -160,7 +160,7 @@ export function setupAuth(app: Express) {
             totalPoints: "0"
           });
 
-          console.log('Created new Google user:', user.id);
+          console.log('Created new Google user (needs username):', user.id);
 
           // Add user to default league
           try {
@@ -306,6 +306,48 @@ export function setupAuth(app: Express) {
       emailVerified: req.user.emailVerified,
       receiveNotifications: req.user.receiveNotifications,
     });
+  });
+
+  // Update user profile endpoint
+  app.patch("/api/auth/profile", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    try {
+      const { username } = req.body;
+      const userId = req.user.id;
+
+      if (username) {
+        // Check if username is already taken by another user
+        const existingUser = await storage.getUserByUsername(username);
+        if (existingUser && existingUser.id !== userId) {
+          return res.status(400).json({ message: "Username already taken" });
+        }
+      }
+
+      const updatedUser = await storage.updateUser(userId, {
+        username: username || null
+      });
+
+      // Update the session with the new username
+      req.user.username = updatedUser.username;
+
+      res.json({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        username: updatedUser.username,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        profileImageUrl: updatedUser.profileImageUrl,
+        totalPoints: updatedUser.totalPoints,
+        emailVerified: updatedUser.emailVerified,
+        receiveNotifications: updatedUser.receiveNotifications,
+      });
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
   });
 
   // Check if current user is super user

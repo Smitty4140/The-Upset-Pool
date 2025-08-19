@@ -13,6 +13,7 @@ import Welcome from "@/pages/Welcome";
 import AuthPage from "@/pages/auth-page";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import SetupUsername from "@/pages/SetupUsername";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
@@ -42,7 +43,12 @@ function Router() {
     return <div className="flex h-screen w-screen items-center justify-center">Loading...</div>;
   }
   
-  // If user is logged in, show regular app layout
+  // Check if user needs to set username
+  if (user && !user.username) {
+    return <SetupUsername />;
+  }
+  
+  // If user is logged in and has username, show regular app layout
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
