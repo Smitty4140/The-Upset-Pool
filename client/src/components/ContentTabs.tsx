@@ -1,6 +1,6 @@
 import { Eye, Shield, MessageSquare, Trophy, Flag, UserCog } from "lucide-react";
 
-type Tab = "spreads" | "messageboard" | "leaderboard" | "weeklypicks" | "results" | "admin";
+type Tab = "spreads" | "leaderboard" | "weeklypicks" | "results" | "admin";
 
 type ContentTabsProps = {
   activeTab: Tab;
@@ -79,17 +79,7 @@ export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = fa
             </button>
           )}
 
-          <button
-            onClick={() => onTabChange("messageboard")}
-            className={`${
-              activeTab === "messageboard"
-                ? "bg-white border-primary text-primary"
-                : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300 hover:bg-white/50"
-            } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm flex items-center transition-all duration-200`}
-          >
-            <MessageSquare className={`h-4 w-4 mr-2 ${activeTab === "messageboard" ? "text-primary" : "text-gray-500"}`} />
-            Messageboard
-          </button>
+
         </nav>
       </div>
     </div>

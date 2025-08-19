@@ -31,7 +31,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
 
-type Tab = "spreads" | "messageboard" | "leaderboard" | "weeklypicks" | "results" | "admin";
+type Tab = "spreads" | "leaderboard" | "weeklypicks" | "results" | "admin";
 type SortOption = "spread" | "homeUnderdog" | "gameTime";
 
 export default function Home() {
@@ -650,25 +650,7 @@ export default function Home() {
           </div>
         )}
 
-        {activeTab === "messageboard" && (
-          <div>
-            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6 border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-primary/10 to-secondary/10">
-                <h3 className="text-xl font-medium text-gray-900 flex items-center">
-                  <MessageSquare className="h-5 w-5 text-primary mr-2" />
-                  League Discussion
-                </h3>
-              </div>
-              <div className="p-12 text-center">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-                <h3 className="mt-2 text-lg font-medium text-gray-900">Coming Soon</h3>
-                <p className="mt-1 text-gray-500">The messageboard feature will be available in a future update.</p>
-              </div>
-            </div>
-          </div>
-        )}
+
       </div>
     </div>
   );

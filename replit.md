@@ -102,3 +102,7 @@ Preferred communication style: Simple, everyday language.
   - Deleted all user picks and league members except the main admin
   - Removed all leagues except League 1 (NFL Upset Pool)
   - Preserved all NFL games, weeks, teams, and schedule data
+- **UI Cleanup**: Removed messageboard tab from league navigation
+  - Eliminated messageboard tab button from ContentTabs component
+  - Removed placeholder messageboard content from Home page
+  - Streamlined league interface to focus on core features
