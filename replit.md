@@ -96,3 +96,8 @@ Preferred communication style: Simple, everyday language.
 - **Custom Domain Integration**: Configured OAuth redirects to use upsetpool.com custom domain
   - Updated Google OAuth callback to redirect to https://upsetpool.com after authentication
   - Users now see upsetpool.com URL instead of Replit app domain after login
+- **Database Reset**: Clean slate for fresh production deployment
+  - Removed all users except samsemail123456789@gmail.com (Commish)
+  - Deleted all user picks and league members except the main admin
+  - Removed all leagues except League 1 (NFL Upset Pool)
+  - Preserved all NFL games, weeks, teams, and schedule data
