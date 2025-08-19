@@ -2743,10 +2743,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/scheduler/test-weekly-emails', isAuthenticated, isSuperUser, async (req: any, res) => {
     try {
       const { gameScheduler } = await import("./scheduler.js");
-      await gameScheduler.sendWeeklyEmailReminders();
+      await gameScheduler.sendWeeklyEmailRemindersTest();
       res.json({ 
         success: true,
-        message: 'Weekly email reminders sent successfully'
+        message: 'Weekly email reminders test sent successfully'
       });
     } catch (error) {
       console.error('[Admin] Failed to send test weekly emails:', error);

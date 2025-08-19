@@ -393,6 +393,107 @@ class GameScheduler {
   }
 
   /**
+   * Send weekly email reminders to all league members (test version - bypasses week restrictions)
+   */
+  async sendWeeklyEmailRemindersTest() {
+    try {
+      console.log('[Scheduler] Starting weekly email reminder test (bypassing week restrictions)...');
+      
+      // Get the current NFL week
+      const currentWeek = await db
+        .select()
+        .from(nflWeeks)
+        .where(eq(nflWeeks.active, true))
+        .limit(1);
+
+      if (currentWeek.length === 0) {
+        console.log('[Scheduler] No active NFL week found, skipping email reminders');
+        return;
+      }
+
+      const week = currentWeek[0];
+      console.log(`[Scheduler] Testing reminders for Week ${week.weekNumber} (test mode - ignoring week restrictions)`);
+
+      // Get all users with their league memberships (only active members who want notifications)
+      // For testing, only send to admins
+      const usersWithLeagues = await db
+        .select({
+          userId: users.id,
+          username: users.username,
+          email: users.email,
+          receiveNotifications: users.receiveNotifications,
+          leagueId: leagueMembers.leagueId,
+          leagueName: leagues.name,
+          isActive: leagueMembers.isActive
+        })
+        .from(users)
+        .innerJoin(leagueMembers, eq(users.id, leagueMembers.userId))
+        .innerJoin(leagues, eq(leagueMembers.leagueId, leagues.id))
+        .where(and(
+          eq(leagueMembers.isActive, true), // Only active league members
+          eq(users.receiveNotifications, true), // Only users who want notifications
+          eq(leagueMembers.isAdmin, true) // Only send to admins for testing
+        ));
+
+      console.log(`[Scheduler] Found ${usersWithLeagues.length} active admin members for testing`);
+
+      // Group users by their ID to process each user's leagues together
+      const userMap = new Map<string, { user: { id: string, username: string, email: string }, leagues: Array<{ id: number, name: string }> }>();
+      
+      for (const row of usersWithLeagues) {
+        if (!userMap.has(row.userId)) {
+          userMap.set(row.userId, {
+            user: { id: row.userId, username: row.username, email: row.email },
+            leagues: []
+          });
+        }
+        // Only add leagues where the user is an active member
+        if (row.isActive) {
+          userMap.get(row.userId)!.leagues.push({ id: row.leagueId, name: row.leagueName });
+        }
+      }
+
+      let emailsSent = 0;
+      let emailsFailed = 0;
+
+      // Process each user and send appropriate email
+      for (const [userId, userData] of userMap) {
+        try {
+          console.log(`[Scheduler] Processing user ${userData.user.username} with ${userData.leagues.length} leagues`);
+
+          // For testing, send a simple test email
+          const success = await sendWeeklyPickConfirmationEmail(
+            userData.user.email,
+            userData.user.username,
+            week.weekNumber,
+            userData.leagues.map(league => ({
+              leagueName: league.name,
+              teamName: "Test Team",
+              teamAbbreviation: "TEST",
+              spread: "+3.0"
+            }))
+          );
+
+          if (success) {
+            emailsSent++;
+            console.log(`[Scheduler] Test email sent successfully to ${userData.user.email}`);
+          } else {
+            emailsFailed++;
+            console.log(`[Scheduler] Failed to send test email to ${userData.user.email}`);
+          }
+        } catch (error) {
+          console.error(`[Scheduler] Error processing user ${userData.user.username}:`, error);
+          emailsFailed++;
+        }
+      }
+
+      console.log(`[Scheduler] Test email reminders completed: ${emailsSent} sent, ${emailsFailed} failed`);
+    } catch (error) {
+      console.error('[Scheduler] Error in test email reminders:', error);
+    }
+  }
+
+  /**
    * Send weekly email reminders to all league members
    */
   async sendWeeklyEmailReminders() {
