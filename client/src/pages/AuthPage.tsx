@@ -26,29 +26,48 @@ export default function AuthPage() {
             The bigger the upset, the more points you earn!
           </p>
           
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col gap-4 justify-center max-w-md mx-auto">
+            {/* Primary Google Sign-In */}
             <Button 
               onClick={handleGoogleSignIn}
               size="lg" 
-              className="flex items-center gap-2"
+              className="flex items-center justify-center gap-2 w-full"
             >
               <Chrome className="h-5 w-5" />
-              Sign in with Google
+              Continue with Google
             </Button>
-            <Button 
-              onClick={() => setLocation('/login')} 
-              variant="outline" 
-              size="lg"
-            >
-              Sign In with Email
-            </Button>
-            <Button 
-              onClick={() => setLocation('/register')} 
-              variant="outline" 
-              size="lg"
-            >
-              Create Account
-            </Button>
+
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-blue-50 px-2 text-muted-foreground">
+                  Or continue with email
+                </span>
+              </div>
+            </div>
+
+            {/* Email Options */}
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => setLocation('/login')} 
+                variant="outline" 
+                size="lg"
+                className="flex-1"
+              >
+                Sign In
+              </Button>
+              <Button 
+                onClick={() => setLocation('/register')} 
+                variant="outline" 
+                size="lg"
+                className="flex-1"
+              >
+                Sign Up
+              </Button>
+            </div>
           </div>
         </div>
 

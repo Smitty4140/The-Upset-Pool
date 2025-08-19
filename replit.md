@@ -58,6 +58,12 @@ Preferred communication style: Simple, everyday language.
 - **ESPN API**: Used for pulling NFL game results.
 
 ## Recent Updates (August 2025)
+- **Google OAuth Authentication**: Implemented dual authentication system supporting both Google OAuth and traditional email/password
+  - Users can sign in with Google accounts without creating passwords
+  - Account linking: existing email users can link their Google accounts
+  - Updated database schema with google_id field and optional password
+  - Beautiful login/registration pages with Google sign-in integration
+  - Automatic user assignment to default league for new Google users
 - **Weekly Email Reminders**: Implemented automated email system that runs every Sunday at noon (Eastern Time) during NFL weeks 1-18.
   - Only sends emails to active league members who have notifications enabled
   - Sends stylized confirmation emails to users who completed all picks across their leagues
