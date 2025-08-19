@@ -77,21 +77,17 @@ export function setupAuth(app: Express) {
     )
   );
 
-  // Configure Google OAuth strategy
-  const domain = process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000';
-  const protocol = domain.includes('localhost') ? 'http' : 'https';
-  const callbackURL = `${protocol}://${domain}/api/auth/google/callback`;
-
-  console.log('Google OAuth callback URL:', callbackURL);
+  // Configure Google OAuth strategy with dynamic callback URL based on request
   console.log('Google Client ID:', process.env.GOOGLE_CLIENT_ID ? 'Set' : 'NOT SET');
   console.log('Google Client Secret:', process.env.GOOGLE_CLIENT_SECRET ? 'Set' : 'NOT SET');
 
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID!,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    callbackURL: callbackURL
+    callbackURL: '/api/auth/google/callback', // Use relative URL
+    passReqToCallback: true
   },
-  async (accessToken, refreshToken, profile, done) => {
+  async (req, accessToken, refreshToken, profile, done) => {
     try {
       console.log('Google OAuth callback received for profile:', profile.id);
       
@@ -363,7 +359,7 @@ export function setupAuth(app: Express) {
     });
   });
 
-  // Google OAuth routes
+  // Google OAuth routes with dynamic callback URL support
   app.get('/api/auth/google', (req, res, next) => {
     console.log('Starting Google OAuth flow');
     console.log('Request headers:', {
@@ -371,6 +367,20 @@ export function setupAuth(app: Express) {
       'referer': req.get('referer'),
       'host': req.get('host')
     });
+    
+    // Set dynamic callback URL based on the host making the request
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const callbackURL = `${protocol}://${host}/api/auth/google/callback`;
+    
+    console.log('Dynamic callback URL:', callbackURL);
+    
+    // Update the strategy's callback URL for this request
+    const strategy = passport._strategy('google');
+    if (strategy) {
+      strategy._callbackURL = callbackURL;
+    }
+    
     next();
   }, passport.authenticate('google', { 
     scope: ['profile', 'email'] 
@@ -397,11 +407,16 @@ export function setupAuth(app: Express) {
 
   // Test endpoint for debugging Google OAuth
   app.get('/api/auth/google/test', (req, res) => {
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const dynamicCallbackURL = `${protocol}://${host}/api/auth/google/callback`;
+    
     res.json({
       clientIdSet: !!process.env.GOOGLE_CLIENT_ID,
       clientSecretSet: !!process.env.GOOGLE_CLIENT_SECRET,
-      callbackUrl: callbackURL,
-      domain: domain
+      requestHost: host,
+      dynamicCallbackURL: dynamicCallbackURL,
+      supportedDomains: ['upsetpool.com', 'www.upsetpool.com', process.env.REPLIT_DOMAINS]
     });
   });
 }
