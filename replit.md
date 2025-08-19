@@ -93,9 +93,10 @@ Preferred communication style: Simple, everyday language.
   - Removed duplicate and incorrect matchups from Week 1
   - Set all spreads to 0.0 to disable picks until automated spread pulls occur
   - Picks will be available 12 hours before Week 1 begins when the scheduler pulls real spreads
-- **Custom Domain Integration**: Configured OAuth redirects to use upsetpool.com custom domain
-  - Updated Google OAuth callback to redirect to https://upsetpool.com after authentication
-  - Users now see upsetpool.com URL instead of Replit app domain after login
+- **Custom Domain Integration**: OAuth redirects temporarily reverted to Replit domain
+  - Custom domain upsetpool.com needs DNS configuration in Replit deployment settings
+  - OAuth redirects use relative URLs until custom domain is properly linked
+  - Once DNS is configured, can switch back to absolute upsetpool.com URLs
 - **Database Reset**: Clean slate for fresh production deployment
   - Removed all users except samsemail123456789@gmail.com (Commish)
   - Deleted all user picks and league members except the main admin
