@@ -28,8 +28,15 @@ export default function Header() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <div className="flex-shrink-0 flex items-center">
-              <Shield className="h-8 w-8 text-accent mr-2" />
-              <h1 className="text-2xl font-bold text-white">Upset Pool</h1>
+              <a 
+                href="https://playminigames.net/game/snood"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center cursor-pointer"
+              >
+                <Shield className="h-8 w-8 text-accent mr-2" />
+                <h1 className="text-2xl font-bold text-white hover:text-gray-200 transition-colors">Upset Pool</h1>
+              </a>
             </div>
             <nav className="ml-6 flex space-x-8">
               <NavLink href="/" active={location === "/"}>
@@ -44,14 +51,6 @@ export default function Header() {
               <NavLink href="/rules" active={location === "/rules"}>
                 Rules
               </NavLink>
-              <a 
-                href="https://playminigames.net/game/snood"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-300 hover:text-white border-b-2 border-transparent hover:border-gray-300 px-3 py-2"
-              >
-                Snood
-              </a>
               {user?.id === "42820911" && (
                 <NavLink href="/admin" active={location === "/admin"}>
                   Admin
