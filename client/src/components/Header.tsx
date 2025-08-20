@@ -59,7 +59,7 @@ export default function Header() {
             </div>
             
             {/* Desktop Navigation */}
-            <nav className="hidden md:ml-6 md:flex md:space-x-8">
+            <nav className="hidden lg:ml-6 lg:flex lg:space-x-8">
               <NavLink href="/" active={location === "/"}>
                 My Leagues
               </NavLink>
@@ -81,7 +81,7 @@ export default function Header() {
           </div>
 
           {/* Desktop User Profile */}
-          <div className="hidden md:flex md:items-center md:space-x-4">
+          <div className="hidden lg:flex lg:items-center lg:space-x-4">
             {isLoading ? (
               <Skeleton className="h-10 w-10 rounded-full" />
             ) : isAuthenticated ? (
@@ -102,7 +102,7 @@ export default function Header() {
           </div>
 
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
+          <div className="lg:hidden flex items-center">
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
@@ -120,7 +120,7 @@ export default function Header() {
 
         {/* Mobile menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden">
+          <div className="lg:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-700">
               <NavLink href="/" active={location === "/"} mobile>
                 My Leagues

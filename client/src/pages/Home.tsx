@@ -335,29 +335,29 @@ export default function Home() {
       {/* League Selector */}
       {isAuthenticated && (
         <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full lg:w-auto">
+              <div className="flex items-center flex-shrink-0">
                 <Users className="h-5 w-5 text-primary mr-2" />
                 <span className="text-sm font-medium text-gray-700">League:</span>
               </div>
               {isLoadingUserLeagues ? (
-                <Skeleton className="h-8 w-48" />
+                <Skeleton className="h-8 w-full sm:w-48" />
               ) : (
                 <Select
                   value={selectedLeagueId.toString()}
                   onValueChange={(value) => setSelectedLeagueId(Number(value))}
                 >
-                  <SelectTrigger className="w-64">
+                  <SelectTrigger className="w-full sm:w-64 max-w-xs">
                     <SelectValue placeholder="Select a league" />
                   </SelectTrigger>
                   <SelectContent>
                     {userLeagues && Array.isArray(userLeagues) && userLeagues.map((membership: any) => (
                       <SelectItem key={membership.league?.id || membership.id} value={(membership.league?.id || membership.id).toString()}>
                         <div className="flex items-center gap-2">
-                          <span>{membership.league?.name || membership.name}</span>
+                          <span className="truncate">{membership.league?.name || membership.name}</span>
                           {membership.isAdmin && (
-                            <Trophy className="h-3 w-3 text-yellow-600" />
+                            <Trophy className="h-3 w-3 text-yellow-600 flex-shrink-0" />
                           )}
                         </div>
                       </SelectItem>
@@ -366,7 +366,7 @@ export default function Home() {
                 </Select>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
               <CreateLeague onLeagueCreated={(league) => {
                 toast({
                   title: "Success!",
