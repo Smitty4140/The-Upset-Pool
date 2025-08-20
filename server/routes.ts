@@ -290,7 +290,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ 
         isActive: leagueMember.isActive,
-        isAdmin: leagueMember.isAdmin 
+        isAdmin: leagueMember.isAdmin,
+        hasPaid: leagueMember.hasPaid 
       });
     } catch (error) {
       console.error("Error fetching member status:", error);

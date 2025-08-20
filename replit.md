@@ -106,3 +106,9 @@ Preferred communication style: Simple, everyday language.
   - Eliminated messageboard tab button from ContentTabs component
   - Removed placeholder messageboard content from Home page
   - Streamlined league interface to focus on core features
+- **Payment Warning System**: Added payment status tracking and visual warning banner
+  - Enhanced league member status API to include payment information (hasPaid field)
+  - Added prominent warning banner on pick selection for users who haven't paid
+  - Banner clearly states picks won't count until payment is complete
+  - Encourages users to contact league administrator for payment completion
+  - Yellow warning design matches existing UI patterns for important notifications
