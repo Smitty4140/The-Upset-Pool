@@ -39,13 +39,14 @@ export default function Rules() {
               <p>If the Giants win or the game ends in a tie, you earn 0 points.</p>
             </div>
 
-            <h3>Tips for Success</h3>
+            <h3>Winners</h3>
             <ul>
-              <li>Look for underdogs with a realistic chance to win outright.</li>
-              <li>Consider home underdogs, which historically have a better chance of upsetting.</li>
-              <li>Pay attention to injury reports and team news before making your selection.</li>
-              <li>Bigger spreads offer more points but have a lower probability of winning.</li>
+              <li>Top 5 places earn payouts (amounts TBD)</li>
+              <li>Pick every week to be entered into an end of season payout lottery (amount TBD)</li>
+              <li>Finish in the top half of the league to be entered into an end of season lottery (amount TBD) </li>
             </ul>
+
+            
           </CardContent>
         </Card>
         
