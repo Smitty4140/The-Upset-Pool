@@ -51,7 +51,15 @@ export default function Header() {
               )}
             </nav>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center space-x-4">
+            <a 
+              href="https://playminigames.net/game/snood"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium"
+            >
+              Snood
+            </a>
             {isLoading ? (
               <Skeleton className="h-10 w-10 rounded-full" />
             ) : isAuthenticated ? (
