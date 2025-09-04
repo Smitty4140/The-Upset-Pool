@@ -5,7 +5,7 @@ import { setupAuth, isAuthenticated } from "./auth";
 
 import { z } from "zod";
 import { userPickFormSchema } from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, asc } from "drizzle-orm";
 import { db, pool } from "./db";
 import { userPicks, nflGames, nflWeeks, users, nflTeams } from "@shared/schema";
 import emailRoutes from "./routes/email";
@@ -912,16 +912,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Admin route to fetch NFL games from API for the current week
+  // Helper function to find the correct NFL week based on game date
+  async function findCorrectWeekForGame(gameDate: Date) {
+    // Get all NFL weeks
+    const weeks = await db.select().from(nflWeeks).orderBy(asc(nflWeeks.weekNumber));
+    
+    // Find the week that contains this game date
+    for (const week of weeks) {
+      // Get existing games for this week to determine the week's date range
+      const weekGames = await db
+        .select()
+        .from(nflGames)
+        .where(eq(nflGames.weekId, week.id))
+        .orderBy(asc(nflGames.gameTime));
+      
+      if (weekGames.length > 0) {
+        const firstGameOfWeek = new Date(weekGames[0].gameTime);
+        const lastGameOfWeek = new Date(weekGames[weekGames.length - 1].gameTime);
+        
+        // Check if the game date falls within this week's range (with some flexibility)
+        const gameTime = gameDate.getTime();
+        const weekStart = firstGameOfWeek.getTime() - (24 * 60 * 60 * 1000); // 1 day before first game
+        const weekEnd = lastGameOfWeek.getTime() + (24 * 60 * 60 * 1000); // 1 day after last game
+        
+        if (gameTime >= weekStart && gameTime <= weekEnd) {
+          return week;
+        }
+      }
+    }
+    
+    // If no week found based on existing games, try to determine by week number and typical NFL schedule
+    const gameYear = gameDate.getFullYear();
+    const gameMonth = gameDate.getMonth(); // 0-based (September = 8)
+    const gameDay = gameDate.getDate();
+    
+    // NFL season typically starts first Thursday of September
+    // Week 1 starts around Sept 5-12, Week 2 around Sept 12-19, etc.
+    if (gameYear === 2025) {
+      if (gameMonth === 8) { // September
+        if (gameDay >= 5 && gameDay <= 11) return weeks.find(w => w.weekNumber === 1);
+        if (gameDay >= 12 && gameDay <= 18) return weeks.find(w => w.weekNumber === 2);
+        if (gameDay >= 19 && gameDay <= 25) return weeks.find(w => w.weekNumber === 3);
+        if (gameDay >= 26) return weeks.find(w => w.weekNumber === 4);
+      } else if (gameMonth === 9) { // October
+        if (gameDay <= 2) return weeks.find(w => w.weekNumber === 4);
+        if (gameDay >= 3 && gameDay <= 9) return weeks.find(w => w.weekNumber === 5);
+        if (gameDay >= 10 && gameDay <= 16) return weeks.find(w => w.weekNumber === 6);
+        if (gameDay >= 17 && gameDay <= 23) return weeks.find(w => w.weekNumber === 7);
+        if (gameDay >= 24 && gameDay <= 30) return weeks.find(w => w.weekNumber === 8);
+        if (gameDay >= 31) return weeks.find(w => w.weekNumber === 9);
+      }
+      // Add more months as needed...
+    }
+    
+    // Default fallback - return first week if can't determine
+    return weeks[0];
+  }
+
+  // Admin route to fetch NFL games from API for all weeks
   app.post('/api/admin/games/fetch-from-api', isAuthenticated, async (req: any, res) => {
     try {
       const { weekId } = req.body;
       
       console.log("Fetch from API route called", { weekId, user: req.user });
-      
-      if (!weekId || isNaN(parseInt(weekId))) {
-        return res.status(400).json({ message: "Invalid week ID" });
-      }
       
       // Check if user is an admin for any league
       const userId = req.user.id;
@@ -932,12 +985,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!isAdmin) {
         return res.status(403).json({ message: "Unauthorized: Admin access required" });
-      }
-      
-      // Get the week
-      const week = await storage.getNFLWeek(parseInt(weekId));
-      if (!week) {
-        return res.status(404).json({ message: "NFL week not found" });
       }
       
       // Check for API key
@@ -1018,10 +1065,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
           
-          // Check if game already exists
+          // Determine the correct week for this game based on its date
+          const gameDate = new Date(game.commence_time);
+          const correctWeek = await findCorrectWeekForGame(gameDate);
+          
+          if (!correctWeek) {
+            console.log(`Could not determine correct week for game: ${game.home_team} vs ${game.away_team} on ${gameDate.toISOString()}`);
+            results.errors++;
+            continue;
+          }
+          
+          console.log(`Game: ${game.home_team} vs ${game.away_team} on ${gameDate.toDateString()} assigned to Week ${correctWeek.weekNumber}`);
+          
+          // Check if game already exists in the correct week
           const existingGames = await db.select().from(nflGames).where(
             and(
-              eq(nflGames.weekId, week.id),
+              eq(nflGames.weekId, correctWeek.id),
               eq(nflGames.homeTeamId, homeTeam.id),
               eq(nflGames.awayTeamId, awayTeam.id)
             )
@@ -1038,13 +1097,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })
               .where(eq(nflGames.id, gameId));
             
-            console.log(`Updated game ID ${gameId}: ${homeTeam.name} vs ${awayTeam.name}`);
+            console.log(`Updated game ID ${gameId}: ${homeTeam.name} vs ${awayTeam.name} in Week ${correctWeek.weekNumber}`);
             results.gamesUpdated++;
           } else {
-            // Create new game
+            // Create new game in the correct week
             try {
               const [newGame] = await db.insert(nflGames).values({
-                weekId: week.id,
+                weekId: correctWeek.id,
                 homeTeamId: homeTeam.id,
                 awayTeamId: awayTeam.id,
                 spread: homeSpread,
@@ -1056,7 +1115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 updatedAt: new Date()
               }).returning();
               
-              console.log(`Created game ID ${newGame.id}: ${homeTeam.name} vs ${awayTeam.name}`);
+              console.log(`Created game ID ${newGame.id}: ${homeTeam.name} vs ${awayTeam.name} in Week ${correctWeek.weekNumber}`);
               results.gamesCreated++;
             } catch (insertError) {
               console.error(`Error inserting game ${homeTeam.name} vs ${awayTeam.name}:`, insertError);
@@ -1070,9 +1129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       return res.json({
-        message: `Successfully processed NFL games for Week ${week.weekNumber}`,
-        weekId: week.id,
-        weekNumber: week.weekNumber,
+        message: `Successfully processed ${results.gamesCreated + results.gamesUpdated} NFL games across all weeks`,
         created: results.gamesCreated,
         updated: results.gamesUpdated,
         errors: results.errors
