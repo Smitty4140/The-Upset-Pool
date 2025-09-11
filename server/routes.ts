@@ -917,9 +917,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Get all NFL weeks
     const weeks = await db.select().from(nflWeeks).orderBy(asc(nflWeeks.weekNumber));
     
-    // Find the week that contains this game date
+    // First, try to match using database week start/end dates
     for (const week of weeks) {
-      // Get existing games for this week to determine the week's date range
+      const weekStart = new Date(week.startDate);
+      const weekEnd = new Date(week.endDate);
+      
+      // Extend the end date to include the full day
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      if (gameDate >= weekStart && gameDate <= weekEnd) {
+        console.log(`Game on ${gameDate.toISOString()} assigned to week ${week.weekNumber} (${week.startDate} to ${week.endDate})`);
+        return week;
+      }
+    }
+    
+    // If no direct match found, try finding based on existing games in each week
+    for (const week of weeks) {
       const weekGames = await db
         .select()
         .from(nflGames)
@@ -930,42 +943,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const firstGameOfWeek = new Date(weekGames[0].gameTime);
         const lastGameOfWeek = new Date(weekGames[weekGames.length - 1].gameTime);
         
-        // Check if the game date falls within this week's range (with some flexibility)
+        // Check if the game date falls within this week's range (with minimal flexibility)
         const gameTime = gameDate.getTime();
-        const weekStart = firstGameOfWeek.getTime() - (24 * 60 * 60 * 1000); // 1 day before first game
-        const weekEnd = lastGameOfWeek.getTime() + (24 * 60 * 60 * 1000); // 1 day after last game
+        const weekStart = firstGameOfWeek.getTime() - (6 * 60 * 60 * 1000); // 6 hours before first game
+        const weekEnd = lastGameOfWeek.getTime() + (6 * 60 * 60 * 1000); // 6 hours after last game
         
         if (gameTime >= weekStart && gameTime <= weekEnd) {
+          console.log(`Game on ${gameDate.toISOString()} assigned to week ${week.weekNumber} based on existing games`);
           return week;
         }
       }
     }
     
-    // If no week found based on existing games, try to determine by week number and typical NFL schedule
-    const gameYear = gameDate.getFullYear();
-    const gameMonth = gameDate.getMonth(); // 0-based (September = 8)
-    const gameDay = gameDate.getDate();
-    
-    // NFL season typically starts first Thursday of September
-    // Week 1 starts around Sept 5-12, Week 2 around Sept 12-19, etc.
-    if (gameYear === 2025) {
-      if (gameMonth === 8) { // September
-        if (gameDay >= 5 && gameDay <= 11) return weeks.find(w => w.weekNumber === 1);
-        if (gameDay >= 12 && gameDay <= 18) return weeks.find(w => w.weekNumber === 2);
-        if (gameDay >= 19 && gameDay <= 25) return weeks.find(w => w.weekNumber === 3);
-        if (gameDay >= 26) return weeks.find(w => w.weekNumber === 4);
-      } else if (gameMonth === 9) { // October
-        if (gameDay <= 2) return weeks.find(w => w.weekNumber === 4);
-        if (gameDay >= 3 && gameDay <= 9) return weeks.find(w => w.weekNumber === 5);
-        if (gameDay >= 10 && gameDay <= 16) return weeks.find(w => w.weekNumber === 6);
-        if (gameDay >= 17 && gameDay <= 23) return weeks.find(w => w.weekNumber === 7);
-        if (gameDay >= 24 && gameDay <= 30) return weeks.find(w => w.weekNumber === 8);
-        if (gameDay >= 31) return weeks.find(w => w.weekNumber === 9);
-      }
-      // Add more months as needed...
-    }
-    
     // Default fallback - return first week if can't determine
+    console.log(`Game on ${gameDate.toISOString()} assigned to week 1 as fallback`);
     return weeks[0];
   }
 
