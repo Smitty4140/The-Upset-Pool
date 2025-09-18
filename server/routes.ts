@@ -6,6 +6,7 @@ import { setupAuth, isAuthenticated } from "./auth";
 import { z } from "zod";
 import { userPickFormSchema } from "@shared/schema";
 import { eq, and, sql, asc } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db, pool } from "./db";
 import { userPicks, nflGames, nflWeeks, users, nflTeams } from "@shared/schema";
 import emailRoutes from "./routes/email";
@@ -1021,9 +1022,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Pulling spreads for Week ${week.weekNumber} only`);
       
       // Get existing games for the specified week only
+      const homeTeamAlias = alias(nflTeams, 'homeTeam');
+      const awayTeamAlias = alias(nflTeams, 'awayTeam');
       const existingWeekGames = await db.select().from(nflGames)
-        .leftJoin(nflTeams, eq(nflGames.homeTeamId, nflTeams.id))
-        .leftJoin(nflTeams, eq(nflGames.awayTeamId, nflTeams.id))
+        .leftJoin(homeTeamAlias, eq(nflGames.homeTeamId, homeTeamAlias.id))
+        .leftJoin(awayTeamAlias, eq(nflGames.awayTeamId, awayTeamAlias.id))
         .where(eq(nflGames.weekId, weekId));
       
       console.log(`Found ${existingWeekGames.length} existing games in Week ${week.weekNumber}`);
