@@ -1011,7 +1011,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         errors: 0
       };
       
-      // Process each game
+      // Get the specified week details
+      const targetWeek = await db.select().from(nflWeeks).where(eq(nflWeeks.id, weekId)).limit(1);
+      if (targetWeek.length === 0) {
+        return res.status(404).json({ message: "Week not found" });
+      }
+      
+      const week = targetWeek[0];
+      console.log(`Pulling spreads for Week ${week.weekNumber} only`);
+      
+      // Get existing games for the specified week only
+      const existingWeekGames = await db.select().from(nflGames)
+        .leftJoin(nflTeams, eq(nflGames.homeTeamId, nflTeams.id))
+        .leftJoin(nflTeams, eq(nflGames.awayTeamId, nflTeams.id))
+        .where(eq(nflGames.weekId, weekId));
+      
+      console.log(`Found ${existingWeekGames.length} existing games in Week ${week.weekNumber}`);
+      
+      // Process each game from the API
       for (const game of gamesData) {
         try {
           // Find DraftKings bookmaker
@@ -1038,7 +1055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           const homeSpread = parseFloat(homeOutcome.point) || 0;
-          console.log(`Game: ${game.home_team} vs ${game.away_team}, Spread: ${homeSpread}`);
+          console.log(`API Game: ${game.home_team} vs ${game.away_team}, Spread: ${homeSpread}`);
           
           // Find teams
           const homeTeam = teamNameMap.get(game.home_team.toLowerCase());
@@ -1056,62 +1073,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
           
-          // Determine the correct week for this game based on its date
-          const gameDate = new Date(game.commence_time);
-          const correctWeek = await findCorrectWeekForGame(gameDate);
-          
-          if (!correctWeek) {
-            console.log(`Could not determine correct week for game: ${game.home_team} vs ${game.away_team} on ${gameDate.toISOString()}`);
-            results.errors++;
-            continue;
-          }
-          
-          console.log(`Game: ${game.home_team} vs ${game.away_team} on ${gameDate.toDateString()} assigned to Week ${correctWeek.weekNumber}`);
-          
-          // Check if game already exists in the correct week
-          const existingGames = await db.select().from(nflGames).where(
+          // ONLY update existing games in the specified week - DO NOT create new games
+          const existingGame = await db.select().from(nflGames).where(
             and(
-              eq(nflGames.weekId, correctWeek.id),
+              eq(nflGames.weekId, weekId),
               eq(nflGames.homeTeamId, homeTeam.id),
               eq(nflGames.awayTeamId, awayTeam.id)
             )
-          );
+          ).limit(1);
           
-          if (existingGames.length > 0) {
-            // Update existing game
-            const gameId = existingGames[0].id;
+          if (existingGame.length > 0) {
+            // Update existing game with spread only
+            const gameId = existingGame[0].id;
             await db.update(nflGames)
               .set({
-                spread: homeSpread,
+                spread: homeSpread.toString(),
                 gameTime: new Date(game.commence_time),
                 updatedAt: new Date()
               })
               .where(eq(nflGames.id, gameId));
             
-            console.log(`Updated game ID ${gameId}: ${homeTeam.name} vs ${awayTeam.name} in Week ${correctWeek.weekNumber}`);
+            console.log(`Updated existing game: ${homeTeam.name} vs ${awayTeam.name} in Week ${week.weekNumber} with spread ${homeSpread}`);
             results.gamesUpdated++;
           } else {
-            // Create new game in the correct week
-            try {
-              const [newGame] = await db.insert(nflGames).values({
-                weekId: correctWeek.id,
-                homeTeamId: homeTeam.id,
-                awayTeamId: awayTeam.id,
-                spread: homeSpread,
-                homeTeamRecord: "0-0",
-                awayTeamRecord: "0-0",
-                gameTime: new Date(game.commence_time),
-                completed: false,
-                createdAt: new Date(),
-                updatedAt: new Date()
-              }).returning();
-              
-              console.log(`Created game ID ${newGame.id}: ${homeTeam.name} vs ${awayTeam.name} in Week ${correctWeek.weekNumber}`);
-              results.gamesCreated++;
-            } catch (insertError) {
-              console.error(`Error inserting game ${homeTeam.name} vs ${awayTeam.name}:`, insertError);
-              results.errors++;
-            }
+            // Skip games that don't exist in this week - do not create new games
+            console.log(`Skipping game ${game.home_team} vs ${game.away_team} - not found in Week ${week.weekNumber}`);
           }
         } catch (error) {
           console.error(`Error processing game:`, error);
@@ -1120,10 +1106,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       return res.json({
-        message: `Successfully processed ${results.gamesCreated + results.gamesUpdated} NFL games across all weeks`,
+        message: `Successfully updated spreads for ${results.gamesUpdated} games in Week ${week.weekNumber}`,
         created: results.gamesCreated,
         updated: results.gamesUpdated,
-        errors: results.errors
+        errors: results.errors,
+        weekNumber: week.weekNumber
       });
     } catch (error) {
       console.error("Error fetching NFL games from API:", error);
