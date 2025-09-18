@@ -364,9 +364,11 @@ export default function Home() {
       })
     : [];
 
-  // Determine if picks are locked for the current week
-  const arePicksLocked = currentWeek
-    ? new Date() >= new Date(currentWeek.picksLockAt)
+  // Determine if picks should be shown (locked current week OR previous week)
+  const arePicksLocked = currentWeek && activeWeekId
+    ? // Show picks if current week is locked OR if viewing a previous week
+      new Date() >= new Date(currentWeek.picksLockAt) || 
+      (selectedWeekDetails && selectedWeekDetails.weekNumber < currentWeek.weekNumber)
     : false;
 
   // Determine if the selected week allows picks (only current week + not locked)
