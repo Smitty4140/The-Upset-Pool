@@ -935,34 +935,37 @@ export class DatabaseStorage implements IStorage {
       return result.map(user => ({
         ...user,
         everyWeekEligible: true
-      })) as User[];
+      })) as UserWithEligibility[];
     }
     
     // For each user, check if they have picks for every eligible week
     const usersWithEligibility = await Promise.all(
       result.map(async (user) => {
-        let picksCount = 0;
-        
-        // Only check if there are weeks to check
-        if (eligibilityWeekIds.length > 0) {
-          // Count how many picks this user has made for eligible weeks in this league
-          const userPickCount = await db
-            .select({
-              count: sql<number>`COUNT(DISTINCT ${userPicks.weekId})`
-            })
-            .from(userPicks)
-            .where(
-              and(
-                eq(userPicks.userId, user.id),
-                eq(userPicks.leagueId, leagueId),
-                inArray(userPicks.weekId, eligibilityWeekIds)
-              )
-            );
-          
-          picksCount = userPickCount[0]?.count || 0;
+        if (eligibilityWeekIds.length === 0) {
+          return { ...user, everyWeekEligible: true };
         }
         
-        const everyWeekEligible = picksCount === eligibilityWeekIds.length;
+        // Count picks for this user in eligible weeks for this league
+        const userPicksQuery = await db
+          .select({
+            weekId: userPicks.weekId
+          })
+          .from(userPicks)
+          .where(
+            and(
+              eq(userPicks.userId, user.id),
+              eq(userPicks.leagueId, leagueId),
+              inArray(userPicks.weekId, eligibilityWeekIds)
+            )
+          )
+          .groupBy(userPicks.weekId);
+        
+        const uniqueWeeksPicked = userPicksQuery.length;
+        const requiredWeeks = eligibilityWeekIds.length;
+        
+        // Simple boolean check
+        const everyWeekEligible = (uniqueWeeksPicked >= requiredWeeks && requiredWeeks > 0);
+        
         
         return {
           ...user,
@@ -971,7 +974,7 @@ export class DatabaseStorage implements IStorage {
       })
     );
     
-    return usersWithEligibility as UserWithEligibility[];
+    return usersWithEligibility as any;
   }
 
   async processGameResults(gameId: number): Promise<void> {
