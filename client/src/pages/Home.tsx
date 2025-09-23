@@ -43,7 +43,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
 
-type Tab = "spreads" | "weeklypicks" | "results" | "admin";
+type Tab = "spreads" | "leaderboard" | "weeklypicks" | "results" | "admin";
 type SortOption = "spread" | "homeUnderdog" | "gameTime";
 
 export default function Home() {
