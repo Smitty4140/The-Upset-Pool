@@ -11,7 +11,11 @@ type LeaderboardProps = {
 export default function Leaderboard({ leagueId }: LeaderboardProps) {
   const { data: leaderboard, isLoading } = useQuery<UserWithEligibility[]>({
     queryKey: [`/api/league/${leagueId}/leaderboard`],
+    staleTime: 0,
   });
+
+  // Debug log to verify data
+  console.log("Leaderboard data:", leaderboard?.slice(0, 1));
 
   // Function to calculate proper rankings with ties
   const calculateRankings = (users: UserWithEligibility[]) => {

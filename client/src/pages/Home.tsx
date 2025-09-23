@@ -36,6 +36,8 @@ import {
   Check,
   Lock,
   Users,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
@@ -774,6 +776,12 @@ export default function Home() {
                         </th>
                         <th
                           scope="col"
+                          className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Every Week Eligible
+                        </th>
+                        <th
+                          scope="col"
                           className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Pooler
@@ -804,6 +812,19 @@ export default function Home() {
                                 {user.totalPoints || "0"} pts
                               </div>
                             </td>
+                            <td className="px-3 py-4 whitespace-nowrap text-center">
+                              {user.everyWeekEligible ? (
+                                <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center">
+                                  <CheckCircle className="h-5 w-5 text-green-600" />
+                                  <span className="ml-1 text-xs font-medium text-green-700">Yes</span>
+                                </div>
+                              ) : (
+                                <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center">
+                                  <XCircle className="h-5 w-5 text-red-600" />
+                                  <span className="ml-1 text-xs font-medium text-red-700">No</span>
+                                </div>
+                              )}
+                            </td>
                             <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
                               <div className="flex items-center">
                                 <Avatar className="h-7 w-7 mr-2 border border-gray-200">
@@ -826,7 +847,7 @@ export default function Home() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={3} className="px-3 py-8 text-center">
+                          <td colSpan={4} className="px-3 py-8 text-center">
                             <div className="flex flex-col items-center text-gray-500">
                               <Trophy className="h-10 w-10 text-gray-300 mb-2" />
                               <p className="font-medium">No entries yet</p>
