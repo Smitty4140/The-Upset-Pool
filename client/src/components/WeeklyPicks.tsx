@@ -197,6 +197,9 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
                     Standing
                   </th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Season Total
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Player
                   </th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -207,9 +210,6 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
                   </th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Spread
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Season Total
                   </th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -239,6 +239,13 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap">
                         <div className="flex items-center">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">
+                            {user.totalPoints || 0} pts
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
                           <Avatar className="h-8 w-8 mr-2 border border-gray-200">
                             <AvatarImage src={user.profileImageUrl || ""} alt={user.username} />
                             <AvatarFallback className="bg-primary/10 text-primary">
@@ -247,7 +254,6 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
                           </Avatar>
                           <div>
                             <div className="font-medium text-gray-900">{user.username}</div>
-                            <div className="text-xs text-gray-500">{user.totalPoints || 0} pts total</div>
                           </div>
                         </div>
                       </td>
@@ -316,13 +322,6 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
                         ) : (
                           <span>-</span>
                         )}
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">
-                            {user.totalPoints || 0} pts
-                          </span>
-                        </div>
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap">
                         {userPick ? (
