@@ -101,7 +101,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
     return user;
   }
 
@@ -116,16 +116,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(userId: string, updateData: Partial<InsertUser>): Promise<User> {
+    const normalizedUpdateData = {
+      ...updateData,
+      ...(updateData.email && { email: updateData.email.toLowerCase() }),
+      updatedAt: new Date()
+    };
     const [user] = await db
       .update(users)
-      .set({ ...updateData, updatedAt: new Date() })
+      .set(normalizedUpdateData)
       .where(eq(users.id, userId))
       .returning();
     return user;
   }
 
   async createUser(userData: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(userData).returning();
+    const normalizedUserData = {
+      ...userData,
+      email: userData.email.toLowerCase()
+    };
+    const [user] = await db.insert(users).values(normalizedUserData).returning();
     
     // Automatically add new users to the default league (NFL Upset Pool - ID 1)
     try {
@@ -148,7 +157,7 @@ export class DatabaseStorage implements IStorage {
       .insert(users)
       .values({
         id: userData.id,
-        email: userData.email || '',
+        email: userData.email ? userData.email.toLowerCase() : '',
         password: userData.password || '',
         username: userData.username || `user_${userData.id}`,
         firstName: userData.firstName || null,
@@ -161,7 +170,7 @@ export class DatabaseStorage implements IStorage {
       .onConflictDoUpdate({
         target: users.id,
         set: {
-          email: userData.email || sql`${users.email}`,
+          email: userData.email ? userData.email.toLowerCase() : sql`${users.email}`,
           username: userData.username || sql`${users.username}`,
           firstName: userData.firstName || sql`${users.firstName}`,
           lastName: userData.lastName || sql`${users.lastName}`,
