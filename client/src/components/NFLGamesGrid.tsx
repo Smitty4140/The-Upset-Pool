@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { NFLGame, NFLTeam, NFLWeek } from "@/lib/types";
 import NFLGameCard from "./NFLGameCard";
@@ -26,8 +26,18 @@ export default function NFLGamesGrid({
 }: NFLGamesGridProps) {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(userPick?.gameId?.toString() || null);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(userPick?.pickedTeamId || null);
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Auto-refresh the current time to keep game lock status synchronized
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 30000); // Refresh every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch games data for the selected week
   const { data: games, isLoading: isLoadingGames } = useQuery<(NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam })[]>({

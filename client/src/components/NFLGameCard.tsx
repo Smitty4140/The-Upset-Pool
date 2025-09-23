@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { NFLGame } from "@/lib/types";
 import { getTeamLogo } from "@/lib/teamLogos";
 import { formatGameTime } from "@/lib/formatDate";
@@ -23,10 +24,28 @@ type NFLGameCardProps = {
 };
 
 export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false, isInactive = false }: NFLGameCardProps) {
+  // State to track current time for automatic refresh
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  
+  // Auto-refresh the current time to keep game lock status synchronized
+  useEffect(() => {
+    const gameKickoffTime = new Date(game.gameTime);
+    const timeDiff = gameKickoffTime.getTime() - new Date().getTime();
+    
+    // If game starts within 2 hours, refresh every 30 seconds for accuracy
+    // Otherwise, refresh every 5 minutes to save resources
+    const refreshInterval = timeDiff < 2 * 60 * 60 * 1000 ? 30000 : 300000;
+    
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, refreshInterval);
+    
+    return () => clearInterval(interval);
+  }, [game.gameTime]);
+  
   // Check if the game has already started (kickoff time passed)
-  const now = new Date();
   const gameKickoffTime = new Date(game.gameTime);
-  const hasGameStarted = now > gameKickoffTime;
+  const hasGameStarted = currentTime > gameKickoffTime;
   
   // Determine which teams are underdogs based on the spread
   const isHomeUnderdog = Number(game.spread) > 0;
