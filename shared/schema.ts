@@ -213,6 +213,11 @@ export const userPicksRelations = relations(userPicks, ({ one }) => ({
 export type InsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
+// Extended User type for leaderboard with computed eligibility status
+export type UserWithEligibility = User & {
+  everyWeekEligible: boolean;
+};
+
 export type NFLTeam = typeof nflTeams.$inferSelect;
 export type InsertNFLTeam = typeof nflTeams.$inferInsert;
 export const insertNFLTeamSchema = createInsertSchema(nflTeams);

@@ -1,4 +1,4 @@
-import { eq, and, sql, desc, asc, not, gte, lt, isNull } from "drizzle-orm";
+import { eq, and, sql, desc, asc, not, gte, lt, isNull, inArray } from "drizzle-orm";
 
 // Generate a unique 6-character invite code
 function generateInviteCode(): string {
@@ -19,6 +19,7 @@ import {
   nflGames,
   userPicks,
   type User,
+  type UserWithEligibility,
   type InsertUser,
   type NFLTeam,
   type InsertNFLTeam,
@@ -876,7 +877,8 @@ export class DatabaseStorage implements IStorage {
     return updatedPick;
   }
 
-  async getLeaderboard(leagueId: number): Promise<User[]> {
+  async getLeaderboard(leagueId: number): Promise<UserWithEligibility[]> {
+    // First get all league members with their points
     const result = await db
       .select({
         id: users.id,
@@ -901,7 +903,58 @@ export class DatabaseStorage implements IStorage {
       .groupBy(users.id, users.username, users.email, users.firstName, users.lastName, users.profileImageUrl, users.emailVerified, users.receiveNotifications, users.createdAt, users.updatedAt)
       .orderBy(desc(sql`COALESCE(SUM(${userPicks.pointsEarned}), 0)`));
     
-    return result as User[];
+    // Get all weeks that have occurred (past weeks only)
+    const now = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const pastWeeks = await db
+      .select()
+      .from(nflWeeks)
+      .where(lt(nflWeeks.endDate, now))
+      .orderBy(nflWeeks.weekNumber);
+    
+    const pastWeekIds = pastWeeks.map(week => week.id);
+    
+    // If no past weeks, everyone is eligible
+    if (pastWeekIds.length === 0) {
+      return result.map(user => ({
+        ...user,
+        everyWeekEligible: true
+      })) as User[];
+    }
+    
+    // For each user, check if they have picks for every past week
+    const usersWithEligibility = await Promise.all(
+      result.map(async (user) => {
+        let picksCount = 0;
+        
+        // Only check if there are past weeks to check
+        if (pastWeekIds.length > 0) {
+          // Count how many picks this user has made for past weeks in this league
+          const userPickCount = await db
+            .select({
+              count: sql<number>`COUNT(DISTINCT ${userPicks.weekId})`
+            })
+            .from(userPicks)
+            .where(
+              and(
+                eq(userPicks.userId, user.id),
+                eq(userPicks.leagueId, leagueId),
+                inArray(userPicks.weekId, pastWeekIds)
+              )
+            );
+          
+          picksCount = userPickCount[0]?.count || 0;
+        }
+        
+        const everyWeekEligible = picksCount === pastWeekIds.length;
+        
+        return {
+          ...user,
+          everyWeekEligible
+        };
+      })
+    );
+    
+    return usersWithEligibility as UserWithEligibility[];
   }
 
   async processGameResults(gameId: number): Promise<void> {
