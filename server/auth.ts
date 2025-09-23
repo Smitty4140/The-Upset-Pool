@@ -92,17 +92,20 @@ export function setupAuth(app: Express) {
       console.log('Google OAuth callback received for profile:', profile.id);
       
       // Extract user information from Google profile
-      const googleEmail = profile.emails?.[0]?.value;
+      const rawGoogleEmail = profile.emails?.[0]?.value;
       const firstName = profile.name?.givenName;
       const lastName = profile.name?.familyName;
       const profileImageUrl = profile.photos?.[0]?.value;
 
-      console.log('Google profile email:', googleEmail);
+      console.log('Google profile email:', rawGoogleEmail);
 
-      if (!googleEmail) {
+      if (!rawGoogleEmail) {
         console.error('No email found in Google profile');
         return done(new Error('No email found in Google profile'), false);
       }
+
+      // Normalize email to lowercase for consistent handling
+      const googleEmail = rawGoogleEmail.toLowerCase();
 
       // Check if user already exists by Google ID first
       let user = await storage.getUserByGoogleId(profile.id);
@@ -200,8 +203,11 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Password must be at least 6 characters long" });
       }
 
+      // Normalize email to lowercase for consistent checking
+      const normalizedEmail = email.toLowerCase();
+      
       // Check if user already exists
-      const existingUserByEmail = await storage.getUserByEmail(email);
+      const existingUserByEmail = await storage.getUserByEmail(normalizedEmail);
       if (existingUserByEmail) {
         return res.status(400).json({ message: "User with this email already exists" });
       }
@@ -217,7 +223,7 @@ export function setupAuth(app: Express) {
       
       const newUser = await storage.createUser({
         id: userId,
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         username,
         firstName: firstName || null,
