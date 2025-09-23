@@ -772,6 +772,12 @@ export default function Home() {
                           scope="col"
                           className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
+                          Pooler
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
                           Score
                         </th>
                         <th
@@ -779,12 +785,6 @@ export default function Home() {
                           className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
                         >
                           Every Week Eligible
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Pooler
                         </th>
                       </tr>
                     </thead>
@@ -807,24 +807,6 @@ export default function Home() {
                                 )}
                               </div>
                             </td>
-                            <td className="px-3 py-4 whitespace-nowrap">
-                              <div className="text-sm font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full inline-block">
-                                {user.totalPoints || "0"} pts
-                              </div>
-                            </td>
-                            <td className="px-3 py-4 whitespace-nowrap text-center">
-                              {user.everyWeekEligible ? (
-                                <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center">
-                                  <CheckCircle className="h-5 w-5 text-green-600" />
-                                  <span className="ml-1 text-xs font-medium text-green-700">Yes</span>
-                                </div>
-                              ) : (
-                                <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center">
-                                  <XCircle className="h-5 w-5 text-red-600" />
-                                  <span className="ml-1 text-xs font-medium text-red-700">No</span>
-                                </div>
-                              )}
-                            </td>
                             <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
                               <div className="flex items-center">
                                 <Avatar className="h-7 w-7 mr-2 border border-gray-200">
@@ -842,6 +824,24 @@ export default function Home() {
                                   {user.username}
                                 </span>
                               </div>
+                            </td>
+                            <td className="px-3 py-4 whitespace-nowrap">
+                              <div className="text-sm font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full inline-block">
+                                {user.totalPoints || "0"} pts
+                              </div>
+                            </td>
+                            <td className="px-3 py-4 whitespace-nowrap text-center">
+                              {user.everyWeekEligible ? (
+                                <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center">
+                                  <CheckCircle className="h-5 w-5 text-green-600" />
+                                  <span className="ml-1 text-xs font-medium text-green-700">Yes</span>
+                                </div>
+                              ) : (
+                                <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center">
+                                  <XCircle className="h-5 w-5 text-red-600" />
+                                  <span className="ml-1 text-xs font-medium text-red-700">No</span>
+                                </div>
+                              )}
                             </td>
                           </tr>
                         ))
