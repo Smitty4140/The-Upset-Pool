@@ -1,4 +1,4 @@
-import { eq, and, sql, desc, asc, not, gte, lt, isNull, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, asc, not, gte, lt, lte, isNull, inArray } from "drizzle-orm";
 
 // Generate a unique 6-character invite code
 function generateInviteCode(): string {
