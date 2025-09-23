@@ -106,9 +106,9 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
           <thead className="bg-gray-50">
             <tr>
               <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Place</th>
+              <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pooler</th>
               <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
               <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Every Week Eligible</th>
-              <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pooler</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -128,6 +128,17 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                       )}
                     </div>
                   </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
+                    <div className="flex items-center">
+                      <Avatar className="h-7 w-7 mr-2 border border-gray-200">
+                        <AvatarImage src={user.profileImageUrl ?? ""} alt={user.username ?? ""} />
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          {user.username?.[0].toUpperCase() || "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium">{user.username}</span>
+                    </div>
+                  </td>
                   <td className="px-3 py-4 whitespace-nowrap">
                     <div className="text-sm font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full inline-block">
                       {user.totalPoints || "0"} pts
@@ -145,17 +156,6 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                         <span className="ml-1 text-xs font-medium text-red-700">No</span>
                       </div>
                     )}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
-                    <div className="flex items-center">
-                      <Avatar className="h-7 w-7 mr-2 border border-gray-200">
-                        <AvatarImage src={user.profileImageUrl ?? ""} alt={user.username ?? ""} />
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {user.username?.[0].toUpperCase() || "?"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium">{user.username}</span>
-                    </div>
                   </td>
                 </tr>
               ))
