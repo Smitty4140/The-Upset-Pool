@@ -92,24 +92,21 @@ class GameScheduler {
     }
 
     try {
-      // Get all games for this week to find the earliest game
-      const games = await db
-        .select()
-        .from(nflGames)
-        .where(eq(nflGames.weekId, week.id))
-        .orderBy(asc(nflGames.gameTime));
-
-      if (games.length === 0) {
-        console.log(`[Scheduler] No games found for week ${week.weekNumber}`);
-        return;
-      }
-
-      const firstGame = games[0];
-      const firstGameTime = new Date(firstGame.gameTime);
-      const pullTime = new Date(firstGameTime.getTime() - (12 * 60 * 60 * 1000)); // 12 hours before
+      // Calculate when picks should open for this week
+      // Picks open on Thursday at 1:00 PM EDT for each week
+      const weekStartDate = new Date(week.startDate);
+      
+      // Find the Thursday of this week (startDate is Monday, so Thursday is +3 days)
+      const thursday = new Date(weekStartDate);
+      thursday.setDate(weekStartDate.getDate() + 3); // Monday + 3 = Thursday
+      
+      // Set time to 1:00 PM (13:00)
+      const pullTime = new Date(thursday);
+      pullTime.setHours(13, 0, 0, 0); // 1:00 PM
+      
       const currentTime = new Date();
 
-      console.log(`[Scheduler] Week ${week.weekNumber}: First game at ${firstGameTime.toISOString()}, pull scheduled for ${pullTime.toISOString()}`);
+      console.log(`[Scheduler] Week ${week.weekNumber}: Picks open (data pull) scheduled for ${pullTime.toISOString()}`);
 
       // If the pull time has already passed, pull immediately
       if (pullTime <= currentTime) {
