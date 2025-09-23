@@ -1,4 +1,5 @@
 import { eq, and, sql, desc, asc, not, gte, lt, lte, isNull, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 // Generate a unique 6-character invite code
 function generateInviteCode(): string {
@@ -807,10 +808,96 @@ export class DatabaseStorage implements IStorage {
 
   async getUserPicksForWeek(weekId: number, leagueId: number): Promise<(UserPick & { user: User, pickedTeam: NFLTeam, game: NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam } })[]> {
     try {
-      // First get all user picks for this week and league
-      const picks = await db
-        .select()
+      // Create aliases for the multiple nflTeams joins
+      const pickedTeamAlias = alias(nflTeams, 'picked_team');
+      const homeTeamAlias = alias(nflTeams, 'home_team');
+      const awayTeamAlias = alias(nflTeams, 'away_team');
+      
+      // Single optimized JOIN query to get all data at once
+      const results = await db
+        .select({
+          // Pick data
+          id: userPicks.id,
+          userId: userPicks.userId,
+          leagueId: userPicks.leagueId,
+          weekId: userPicks.weekId,
+          gameId: userPicks.gameId,
+          pickedTeamId: userPicks.pickedTeamId,
+          isUnderdog: userPicks.isUnderdog,
+          spreadAtTimeOfPick: userPicks.spreadAtTimeOfPick,
+          won: userPicks.won,
+          pointsEarned: userPicks.pointsEarned,
+          createdAt: userPicks.createdAt,
+          updatedAt: userPicks.updatedAt,
+          
+          // User data
+          user: {
+            id: users.id,
+            username: users.username,
+            email: users.email,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            profileImageUrl: users.profileImageUrl,
+            emailVerified: users.emailVerified,
+            receiveNotifications: users.receiveNotifications,
+            createdAt: users.createdAt,
+            updatedAt: users.updatedAt
+          },
+          
+          // Picked team data
+          pickedTeam: {
+            id: pickedTeamAlias.id,
+            name: pickedTeamAlias.name,
+            abbreviation: pickedTeamAlias.abbreviation,
+            logoUrl: pickedTeamAlias.logoUrl,
+            primaryColor: pickedTeamAlias.primaryColor,
+            secondaryColor: pickedTeamAlias.secondaryColor
+          },
+          
+          // Game data
+          game: {
+            id: nflGames.id,
+            weekId: nflGames.weekId,
+            homeTeamId: nflGames.homeTeamId,
+            awayTeamId: nflGames.awayTeamId,
+            homeTeamScore: nflGames.homeTeamScore,
+            awayTeamScore: nflGames.awayTeamScore,
+            spread: nflGames.spread,
+            homeTeamRecord: nflGames.homeTeamRecord,
+            awayTeamRecord: nflGames.awayTeamRecord,
+            gameTime: nflGames.gameTime,
+            completed: nflGames.completed,
+            winningTeamId: nflGames.winningTeamId,
+            createdAt: nflGames.createdAt,
+            updatedAt: nflGames.updatedAt
+          },
+          
+          // Home team data
+          homeTeam: {
+            id: homeTeamAlias.id,
+            name: homeTeamAlias.name,
+            abbreviation: homeTeamAlias.abbreviation,
+            logoUrl: homeTeamAlias.logoUrl,
+            primaryColor: homeTeamAlias.primaryColor,
+            secondaryColor: homeTeamAlias.secondaryColor
+          },
+          
+          // Away team data
+          awayTeam: {
+            id: awayTeamAlias.id,
+            name: awayTeamAlias.name,
+            abbreviation: awayTeamAlias.abbreviation,
+            logoUrl: awayTeamAlias.logoUrl,
+            primaryColor: awayTeamAlias.primaryColor,
+            secondaryColor: awayTeamAlias.secondaryColor
+          }
+        })
         .from(userPicks)
+        .innerJoin(users, eq(userPicks.userId, users.id))
+        .innerJoin(pickedTeamAlias, eq(userPicks.pickedTeamId, pickedTeamAlias.id))
+        .innerJoin(nflGames, eq(userPicks.gameId, nflGames.id))
+        .innerJoin(homeTeamAlias, eq(nflGames.homeTeamId, homeTeamAlias.id))
+        .innerJoin(awayTeamAlias, eq(nflGames.awayTeamId, awayTeamAlias.id))
         .where(
           and(
             eq(userPicks.weekId, weekId),
@@ -818,54 +905,28 @@ export class DatabaseStorage implements IStorage {
           )
         );
       
-      // Now build the full objects with related data
-      const fullPicks = [];
-      
-      for (const pick of picks) {
-        // Get user
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.id, pick.userId));
-        
-        // Get picked team
-        const [pickedTeam] = await db
-          .select()
-          .from(nflTeams)
-          .where(eq(nflTeams.id, pick.pickedTeamId));
-        
-        // Get game
-        const [game] = await db
-          .select()
-          .from(nflGames)
-          .where(eq(nflGames.id, pick.gameId));
-        
-        // Get home team
-        const [homeTeam] = await db
-          .select()
-          .from(nflTeams)
-          .where(eq(nflTeams.id, game.homeTeamId));
-        
-        // Get away team
-        const [awayTeam] = await db
-          .select()
-          .from(nflTeams)
-          .where(eq(nflTeams.id, game.awayTeamId));
-        
-        fullPicks.push({
-          ...pick,
-          user,
-          pickedTeam,
-          game: {
-            ...game,
-            homeTeam,
-            awayTeam,
-            winningTeamId: game.winningTeamId
-          }
-        });
-      }
-      
-      return fullPicks;
+      // Transform the results to match the expected structure
+      return results.map(result => ({
+        id: result.id,
+        userId: result.userId,
+        leagueId: result.leagueId,
+        weekId: result.weekId,
+        gameId: result.gameId,
+        pickedTeamId: result.pickedTeamId,
+        isUnderdog: result.isUnderdog,
+        spreadAtTimeOfPick: result.spreadAtTimeOfPick,
+        won: result.won,
+        pointsEarned: result.pointsEarned,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt,
+        user: result.user,
+        pickedTeam: result.pickedTeam,
+        game: {
+          ...result.game,
+          homeTeam: result.homeTeam,
+          awayTeam: result.awayTeam
+        }
+      }));
     } catch (error) {
       console.error("Error fetching user picks for week:", error);
       return [];
