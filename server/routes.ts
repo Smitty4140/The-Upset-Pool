@@ -864,35 +864,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid league ID or week ID" });
       }
       
-      // Cheap version check for ETag optimization
-      const [versionInfo] = await db
-        .select({
-          count: sql<number>`COUNT(*)`,
-          maxUpdated: sql<string>`COALESCE(MAX(${userPicks.updatedAt}), 'epoch')`
-        })
-        .from(userPicks)
-        .where(
-          and(
-            eq(userPicks.weekId, weekId),
-            eq(userPicks.leagueId, leagueId)
-          )
-        );
-      
-      // Generate ETag from count and max update time
-      const etag = `"${versionInfo.count}:${versionInfo.maxUpdated}"`;
-      
-      // Check if client has current version
-      const clientETag = req.headers['if-none-match'];
-      if (clientETag === etag) {
-        return res.status(304).end();
-      }
-      
-      // Set cache headers
-      res.set({
-        'ETag': etag,
-        'Cache-Control': 'public, max-age=60' // Cache for 1 minute
-      });
-      
       // Get all picks for the week and league
       const picks = await storage.getUserPicksForWeek(weekId, leagueId);
       
