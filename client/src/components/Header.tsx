@@ -63,9 +63,6 @@ export default function Header() {
               <NavLink href="/" active={location === "/"}>
                 My Leagues
               </NavLink>
-              <NavLink href="/leaderboard" active={location === "/leaderboard"}>
-                Leaderboard
-              </NavLink>
               <NavLink href="/profile" active={location === "/profile"}>
                 Profile
               </NavLink>
@@ -124,9 +121,6 @@ export default function Header() {
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-700">
               <NavLink href="/" active={location === "/"} mobile>
                 My Leagues
-              </NavLink>
-              <NavLink href="/leaderboard" active={location === "/leaderboard"} mobile>
-                Leaderboard
               </NavLink>
               <NavLink href="/profile" active={location === "/profile"} mobile>
                 Profile
