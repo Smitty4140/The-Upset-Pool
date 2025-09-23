@@ -149,7 +149,7 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
                     <div className="flex items-center">
                       <Avatar className="h-7 w-7 mr-2 border border-gray-200">
-                        <AvatarImage src={user.profileImageUrl || ""} alt={user.username} />
+                        <AvatarImage src={user.profileImageUrl ?? ""} alt={user.username ?? ""} />
                         <AvatarFallback className="bg-primary/10 text-primary">
                           {user.username?.[0].toUpperCase() || "?"}
                         </AvatarFallback>
