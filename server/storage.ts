@@ -903,32 +903,32 @@ export class DatabaseStorage implements IStorage {
       .groupBy(users.id, users.username, users.email, users.firstName, users.lastName, users.profileImageUrl, users.emailVerified, users.receiveNotifications, users.createdAt, users.updatedAt)
       .orderBy(desc(sql`COALESCE(SUM(${userPicks.pointsEarned}), 0)`));
     
-    // Get all weeks that have occurred (past weeks only)
+    // Get all weeks that have started (locked weeks)
     const now = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-    const pastWeeks = await db
+    const lockedWeeks = await db
       .select()
       .from(nflWeeks)
-      .where(lt(nflWeeks.endDate, now))
+      .where(lte(nflWeeks.startDate, now))
       .orderBy(nflWeeks.weekNumber);
     
-    const pastWeekIds = pastWeeks.map(week => week.id);
+    const lockedWeekIds = lockedWeeks.map(week => week.id);
     
-    // If no past weeks, everyone is eligible
-    if (pastWeekIds.length === 0) {
+    // If no locked weeks, everyone is eligible
+    if (lockedWeekIds.length === 0) {
       return result.map(user => ({
         ...user,
         everyWeekEligible: true
       })) as User[];
     }
     
-    // For each user, check if they have picks for every past week
+    // For each user, check if they have picks for every locked week
     const usersWithEligibility = await Promise.all(
       result.map(async (user) => {
         let picksCount = 0;
         
-        // Only check if there are past weeks to check
-        if (pastWeekIds.length > 0) {
-          // Count how many picks this user has made for past weeks in this league
+        // Only check if there are locked weeks to check
+        if (lockedWeekIds.length > 0) {
+          // Count how many picks this user has made for locked weeks in this league
           const userPickCount = await db
             .select({
               count: sql<number>`COUNT(DISTINCT ${userPicks.weekId})`
@@ -938,14 +938,14 @@ export class DatabaseStorage implements IStorage {
               and(
                 eq(userPicks.userId, user.id),
                 eq(userPicks.leagueId, leagueId),
-                inArray(userPicks.weekId, pastWeekIds)
+                inArray(userPicks.weekId, lockedWeekIds)
               )
             );
           
           picksCount = userPickCount[0]?.count || 0;
         }
         
-        const everyWeekEligible = picksCount === pastWeekIds.length;
+        const everyWeekEligible = picksCount === lockedWeekIds.length;
         
         return {
           ...user,
