@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { User, NFLGame, NFLTeam } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -36,6 +37,8 @@ type WeeklyPicksProps = {
 export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }: WeeklyPicksProps) {
   const { data: weeklyPicks, isLoading } = useQuery<UserPick[]>({
     queryKey: [`/api/league/${leagueId}/week/${weekId}/picks`],
+    staleTime: 60 * 1000, // Consider data fresh for 1 minute
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
   });
 
   const { data: leaderboard } = useQuery<User[]>({
@@ -134,46 +137,55 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
     );
   }
 
-  // Get unique users who have picks
-  const usersWithPicks = weeklyPicks?.reduce<Record<string, UserPick>>((acc, pick) => {
-    acc[pick.userId] = pick;
-    return acc;
-  }, {}) || {};
+  // Memoize the picks map for efficient O(1) lookup instead of O(n) find operations
+  const usersWithPicks = useMemo(() => {
+    return weeklyPicks?.reduce<Record<string, UserPick>>((acc, pick) => {
+      acc[pick.userId] = pick;
+      return acc;
+    }, {}) || {};
+  }, [weeklyPicks]);
 
-  // Prepare data for charts
-  const picksByTeam = weeklyPicks?.reduce((acc: Record<string, number>, pick) => {
-    const teamName = pick.pickedTeam.name;
-    acc[teamName] = (acc[teamName] || 0) + 1;
-    return acc;
-  }, {}) || {};
+  // Memoize expensive chart data calculations
+  const teamPicksData = useMemo(() => {
+    if (!weeklyPicks) return [];
+    
+    const picksByTeam = weeklyPicks.reduce((acc: Record<string, number>, pick) => {
+      const teamName = pick.pickedTeam.name;
+      acc[teamName] = (acc[teamName] || 0) + 1;
+      return acc;
+    }, {});
+    
+    return Object.entries(picksByTeam).map(([name, count]) => ({
+      name,
+      count
+    }));
+  }, [weeklyPicks]);
   
-  const teamPicksData = Object.entries(picksByTeam).map(([name, count]) => ({
-    name,
-    count
-  }));
-  
-  // Get spread distribution data
-  const spreadRanges = {
-    'Less than 3': 0,
-    '3 to 6': 0,
-    'More than 6': 0
-  };
-  
-  weeklyPicks?.forEach(pick => {
-    const spread = Math.abs(Number(pick.spreadAtTimeOfPick));
-    if (spread < 3) {
-      spreadRanges['Less than 3']++;
-    } else if (spread >= 3 && spread <= 6) {
-      spreadRanges['3 to 6']++;
-    } else {
-      spreadRanges['More than 6']++;
-    }
-  });
-  
-  const spreadData = Object.entries(spreadRanges).map(([range, count]) => ({
-    name: range,
-    value: count
-  }));
+  const spreadData = useMemo(() => {
+    if (!weeklyPicks) return [];
+    
+    const spreadRanges = {
+      'Less than 3': 0,
+      '3 to 6': 0,
+      'More than 6': 0
+    };
+    
+    weeklyPicks.forEach(pick => {
+      const spread = Math.abs(Number(pick.spreadAtTimeOfPick));
+      if (spread < 3) {
+        spreadRanges['Less than 3']++;
+      } else if (spread >= 3 && spread <= 6) {
+        spreadRanges['3 to 6']++;
+      } else {
+        spreadRanges['More than 6']++;
+      }
+    });
+    
+    return Object.entries(spreadRanges).map(([range, count]) => ({
+      name: range,
+      value: count
+    }));
+  }, [weeklyPicks]);
   
 
   
@@ -218,9 +230,8 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {rankedLeaderboard?.map((user) => {
-                  const userPick = Object.values(usersWithPicks).find(
-                    (pick) => pick.userId === user.id
-                  );
+                  // Direct O(1) map lookup instead of expensive O(n) find operation
+                  const userPick = usersWithPicks[user.id];
                   
                   // Format standing with ordinal suffix
                   const getOrdinalSuffix = (num: number) => {
