@@ -374,7 +374,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           gte(nflWeeks.endDate, now),
-          lt(nflWeeks.startDate, now)
+          lte(nflWeeks.startDate, now)
         )
       )
       .limit(1);
