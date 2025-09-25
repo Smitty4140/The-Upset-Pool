@@ -742,24 +742,25 @@ export default function Home() {
                 </div>
               </div>
               <div className="px-4 py-3">
-                {isLoadingLeaderboard ? (
-                  <div className="px-6 py-4">
-                    {Array.from({ length: 5 }).map((_, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center space-x-4 py-3"
-                      >
-                        <Skeleton className="h-5 w-5" />
-                        <Skeleton className="h-5 w-12" />
-                        <div className="flex items-center flex-1">
-                          <Skeleton className="h-8 w-8 rounded-full mr-2" />
-                          <Skeleton className="h-5 w-24" />
+                <div className="overflow-x-auto">
+                  {isLoadingLeaderboard ? (
+                    <div className="px-6 py-4">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center space-x-4 py-3"
+                        >
+                          <Skeleton className="h-5 w-5" />
+                          <Skeleton className="h-5 w-12" />
+                          <div className="flex items-center flex-1">
+                            <Skeleton className="h-8 w-8 rounded-full mr-2" />
+                            <Skeleton className="h-5 w-24" />
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <table className="min-w-full divide-y divide-gray-200">
+                      ))}
+                    </div>
+                  ) : (
+                    <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
                         <th
@@ -859,8 +860,9 @@ export default function Home() {
                         </tr>
                       )}
                     </tbody>
-                  </table>
-                )}
+                    </table>
+                  )}
+                </div>
               </div>
             </div>
           </div>
