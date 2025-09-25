@@ -112,3 +112,8 @@ Preferred communication style: Simple, everyday language.
   - Banner clearly states picks won't count until payment is complete
   - Encourages users to contact league administrator for payment completion
   - Yellow warning design matches existing UI patterns for important notifications
+- **Mobile Leaderboard Scrolling**: Fixed mobile responsiveness for leaderboard tables
+  - Added horizontal scrolling support for leaderboard tab in main page interface
+  - Users can now swipe left/right to view all columns (Place, Pooler, Score, Every Week Eligible) on mobile devices
+  - Enhanced both the component leaderboard and dedicated leaderboard page with overflow-x-auto containers
+  - Improved mobile user experience without breaking desktop layout
