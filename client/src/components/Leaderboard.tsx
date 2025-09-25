@@ -102,7 +102,8 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
         </div>
       </div>
       <div className="px-4 py-3">
-        <table className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Place</th>
@@ -172,6 +173,7 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
