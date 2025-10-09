@@ -246,14 +246,27 @@ class GameScheduler {
 
   /**
    * Convert a Date to cron expression
+   * Since cron is scheduled with timezone 'America/New_York', we need to extract
+   * the time components in Eastern Time, not UTC
    */
   private getCronExpression(date: Date): string {
-    const minutes = date.getMinutes();
-    const hours = date.getHours();
-    const dayOfMonth = date.getDate();
-    const month = date.getMonth() + 1; // cron months are 1-indexed
+    // Convert to Eastern Time to get the correct hours/minutes/day/month
+    const etString = date.toLocaleString('en-US', { 
+      timeZone: 'America/New_York',
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      hour12: false
+    });
     
-    // Create a one-time cron job for this specific date/time
+    // Parse the ET string to extract components
+    // Format will be like: "10/09/2025, 12:15"
+    const [datePart, timePart] = etString.split(', ');
+    const [month, dayOfMonth, year] = datePart.split('/').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+    
+    // Create a one-time cron job for this specific date/time in ET
     return `${minutes} ${hours} ${dayOfMonth} ${month} *`;
   }
 

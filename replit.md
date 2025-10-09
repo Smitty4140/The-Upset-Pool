@@ -117,3 +117,8 @@ Preferred communication style: Simple, everyday language.
   - Users can now swipe left/right to view all columns (Place, Pooler, Score, Every Week Eligible) on mobile devices
   - Enhanced both the component leaderboard and dedicated leaderboard page with overflow-x-auto containers
   - Improved mobile user experience without breaking desktop layout
+- **Scheduler Timezone Fix**: Fixed critical bug where picks were locking and spreads were pulling 1 hour later than scheduled
+  - Root cause: Cron expressions were being generated in UTC timezone but executed in Eastern Time
+  - Fix: Convert Date to Eastern Time before extracting hours/minutes/day/month for cron expression
+  - Now correctly schedules data pulls 8 hours before first game and results pulls 5 hours after last game
+  - Automatically handles daylight saving time transitions (EDT/EST)
