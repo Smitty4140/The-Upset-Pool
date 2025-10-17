@@ -913,29 +913,15 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(sql`COALESCE(SUM(${userPicks.pointsEarned}), 0)`));
     
     // Get weeks for eligibility calculation:
-    // 1. All previous weeks (that have ended)
-    // 2. Current week if it has started (locked)
-    const now = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    // Only include weeks where picks have locked (picksLockAt is in the past)
+    const now = new Date();
     
-    // Get previous weeks (completely finished)
-    const previousWeeks = await db
+    // Get all weeks where picks have locked
+    const eligibilityWeeks = await db
       .select()
       .from(nflWeeks)
-      .where(lt(nflWeeks.endDate, now))
+      .where(lt(nflWeeks.picksLockAt, now))
       .orderBy(nflWeeks.weekNumber);
-    
-    // Get current week if it has started (locked)
-    const currentWeek = await db
-      .select()
-      .from(nflWeeks)
-      .where(and(
-        lte(nflWeeks.startDate, now),
-        gte(nflWeeks.endDate, now)
-      ))
-      .limit(1);
-    
-    // Combine both sets of weeks
-    const eligibilityWeeks = [...previousWeeks, ...currentWeek];
     
     const eligibilityWeekIds = eligibilityWeeks.map(week => week.id);
     
