@@ -907,7 +907,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(userPicks.userId, userId),
           eq(userPicks.leagueId, leagueId)
         ))
-        .orderBy(asc(nflWeeks.weekNumber));
+        .orderBy(desc(nflWeeks.weekNumber));
       
       // Get opponent team names
       const allPicks = await Promise.all(

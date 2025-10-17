@@ -192,8 +192,9 @@ export default function LeaderboardPage() {
                 <tr>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pooler</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Every Week Eligible</th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pooler</th>
+                  <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-12"></th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -223,24 +224,6 @@ export default function LeaderboardPage() {
                             {user.totalPoints || "0"} pts
                           </div>
                         </td>
-                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <Avatar className="h-7 w-7 mr-2 border border-gray-200">
-                                <AvatarImage src={user.profileImageUrl || ""} alt={user.username} />
-                                <AvatarFallback className="bg-primary/10 text-primary">
-                                  {user.username?.[0]?.toUpperCase() || "?"}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium">{user.username}</span>
-                            </div>
-                            {expandedUserId === user.id ? (
-                              <ChevronUp className="h-5 w-5 text-gray-400" />
-                            ) : (
-                              <ChevronDown className="h-5 w-5 text-gray-400" />
-                            )}
-                          </div>
-                        </td>
                         <td className="px-3 py-4 whitespace-nowrap text-sm text-center">
                           {user.everyWeekEligible ? (
                             <div className="flex items-center justify-center text-green-600" data-testid={`eligible-yes-${user.id}`}>
@@ -254,10 +237,28 @@ export default function LeaderboardPage() {
                             </div>
                           )}
                         </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
+                          <div className="flex items-center">
+                            <Avatar className="h-7 w-7 mr-2 border border-gray-200">
+                              <AvatarImage src={user.profileImageUrl || ""} alt={user.username} />
+                              <AvatarFallback className="bg-primary/10 text-primary">
+                                {user.username?.[0]?.toUpperCase() || "?"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">{user.username}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-center">
+                          {expandedUserId === user.id ? (
+                            <ChevronUp className="h-5 w-5 text-gray-400 mx-auto" />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 text-gray-400 mx-auto" />
+                          )}
+                        </td>
                       </tr>
                       {expandedUserId === user.id && (
                         <tr key={`${user.id}-accordion`}>
-                          <td colSpan={4} className="px-3 py-4 bg-gray-50">
+                          <td colSpan={5} className="px-3 py-4 bg-gray-50">
                             <div className="animate-in slide-in-from-top-2 duration-200">
                               <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
                                 <Calendar className="h-4 w-4 mr-2" />
@@ -274,7 +275,7 @@ export default function LeaderboardPage() {
                                   {currentUserPicks.map((pick) => (
                                     <div 
                                       key={pick.id} 
-                                      className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                                      className="flex items-center bg-white p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors max-w-2xl"
                                       data-testid={`pick-week-${pick.weekNumber}`}
                                     >
                                       <div className="flex items-center space-x-4">
@@ -286,11 +287,11 @@ export default function LeaderboardPage() {
                                             {pick.pickedTeamName}
                                           </div>
                                           <div className="text-xs text-gray-500">
-                                            vs {pick.opponentTeamName} ({pick.spread > 0 ? '+' : ''}{pick.spread})
+                                            vs {pick.opponentTeamName} (+{Math.abs(parseFloat(pick.spread))})
                                           </div>
                                         </div>
                                       </div>
-                                      <div className="flex items-center space-x-3">
+                                      <div className="flex items-center space-x-3 ml-6">
                                         {pick.result === 'win' ? (
                                           <>
                                             <div className="flex items-center text-green-600">
