@@ -193,6 +193,7 @@ export default function LeaderboardPage() {
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pooler</th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Every Week Eligible</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -240,10 +241,23 @@ export default function LeaderboardPage() {
                             )}
                           </div>
                         </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm text-center">
+                          {user.everyWeekEligible ? (
+                            <div className="flex items-center justify-center text-green-600" data-testid={`eligible-yes-${user.id}`}>
+                              <Check className="h-5 w-5" />
+                              <span className="ml-1 font-medium">Yes</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center text-red-600" data-testid={`eligible-no-${user.id}`}>
+                              <X className="h-5 w-5" />
+                              <span className="ml-1 font-medium">No</span>
+                            </div>
+                          )}
+                        </td>
                       </tr>
                       {expandedUserId === user.id && (
                         <tr key={`${user.id}-accordion`}>
-                          <td colSpan={3} className="px-3 py-4 bg-gray-50">
+                          <td colSpan={4} className="px-3 py-4 bg-gray-50">
                             <div className="animate-in slide-in-from-top-2 duration-200">
                               <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
                                 <Calendar className="h-4 w-4 mr-2" />
