@@ -196,37 +196,118 @@ export default function LeaderboardPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {rankedLeaderboard && rankedLeaderboard.length > 0 ? (
                   rankedLeaderboard.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-4 whitespace-nowrap text-sm">
-                        <div className="flex items-center">
-                          {user.rank === 1 ? (
-                            <Medal className="h-5 w-5 text-yellow-500 mr-1" />
-                          ) : user.rank === 2 ? (
-                            <Medal className="h-5 w-5 text-gray-400 mr-1" />
-                          ) : user.rank === 3 ? (
-                            <Medal className="h-5 w-5 text-amber-700 mr-1" />
-                          ) : (
-                            <span className="font-medium text-gray-700 mx-1">{user.rank}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        <div className="text-sm font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full inline-block">
-                          {user.totalPoints || "0"} pts
-                        </div>
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
-                        <div className="flex items-center">
-                          <Avatar className="h-7 w-7 mr-2 border border-gray-200">
-                            <AvatarImage src={user.profileImageUrl || ""} alt={user.username} />
-                            <AvatarFallback className="bg-primary/10 text-primary">
-                              {user.username?.[0]?.toUpperCase() || "?"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium">{user.username}</span>
-                        </div>
-                      </td>
-                    </tr>
+                    <>
+                      <tr 
+                        key={user.id} 
+                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                        onClick={() => handleToggleAccordion(user.id)}
+                        data-testid={`leaderboard-row-${user.id}`}
+                      >
+                        <td className="px-3 py-4 whitespace-nowrap text-sm">
+                          <div className="flex items-center">
+                            {user.rank === 1 ? (
+                              <Medal className="h-5 w-5 text-yellow-500 mr-1" />
+                            ) : user.rank === 2 ? (
+                              <Medal className="h-5 w-5 text-gray-400 mr-1" />
+                            ) : user.rank === 3 ? (
+                              <Medal className="h-5 w-5 text-amber-700 mr-1" />
+                            ) : (
+                              <span className="font-medium text-gray-700 mx-1">{user.rank}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap">
+                          <div className="text-sm font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full inline-block">
+                            {user.totalPoints || "0"} pts
+                          </div>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Avatar className="h-7 w-7 mr-2 border border-gray-200">
+                                <AvatarImage src={user.profileImageUrl || ""} alt={user.username} />
+                                <AvatarFallback className="bg-primary/10 text-primary">
+                                  {user.username?.[0]?.toUpperCase() || "?"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="font-medium">{user.username}</span>
+                            </div>
+                            {expandedUserId === user.id ? (
+                              <ChevronUp className="h-5 w-5 text-gray-400" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5 text-gray-400" />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {expandedUserId === user.id && (
+                        <tr key={`${user.id}-accordion`}>
+                          <td colSpan={3} className="px-3 py-4 bg-gray-50">
+                            <div className="animate-in slide-in-from-top-2 duration-200">
+                              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                                <Calendar className="h-4 w-4 mr-2" />
+                                Weekly Picks for {user.username}
+                              </h4>
+                              {isLoadingPicks && !userPicksCache[user.id] ? (
+                                <div className="space-y-2">
+                                  {Array.from({ length: 3 }).map((_, i) => (
+                                    <Skeleton key={i} className="h-12 w-full" />
+                                  ))}
+                                </div>
+                              ) : currentUserPicks.length > 0 ? (
+                                <div className="space-y-2 max-h-96 overflow-y-auto">
+                                  {currentUserPicks.map((pick) => (
+                                    <div 
+                                      key={pick.id} 
+                                      className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                                      data-testid={`pick-week-${pick.weekNumber}`}
+                                    >
+                                      <div className="flex items-center space-x-4">
+                                        <div className="text-sm font-medium text-gray-500 min-w-[60px]">
+                                          Week {pick.weekNumber}
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <div className="font-semibold text-gray-900">
+                                            {pick.pickedTeamName}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            vs {pick.opponentTeamName} ({pick.spread > 0 ? '+' : ''}{pick.spread})
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center space-x-3">
+                                        {pick.result === 'win' ? (
+                                          <>
+                                            <div className="flex items-center text-green-600">
+                                              <Check className="h-5 w-5 mr-1" />
+                                              <span className="font-semibold text-sm">+{pick.pointsEarned} pts</span>
+                                            </div>
+                                          </>
+                                        ) : pick.result === 'loss' ? (
+                                          <div className="flex items-center text-red-600">
+                                            <X className="h-5 w-5 mr-1" />
+                                            <span className="font-semibold text-sm">0 pts</span>
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center text-gray-400">
+                                            <Clock className="h-5 w-5 mr-1" />
+                                            <span className="text-sm">Pending</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center py-6 text-gray-500">
+                                  <p className="text-sm">No picks available yet</p>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   ))
                 ) : (
                   <tr>
