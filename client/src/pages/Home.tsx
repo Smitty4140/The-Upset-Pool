@@ -56,6 +56,7 @@ interface UserPick {
   weekNumber: number;
   pickedTeamName: string;
   pickedTeamAbbreviation: string;
+  pickedTeamLogoUrl: string;
   spread: number;
   result: string | null;
   pointsEarned: number | null;
@@ -923,13 +924,18 @@ export default function Home() {
                                       {currentUserPicks.map((pick) => (
                                         <div 
                                           key={pick.id} 
-                                          className="flex items-center bg-white p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors max-w-2xl"
+                                          className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors max-w-2xl"
                                           data-testid={`pick-week-${pick.weekNumber}`}
                                         >
-                                          <div className="flex items-center space-x-4">
+                                          <div className="flex items-center space-x-4 flex-1">
                                             <div className="text-sm font-medium text-gray-500 min-w-[60px]">
                                               Week {pick.weekNumber}
                                             </div>
+                                            <img 
+                                              src={pick.pickedTeamLogoUrl} 
+                                              alt={pick.pickedTeamName}
+                                              className="h-8 w-8 object-contain"
+                                            />
                                             <div className="flex flex-col">
                                               <div className="font-semibold text-gray-900">
                                                 {pick.pickedTeamName}
@@ -939,7 +945,7 @@ export default function Home() {
                                               </div>
                                             </div>
                                           </div>
-                                          <div className="flex items-center space-x-3 ml-6">
+                                          <div className="flex items-center min-w-[100px] justify-end">
                                             {pick.result === 'win' ? (
                                               <div className="flex items-center text-green-600">
                                                 <Check className="h-5 w-5 mr-1" />
