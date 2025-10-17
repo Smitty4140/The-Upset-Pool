@@ -868,6 +868,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all picks for a specific user in a league (for accordion view)
+  app.get('/api/league/:leagueId/user/:userId/picks', async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.leagueId);
+      const userId = req.params.userId;
+      
+      if (isNaN(leagueId) || !userId) {
+        return res.status(400).json({ message: "Invalid league ID or user ID" });
+      }
+      
+      // Get current week to filter out if not locked
+      const currentWeek = await storage.getCurrentNFLWeek();
+      
+      // Get all picks for this user in this league
+      const allPicks = await db
+        .select({
+          id: userPicks.id,
+          weekId: userPicks.weekId,
+          weekNumber: nflWeeks.weekNumber,
+          pickedTeamId: userPicks.pickedTeamId,
+          pickedTeamName: nflTeams.name,
+          pickedTeamAbbreviation: nflTeams.abbreviation,
+          gameId: userPicks.gameId,
+          spread: nflGames.spread,
+          result: userPicks.result,
+          pointsEarned: userPicks.pointsEarned,
+          picksLockAt: nflWeeks.picksLockAt,
+          gameTime: nflGames.gameTime,
+          opponentTeamId: sql<number>`CASE WHEN ${nflGames.homeTeamId} = ${userPicks.pickedTeamId} THEN ${nflGames.awayTeamId} ELSE ${nflGames.homeTeamId} END`,
+          opponentTeamName: sql<string>`CASE WHEN ${nflGames.homeTeamId} = ${userPicks.pickedTeamId} THEN (SELECT name FROM nfl_teams WHERE id = ${nflGames.awayTeamId}) ELSE (SELECT name FROM nfl_teams WHERE id = ${nflGames.homeTeamId}) END`,
+        })
+        .from(userPicks)
+        .innerJoin(nflWeeks, eq(userPicks.weekId, nflWeeks.id))
+        .innerJoin(nflGames, eq(userPicks.gameId, nflGames.id))
+        .innerJoin(nflTeams, eq(userPicks.pickedTeamId, nflTeams.id))
+        .where(and(
+          eq(userPicks.userId, userId),
+          eq(userPicks.leagueId, leagueId)
+        ))
+        .orderBy(asc(nflWeeks.weekNumber));
+      
+      // Filter out current week if picks are not locked
+      const now = new Date();
+      const filteredPicks = allPicks.filter(pick => {
+        // If this is the current week
+        if (currentWeek && pick.weekId === currentWeek.id) {
+          // Only show if picks are locked (past lock time)
+          const lockTime = new Date(pick.picksLockAt);
+          return now >= lockTime;
+        }
+        // Show all other weeks
+        return true;
+      });
+      
+      res.json(filteredPicks);
+    } catch (error) {
+      console.error("Error fetching user picks for accordion:", error);
+      res.status(500).json({ message: "Failed to fetch user picks" });
+    }
+  });
+
   // Get all users
   app.get('/api/users', isAuthenticated, async (req: any, res) => {
     try {

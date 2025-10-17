@@ -2,13 +2,27 @@ import { useQuery } from "@tanstack/react-query";
 import { User, League } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Trophy, Medal, Calendar, Award, Users } from "lucide-react";
+import { Trophy, Medal, Calendar, Award, Users, ChevronDown, ChevronUp, Check, X, Clock } from "lucide-react";
 import { Helmet } from "react-helmet";
 import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+interface UserPick {
+  id: number;
+  weekId: number;
+  weekNumber: number;
+  pickedTeamName: string;
+  pickedTeamAbbreviation: string;
+  spread: number;
+  result: string | null;
+  pointsEarned: number | null;
+  opponentTeamName: string;
+}
+
 export default function LeaderboardPage() {
   const [selectedLeagueId, setSelectedLeagueId] = useState<number>(1);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [userPicksCache, setUserPicksCache] = useState<Record<string, UserPick[]>>({});
   
   // Get all leagues for the selector
   const { data: leagues, isLoading: isLoadingLeagues } = useQuery<League[]>({
@@ -20,6 +34,34 @@ export default function LeaderboardPage() {
     queryKey: [`/api/league/${selectedLeagueId}/leaderboard`],
     enabled: !!selectedLeagueId
   });
+
+  // Lazy load user picks when accordion is expanded
+  const { data: userPicks, isLoading: isLoadingPicks } = useQuery<UserPick[]>({
+    queryKey: [`/api/league/${selectedLeagueId}/user/${expandedUserId}/picks`],
+    enabled: !!expandedUserId && !userPicksCache[expandedUserId],
+    onSuccess: (data) => {
+      if (expandedUserId) {
+        setUserPicksCache(prev => ({
+          ...prev,
+          [expandedUserId]: data
+        }));
+      }
+    }
+  });
+
+  // Toggle accordion for a user
+  const handleToggleAccordion = (userId: string) => {
+    if (expandedUserId === userId) {
+      // Close accordion
+      setExpandedUserId(null);
+    } else {
+      // Open accordion
+      setExpandedUserId(userId);
+    }
+  };
+
+  // Get picks for currently expanded user
+  const currentUserPicks = expandedUserId ? (userPicksCache[expandedUserId] || userPicks || []) : [];
 
   // Function to calculate proper rankings with ties
   const calculateRankings = (users: User[]) => {
