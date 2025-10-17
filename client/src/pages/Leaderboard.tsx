@@ -192,8 +192,8 @@ export default function LeaderboardPage() {
                 <tr>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Every Week Eligible</th>
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pooler</th>
+                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Every Week Eligible</th>
                   <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-12"></th>
                 </tr>
               </thead>
@@ -224,6 +224,17 @@ export default function LeaderboardPage() {
                             {user.totalPoints || "0"} pts
                           </div>
                         </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
+                          <div className="flex items-center">
+                            <Avatar className="h-7 w-7 mr-2 border border-gray-200">
+                              <AvatarImage src={user.profileImageUrl || ""} alt={user.username} />
+                              <AvatarFallback className="bg-primary/10 text-primary">
+                                {user.username?.[0]?.toUpperCase() || "?"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">{user.username}</span>
+                          </div>
+                        </td>
                         <td className="px-3 py-4 whitespace-nowrap text-sm text-center">
                           {user.everyWeekEligible ? (
                             <div className="flex items-center justify-center text-green-600" data-testid={`eligible-yes-${user.id}`}>
@@ -236,17 +247,6 @@ export default function LeaderboardPage() {
                               <span className="ml-1 font-medium">No</span>
                             </div>
                           )}
-                        </td>
-                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
-                          <div className="flex items-center">
-                            <Avatar className="h-7 w-7 mr-2 border border-gray-200">
-                              <AvatarImage src={user.profileImageUrl || ""} alt={user.username} />
-                              <AvatarFallback className="bg-primary/10 text-primary">
-                                {user.username?.[0]?.toUpperCase() || "?"}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium">{user.username}</span>
-                          </div>
                         </td>
                         <td className="px-3 py-4 whitespace-nowrap text-center">
                           {expandedUserId === user.id ? (

@@ -5,7 +5,7 @@ import { setupAuth, isAuthenticated } from "./auth";
 
 import { z } from "zod";
 import { userPickFormSchema } from "@shared/schema";
-import { eq, and, sql, asc } from "drizzle-orm";
+import { eq, and, sql, asc, desc } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, pool } from "./db";
 import { userPicks, nflGames, nflWeeks, users, nflTeams } from "@shared/schema";
