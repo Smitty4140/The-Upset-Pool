@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Trophy, Medal, Calendar, Award, Users, ChevronDown, ChevronUp, Check, X, Clock } from "lucide-react";
 import { Helmet } from "react-helmet";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface UserPick {
@@ -38,16 +38,18 @@ export default function LeaderboardPage() {
   // Lazy load user picks when accordion is expanded
   const { data: userPicks, isLoading: isLoadingPicks } = useQuery<UserPick[]>({
     queryKey: [`/api/league/${selectedLeagueId}/user/${expandedUserId}/picks`],
-    enabled: !!expandedUserId && !userPicksCache[expandedUserId],
-    onSuccess: (data) => {
-      if (expandedUserId) {
-        setUserPicksCache(prev => ({
-          ...prev,
-          [expandedUserId]: data
-        }));
-      }
-    }
+    enabled: !!expandedUserId && !userPicksCache[expandedUserId]
   });
+
+  // Cache fetched picks
+  useEffect(() => {
+    if (userPicks && expandedUserId && !userPicksCache[expandedUserId]) {
+      setUserPicksCache(prev => ({
+        ...prev,
+        [expandedUserId]: userPicks
+      }));
+    }
+  }, [userPicks, expandedUserId, userPicksCache]);
 
   // Toggle accordion for a user
   const handleToggleAccordion = (userId: string) => {
