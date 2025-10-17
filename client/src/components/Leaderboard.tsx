@@ -2,16 +2,60 @@ import { useQuery } from "@tanstack/react-query";
 import { UserWithEligibility } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Trophy, Medal, Calendar, CheckCircle, XCircle } from "lucide-react";
+import { Trophy, Medal, Calendar, Check, X, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import React, { useState, useEffect } from "react";
+
+interface UserPick {
+  id: number;
+  weekId: number;
+  weekNumber: number;
+  pickedTeamName: string;
+  pickedTeamAbbreviation: string;
+  spread: number;
+  result: string | null;
+  pointsEarned: number | null;
+  opponentTeamName: string;
+}
 
 type LeaderboardProps = {
   leagueId: number;
 };
 
 export default function Leaderboard({ leagueId }: LeaderboardProps) {
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [userPicksCache, setUserPicksCache] = useState<Record<string, UserPick[]>>({});
+  
   const { data: leaderboard, isLoading } = useQuery<UserWithEligibility[]>({
     queryKey: [`/api/league/${leagueId}/leaderboard`],
   });
+
+  // Lazy load user picks when accordion is expanded
+  const { data: userPicks, isLoading: isLoadingPicks } = useQuery<UserPick[]>({
+    queryKey: [`/api/league/${leagueId}/user/${expandedUserId}/picks`],
+    enabled: !!expandedUserId && !userPicksCache[expandedUserId]
+  });
+
+  // Cache fetched picks
+  useEffect(() => {
+    if (userPicks && expandedUserId && !userPicksCache[expandedUserId]) {
+      setUserPicksCache(prev => ({
+        ...prev,
+        [expandedUserId]: userPicks
+      }));
+    }
+  }, [userPicks, expandedUserId, userPicksCache]);
+
+  // Toggle accordion for a user
+  const handleToggleAccordion = (userId: string) => {
+    if (expandedUserId === userId) {
+      setExpandedUserId(null);
+    } else {
+      setExpandedUserId(userId);
+    }
+  };
+
+  // Get picks for currently expanded user
+  const currentUserPicks = expandedUserId ? (userPicksCache[expandedUserId] || userPicks || []) : [];
 
   // Function to calculate proper rankings with ties
   const calculateRankings = (users: UserWithEligibility[]) => {
@@ -107,62 +151,141 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
           <thead className="bg-gray-50">
             <tr>
               <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Place</th>
-              <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pooler</th>
               <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+              <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pooler</th>
               <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Every Week Eligible</th>
+              <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-12"></th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {rankedLeaderboard && rankedLeaderboard.length > 0 ? (
               rankedLeaderboard.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-4 whitespace-nowrap text-sm">
-                    <div className="flex items-center">
-                      {user.rank === 1 ? (
-                        <Medal className="h-5 w-5 text-yellow-500 mr-1" />
-                      ) : user.rank === 2 ? (
-                        <Medal className="h-5 w-5 text-gray-400 mr-1" />
-                      ) : user.rank === 3 ? (
-                        <Medal className="h-5 w-5 text-amber-700 mr-1" />
+                <React.Fragment key={user.id}>
+                  <tr 
+                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => handleToggleAccordion(user.id)}
+                    data-testid={`leaderboard-row-${user.id}`}
+                  >
+                    <td className="px-3 py-4 whitespace-nowrap text-sm">
+                      <div className="flex items-center">
+                        {user.rank === 1 ? (
+                          <Medal className="h-5 w-5 text-yellow-500 mr-1" />
+                        ) : user.rank === 2 ? (
+                          <Medal className="h-5 w-5 text-gray-400 mr-1" />
+                        ) : user.rank === 3 ? (
+                          <Medal className="h-5 w-5 text-amber-700 mr-1" />
+                        ) : (
+                          <span className="font-medium text-gray-700 mx-1">{user.rank}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap">
+                      <div className="text-sm font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full inline-block">
+                        {user.totalPoints || "0"} pts
+                      </div>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
+                      <div className="flex items-center">
+                        <Avatar className="h-7 w-7 mr-2 border border-gray-200">
+                          <AvatarImage src={user.profileImageUrl ?? ""} alt={user.username ?? ""} />
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {user.username?.[0].toUpperCase() || "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">{user.username}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-center">
+                      {user.everyWeekEligible ? (
+                        <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center text-green-600">
+                          <Check className="h-5 w-5" />
+                          <span className="ml-1 font-medium">Yes</span>
+                        </div>
                       ) : (
-                        <span className="font-medium text-gray-700 mx-1">{user.rank}</span>
+                        <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center text-red-600">
+                          <X className="h-5 w-5" />
+                          <span className="ml-1 font-medium">No</span>
+                        </div>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
-                    <div className="flex items-center">
-                      <Avatar className="h-7 w-7 mr-2 border border-gray-200">
-                        <AvatarImage src={user.profileImageUrl ?? ""} alt={user.username ?? ""} />
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {user.username?.[0].toUpperCase() || "?"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium">{user.username}</span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full inline-block">
-                      {user.totalPoints || "0"} pts
-                    </div>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-center">
-                    {user.everyWeekEligible ? (
-                      <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                        <span className="ml-1 text-xs font-medium text-green-700">Yes</span>
-                      </div>
-                    ) : (
-                      <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center">
-                        <XCircle className="h-5 w-5 text-red-600" />
-                        <span className="ml-1 text-xs font-medium text-red-700">No</span>
-                      </div>
-                    )}
-                  </td>
-                </tr>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-center">
+                      {expandedUserId === user.id ? (
+                        <ChevronUp className="h-5 w-5 text-gray-400 mx-auto" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-gray-400 mx-auto" />
+                      )}
+                    </td>
+                  </tr>
+                  {expandedUserId === user.id && (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-4 bg-gray-50">
+                        <div className="animate-in slide-in-from-top-2 duration-200">
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Weekly Picks for {user.username}
+                          </h4>
+                          {isLoadingPicks && !userPicksCache[user.id] ? (
+                            <div className="space-y-2">
+                              {Array.from({ length: 3 }).map((_, i) => (
+                                <Skeleton key={i} className="h-12 w-full" />
+                              ))}
+                            </div>
+                          ) : currentUserPicks.length > 0 ? (
+                            <div className="space-y-2 max-h-96 overflow-y-auto">
+                              {currentUserPicks.map((pick) => (
+                                <div 
+                                  key={pick.id} 
+                                  className="flex items-center bg-white p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors max-w-2xl"
+                                  data-testid={`pick-week-${pick.weekNumber}`}
+                                >
+                                  <div className="flex items-center space-x-4">
+                                    <div className="text-sm font-medium text-gray-500 min-w-[60px]">
+                                      Week {pick.weekNumber}
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <div className="font-semibold text-gray-900">
+                                        {pick.pickedTeamName}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        vs {pick.opponentTeamName} (+{Math.abs(parseFloat(pick.spread))})
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-3 ml-6">
+                                    {pick.result === 'win' ? (
+                                      <div className="flex items-center text-green-600">
+                                        <Check className="h-5 w-5 mr-1" />
+                                        <span className="font-semibold text-sm">+{pick.pointsEarned} pts</span>
+                                      </div>
+                                    ) : pick.result === 'loss' ? (
+                                      <div className="flex items-center text-red-600">
+                                        <X className="h-5 w-5 mr-1" />
+                                        <span className="font-semibold text-sm">0 pts</span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center text-gray-400">
+                                        <Clock className="h-5 w-5 mr-1" />
+                                        <span className="text-sm">Pending</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-6 text-gray-500">
+                              <p className="text-sm">No picks available yet</p>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))
             ) : (
               <tr>
-                <td colSpan={4} className="px-3 py-8 text-center">
+                <td colSpan={5} className="px-3 py-8 text-center">
                   <div className="flex flex-col items-center text-gray-500">
                     <Trophy className="h-10 w-10 text-gray-300 mb-2" />
                     <p className="font-medium">No entries yet</p>
