@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Trophy, Medal, Calendar, Award, Users, ChevronDown, ChevronUp, Check, X, Clock } from "lucide-react";
 import { Helmet } from "react-helmet";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface UserPick {
@@ -198,9 +198,8 @@ export default function LeaderboardPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {rankedLeaderboard && rankedLeaderboard.length > 0 ? (
                   rankedLeaderboard.map((user) => (
-                    <>
+                    <React.Fragment key={user.id}>
                       <tr 
-                        key={user.id} 
                         className="hover:bg-gray-50 cursor-pointer transition-colors"
                         onClick={() => handleToggleAccordion(user.id)}
                         data-testid={`leaderboard-row-${user.id}`}
@@ -309,7 +308,7 @@ export default function LeaderboardPage() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </React.Fragment>
                   ))
                 ) : (
                   <tr>

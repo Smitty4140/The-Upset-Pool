@@ -881,8 +881,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get current week to filter out if not locked
       const currentWeek = await storage.getCurrentNFLWeek();
       
-      // Get all picks for this user in this league
-      const allPicks = await db
+      // Get all picks for this user in this league with separate queries for home/away teams
+      const rawPicks = await db
         .select({
           id: userPicks.id,
           weekId: userPicks.weekId,
@@ -896,8 +896,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pointsEarned: userPicks.pointsEarned,
           picksLockAt: nflWeeks.picksLockAt,
           gameTime: nflGames.gameTime,
-          opponentTeamId: sql<number>`CASE WHEN ${nflGames.homeTeamId} = ${userPicks.pickedTeamId} THEN ${nflGames.awayTeamId} ELSE ${nflGames.homeTeamId} END`,
-          opponentTeamName: sql<string>`CASE WHEN ${nflGames.homeTeamId} = ${userPicks.pickedTeamId} THEN (SELECT name FROM nfl_teams WHERE id = ${nflGames.awayTeamId}) ELSE (SELECT name FROM nfl_teams WHERE id = ${nflGames.homeTeamId}) END`,
+          homeTeamId: nflGames.homeTeamId,
+          awayTeamId: nflGames.awayTeamId,
         })
         .from(userPicks)
         .innerJoin(nflWeeks, eq(userPicks.weekId, nflWeeks.id))
@@ -908,6 +908,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(userPicks.leagueId, leagueId)
         ))
         .orderBy(asc(nflWeeks.weekNumber));
+      
+      // Get opponent team names
+      const allPicks = await Promise.all(
+        rawPicks.map(async (pick) => {
+          const opponentTeamId = pick.homeTeamId === pick.pickedTeamId ? pick.awayTeamId : pick.homeTeamId;
+          const opponentTeam = await db
+            .select({ name: nflTeams.name })
+            .from(nflTeams)
+            .where(eq(nflTeams.id, opponentTeamId))
+            .limit(1);
+          
+          return {
+            id: pick.id,
+            weekId: pick.weekId,
+            weekNumber: pick.weekNumber,
+            pickedTeamName: pick.pickedTeamName,
+            pickedTeamAbbreviation: pick.pickedTeamAbbreviation,
+            spread: pick.spread,
+            result: pick.result,
+            pointsEarned: pick.pointsEarned,
+            picksLockAt: pick.picksLockAt,
+            opponentTeamName: opponentTeam[0]?.name || 'Unknown'
+          };
+        })
+      );
       
       // Filter out current week if picks are not locked
       const now = new Date();
