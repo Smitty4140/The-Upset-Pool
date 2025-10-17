@@ -892,7 +892,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pickedTeamAbbreviation: nflTeams.abbreviation,
           gameId: userPicks.gameId,
           spread: nflGames.spread,
-          result: userPicks.result,
+          won: userPicks.won,
           pointsEarned: userPicks.pointsEarned,
           picksLockAt: nflWeeks.picksLockAt,
           gameTime: nflGames.gameTime,
@@ -919,6 +919,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .where(eq(nflTeams.id, opponentTeamId))
             .limit(1);
           
+          // Convert boolean won to result string
+          let result: string | null = null;
+          if (pick.won === true) {
+            result = 'win';
+          } else if (pick.won === false) {
+            result = 'loss';
+          }
+          
           return {
             id: pick.id,
             weekId: pick.weekId,
@@ -926,7 +934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             pickedTeamName: pick.pickedTeamName,
             pickedTeamAbbreviation: pick.pickedTeamAbbreviation,
             spread: pick.spread,
-            result: pick.result,
+            result: result,
             pointsEarned: pick.pointsEarned,
             picksLockAt: pick.picksLockAt,
             opponentTeamName: opponentTeam[0]?.name || 'Unknown'
