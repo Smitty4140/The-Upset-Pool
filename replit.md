@@ -117,8 +117,15 @@ Preferred communication style: Simple, everyday language.
   - Users can now swipe left/right to view all columns (Place, Pooler, Score, Every Week Eligible) on mobile devices
   - Enhanced both the component leaderboard and dedicated leaderboard page with overflow-x-auto containers
   - Improved mobile user experience without breaking desktop layout
-- **Scheduler Timezone Fix**: Fixed critical bug where picks were locking and spreads were pulling 1 hour later than scheduled
-  - Root cause: Cron expressions were being generated in UTC timezone but executed in Eastern Time
-  - Fix: Convert Date to Eastern Time before extracting hours/minutes/day/month for cron expression
-  - Now correctly schedules data pulls 8 hours before first game and results pulls 5 hours after last game
+- **Scheduler Timezone Fix (COMPREHENSIVE)**: Fixed critical bugs with picks locking/spreads pulling 1 hour late and jobs not executing
+  - **Issue 1**: Cron expressions generated in UTC but executed in ET, causing 1-hour offset
+    - Fix: Created `timezoneUtils.ts` with shared ET→UTC conversion functions
+    - Now properly converts dates to Eastern Time before generating cron expressions
+  - **Issue 2**: Database picksLockAt values were incorrect (12:59 PM instead of 1:00 PM ET)
+    - Fix: Backfilled all 18 weeks with correct times (17:00 UTC for EDT weeks, 18:00 UTC for EST weeks)
+    - Updated toggle-lock endpoint to use shared timezone utility
+  - **Issue 3**: Cron jobs scheduled but not executing
+    - Fix: Added explicit `job.start()` calls and execution logging with ⏰/✅ markers
+    - Added `scheduled: true` option to cron.schedule configuration
+  - **Result**: Backend and frontend now sync perfectly - picks lock at exactly 1:00 PM Eastern Time
   - Automatically handles daylight saving time transitions (EDT/EST)

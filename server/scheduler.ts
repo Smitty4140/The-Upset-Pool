@@ -123,18 +123,24 @@ class GameScheduler {
       console.log(`[Scheduler] Scheduling data pull for week ${week.weekNumber} with cron: ${cronExpression}`);
 
       const job = cron.schedule(cronExpression, async () => {
-        console.log(`[Scheduler] Executing scheduled data pull for week ${week.weekNumber}`);
+        console.log(`[Scheduler] ⏰ EXECUTING scheduled data pull for week ${week.weekNumber} at ${new Date().toISOString()}`);
         await this.executeDataPull(week);
         
         // Remove the job after execution
         this.scheduledJobs.delete(weekKey);
         job.destroy();
+        console.log(`[Scheduler] ✅ Completed and removed job for week ${week.weekNumber}`);
       }, {
-        timezone: 'America/New_York' // NFL times are typically in Eastern Time
+        timezone: 'America/New_York', // NFL times are typically in Eastern Time
+        scheduled: true
       });
 
+      // Explicitly start the job
+      job.start();
+      
       this.scheduledJobs.set(weekKey, job);
       console.log(`[Scheduler] Scheduled data pull for week ${week.weekNumber} at ${pullTime.toISOString()}`);
+      console.log(`[Scheduler] Job status - Week ${week.weekNumber}: scheduled=${cronExpression}, timezone=America/New_York`);
 
     } catch (error) {
       console.error(`[Scheduler] Error scheduling week ${week.weekNumber}:`, error);
@@ -184,18 +190,24 @@ class GameScheduler {
       console.log(`[Scheduler] Scheduling results pull for week ${week.weekNumber} with cron: ${cronExpression}`);
 
       const job = cron.schedule(cronExpression, async () => {
-        console.log(`[Scheduler] Executing scheduled results pull for week ${week.weekNumber}`);
+        console.log(`[Scheduler] ⏰ EXECUTING scheduled results pull for week ${week.weekNumber} at ${new Date().toISOString()}`);
         await this.executeResultsPull(week);
         
         // Remove the job after execution
         this.scheduledJobs.delete(weekKey);
         job.destroy();
+        console.log(`[Scheduler] ✅ Completed and removed results job for week ${week.weekNumber}`);
       }, {
-        timezone: 'America/New_York' // NFL times are typically in Eastern Time
+        timezone: 'America/New_York', // NFL times are typically in Eastern Time
+        scheduled: true
       });
 
+      // Explicitly start the job
+      job.start();
+      
       this.scheduledJobs.set(weekKey, job);
       console.log(`[Scheduler] Scheduled results pull for week ${week.weekNumber} at ${resultsPullTime.toISOString()}`);
+      console.log(`[Scheduler] Job status - Results week ${week.weekNumber}: scheduled=${cronExpression}, timezone=America/New_York`);
 
     } catch (error) {
       console.error(`[Scheduler] Error scheduling results pull for week ${week.weekNumber}:`, error);
