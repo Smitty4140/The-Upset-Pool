@@ -45,7 +45,18 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   
   // Check if the game has already started (kickoff time passed)
   // Always use the current time for accurate comparison
-  const gameKickoffTime = new Date(game.gameTime);
+  // Parse game time consistently with formatGameTime - treat as UTC if no timezone info
+  let gameKickoffTime: Date;
+  const gameTimeStr = game.gameTime;
+  
+  if (gameTimeStr.includes('Z') || gameTimeStr.includes('+') || (gameTimeStr.includes('-') && gameTimeStr.lastIndexOf('-') > 10)) {
+    // Already has timezone info
+    gameKickoffTime = new Date(gameTimeStr);
+  } else {
+    // No timezone info - assume UTC by adding 'Z'
+    gameKickoffTime = new Date(gameTimeStr + 'Z');
+  }
+  
   const now = new Date();
   const hasGameStarted = now > gameKickoffTime;
   
