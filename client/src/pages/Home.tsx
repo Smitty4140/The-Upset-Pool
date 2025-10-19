@@ -789,7 +789,6 @@ export default function Home() {
                 </div>
               </div>
               <div className="px-4 py-3">
-                <div className="overflow-x-auto">
                   {isLoadingLeaderboard ? (
                     <div className="px-6 py-4">
                       {Array.from({ length: 5 }).map((_, index) => (
@@ -807,6 +806,152 @@ export default function Home() {
                       ))}
                     </div>
                   ) : (
+                    <>
+                    {/* Mobile Card View */}
+                    <div className="block sm:hidden space-y-3">
+                      {rankedLeaderboard && rankedLeaderboard.length > 0 ? (
+                        rankedLeaderboard.map((user) => (
+                          <div key={user.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                            <div 
+                              className="p-4 cursor-pointer active:bg-gray-50" 
+                              onClick={() => handleToggleAccordion(user.id)}
+                              data-testid={`leaderboard-row-${user.id}`}
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center space-x-3">
+                                  <div className="flex items-center">
+                                    {user.rank === 1 ? (
+                                      <Medal className="h-6 w-6 text-yellow-500" />
+                                    ) : user.rank === 2 ? (
+                                      <Medal className="h-6 w-6 text-gray-400" />
+                                    ) : user.rank === 3 ? (
+                                      <Medal className="h-6 w-6 text-amber-700" />
+                                    ) : (
+                                      <span className="font-bold text-gray-700 text-lg w-6 text-center">
+                                        {user.rank}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <Avatar className="h-10 w-10 border-2 border-gray-200">
+                                    <AvatarImage
+                                      src={user.profileImageUrl || ""}
+                                      alt={user.username}
+                                    />
+                                    <AvatarFallback className="bg-primary/10 text-primary">
+                                      {user.firstName?.[0] ||
+                                        user.username?.[0]?.toUpperCase() ||
+                                        "?"}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <div className="font-semibold text-gray-900">{user.username}</div>
+                                    <div className="text-sm font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full inline-block mt-1">
+                                      {user.totalPoints || "0"} pts
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  {expandedUserId === user.id ? (
+                                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                                  ) : (
+                                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-500 font-medium">Every Week Eligible:</span>
+                                {user.everyWeekEligible ? (
+                                  <div data-testid={`eligible-status-${user.id}`} className="flex items-center text-green-600">
+                                    <Check className="h-4 w-4 mr-1" />
+                                    <span className="font-semibold">Yes</span>
+                                  </div>
+                                ) : (
+                                  <div data-testid={`eligible-status-${user.id}`} className="flex items-center text-red-600">
+                                    <X className="h-4 w-4 mr-1" />
+                                    <span className="font-semibold">No</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {expandedUserId === user.id && (
+                              <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+                                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                                  <Calendar className="h-4 w-4 mr-2" />
+                                  Weekly Picks for {user.username}
+                                </h4>
+                                {isLoadingPicks && !userPicksCache[user.id] ? (
+                                  <div className="space-y-2">
+                                    {Array.from({ length: 3 }).map((_, i) => (
+                                      <Skeleton key={i} className="h-16 w-full" />
+                                    ))}
+                                  </div>
+                                ) : currentUserPicks.length > 0 ? (
+                                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                                    {currentUserPicks.map((pick) => (
+                                      <div 
+                                        key={pick.id} 
+                                        className="bg-white p-3 rounded-lg border border-gray-200"
+                                        data-testid={`pick-week-${pick.weekNumber}`}
+                                      >
+                                        <div className="flex items-center justify-between mb-2">
+                                          <span className="text-xs font-semibold text-gray-500">Week {pick.weekNumber}</span>
+                                          {pick.result === 'win' ? (
+                                            <div className="flex items-center text-green-600">
+                                              <Check className="h-4 w-4 mr-1" />
+                                              <span className="font-bold text-sm">+{pick.pointsEarned} pts</span>
+                                            </div>
+                                          ) : pick.result === 'loss' ? (
+                                            <div className="flex items-center text-red-600">
+                                              <X className="h-4 w-4 mr-1" />
+                                              <span className="font-bold text-sm">0 pts</span>
+                                            </div>
+                                          ) : (
+                                            <div className="flex items-center text-gray-400">
+                                              <Clock className="h-4 w-4 mr-1" />
+                                              <span className="text-sm font-medium">Pending</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center space-x-3">
+                                          <img 
+                                            src={pick.pickedTeamLogoUrl} 
+                                            alt={pick.pickedTeamName}
+                                            className="h-10 w-10 object-contain flex-shrink-0"
+                                          />
+                                          <div className="flex-1 min-w-0">
+                                            <div className="font-semibold text-gray-900 truncate">
+                                              {pick.pickedTeamName}
+                                            </div>
+                                            <div className="text-xs text-gray-500">
+                                              vs {pick.opponentTeamName} (+{Math.abs(parseFloat(pick.spread.toString()))})
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-4 text-gray-500">
+                                    <p className="text-sm">No picks available yet</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8">
+                          <Trophy className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                          <p className="font-medium text-gray-500">No entries yet</p>
+                          <p className="text-xs mt-1 text-gray-400">
+                            Make your pick to join the leaderboard!
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Desktop Table View */}
+                    <div className="hidden sm:block overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
@@ -992,8 +1137,9 @@ export default function Home() {
                       )}
                     </tbody>
                     </table>
+                    </div>
+                    </>
                   )}
-                </div>
               </div>
             </div>
           </div>
