@@ -24,8 +24,8 @@ type NFLGameCardProps = {
 };
 
 export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false, isInactive = false }: NFLGameCardProps) {
-  // State to track current time for automatic refresh
-  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  // State to track current time for automatic refresh (triggers re-renders)
+  const [, setCurrentTime] = useState<Date>(new Date());
   
   // Auto-refresh the current time to keep game lock status synchronized
   useEffect(() => {
@@ -44,8 +44,10 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   }, [game.gameTime]);
   
   // Check if the game has already started (kickoff time passed)
+  // Always use the current time for accurate comparison
   const gameKickoffTime = new Date(game.gameTime);
-  const hasGameStarted = currentTime > gameKickoffTime;
+  const now = new Date();
+  const hasGameStarted = now > gameKickoffTime;
   
   // Determine which teams are underdogs based on the spread
   const isHomeUnderdog = Number(game.spread) > 0;
