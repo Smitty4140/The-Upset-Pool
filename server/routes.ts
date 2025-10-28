@@ -11,6 +11,7 @@ import { db, pool } from "./db";
 import { userPicks, nflGames, nflWeeks, users, nflTeams } from "@shared/schema";
 import emailRoutes from "./routes/email";
 import { sendWelcomeEmail } from "./email";
+import { pullNFLGamesFromOddsAPI } from "./nflDataPuller";
 
 // Super user configuration - only this account has access to system admin functions
 const SUPER_USER_ID = "user_1753731196994_qfjmyp5i2";
@@ -2389,146 +2390,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify the user is an admin
       const userId = req.user.claims.sub;
       
-      // Get active week
-      const currentWeek = await storage.getCurrentNFLWeek();
-      if (!currentWeek) {
-        return res.status(404).json({ message: "No active NFL week found" });
-      }
-      
-      if (!process.env.THE_ODDS_API_KEY) {
-        return res.status(400).json({ message: "The Odds API key is not configured" });
-      }
-      
-      // Fetch games from The Odds API
-      const apiKey = process.env.THE_ODDS_API_KEY;
-      const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?regions=us&markets=spreads&apiKey=${apiKey}&bookmakers=draftkings`);
-      
-      if (!response.ok) {
-        return res.status(response.status).json({ 
-          message: `Error from The Odds API: ${response.statusText}`,
-          code: response.status
-        });
-      }
-      
-      const oddsData = await response.json();
-      console.log(`Successfully fetched ${oddsData.length} NFL games from The Odds API`);
-      
-      // Get all NFL teams for reference
-      const teams = await storage.getNFLTeams();
-      
-      // Track results
-      const results = {
-        gamesFound: oddsData.length,
-        gamesCreated: 0,
-        gamesUpdated: 0,
-        errors: 0
-      };
-      
-      // Create team name lookup for faster access
-      const teamNameMap = new Map();
-      teams.forEach(team => {
-        teamNameMap.set(team.name.toLowerCase(), team);
-      });
-      
-      // Process each game from the API
-      for (const game of oddsData) {
-        try {
-          // Extract the DraftKings spread information
-          const draftKings = game.bookmakers.find(b => b.key === 'draftkings');
-          const bookmaker = draftKings || game.bookmakers[0]; // Fallback to first bookmaker if DraftKings not found
-          
-          if (!bookmaker) {
-            console.log(`No bookmaker data for game: ${game.home_team} vs ${game.away_team}`);
-            results.errors++;
-            continue;
-          }
-          
-          const spreadsMarket = bookmaker.markets.find(m => m.key === 'spreads');
-          if (!spreadsMarket) {
-            console.log(`No spreads market for game: ${game.home_team} vs ${game.away_team}`);
-            results.errors++;
-            continue;
-          }
-          
-          const homeOutcome = spreadsMarket.outcomes.find(o => o.name === game.home_team);
-          if (!homeOutcome) {
-            console.log(`No home team outcome for game: ${game.home_team} vs ${game.away_team}`);
-            results.errors++;
-            continue;
-          }
-          
-          const homeSpread = parseFloat(homeOutcome.point) || 0;
-          console.log(`Game: ${game.home_team} vs ${game.away_team}, Spread: ${homeSpread}`);
-          
-          // Find team IDs
-          const homeTeam = teamNameMap.get(game.home_team.toLowerCase());
-          const awayTeam = teamNameMap.get(game.away_team.toLowerCase());
-          
-          if (!homeTeam) {
-            console.log(`Home team not found: ${game.home_team}`);
-            results.errors++;
-            continue;
-          }
-          
-          if (!awayTeam) {
-            console.log(`Away team not found: ${game.away_team}`);
-            results.errors++;
-            continue;
-          }
-          
-          // Check if game exists
-          const existingGames = await db.select().from(nflGames).where(
-            and(
-              eq(nflGames.weekId, currentWeek.id),
-              eq(nflGames.homeTeamId, homeTeam.id),
-              eq(nflGames.awayTeamId, awayTeam.id)
-            )
-          );
-          
-          if (existingGames.length > 0) {
-            // Update existing game
-            const gameId = existingGames[0].id;
-            await db.update(nflGames)
-              .set({
-                spread: homeSpread,
-                gameTime: game.commence_time,
-                updatedAt: new Date()
-              })
-              .where(eq(nflGames.id, gameId));
-            
-            console.log(`Updated game ID ${gameId}: ${homeTeam.name} vs ${awayTeam.name}`);
-            results.gamesUpdated++;
-          } else {
-            // Create new game
-            const [newGame] = await db.insert(nflGames).values({
-              weekId: currentWeek.id,
-              homeTeamId: homeTeam.id,
-              awayTeamId: awayTeam.id,
-              spread: homeSpread,
-              homeTeamRecord: "0-0",
-              awayTeamRecord: "0-0",
-              gameTime: game.commence_time,
-              completed: false,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            }).returning();
-            
-            console.log(`Created game ID ${newGame.id}: ${homeTeam.name} vs ${awayTeam.name}`);
-            results.gamesCreated++;
-          }
-        } catch (error) {
-          console.error(`Error processing game ${game.home_team} vs ${game.away_team}:`, error);
-          results.errors++;
-        }
-      }
+      // Use the shared function to pull game data
+      const result = await pullNFLGamesFromOddsAPI(storage);
       
       return res.json({
         message: "NFL games sync completed",
-        results
+        results: result.results
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error syncing NFL games:", error);
-      return res.status(500).json({ message: "Failed to sync NFL games" });
+      return res.status(500).json({ message: error.message || "Failed to sync NFL games" });
     }
   });
   

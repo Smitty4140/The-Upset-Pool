@@ -2,14 +2,18 @@ import * as cron from 'node-cron';
 import { db } from './db.js';
 import { nflWeeks, nflGames, users, leagueMembers, leagues, userPicks, nflTeams } from '../shared/schema.js';
 import { sendWeeklyPickConfirmationEmail, sendWeeklyPickReminderEmail, sendPicksUnlockedEmail } from './email.js';
-// Import functionality will be handled through internal API calls
+import { pullNFLGamesFromOddsAPI } from './nflDataPuller.js';
+import type { IStorage } from './storage.js';
+import { storage } from './storage.js';
 import { eq, and, gte, lte, asc } from 'drizzle-orm';
 
 class GameScheduler {
   private scheduledJobs: Map<string, cron.ScheduledTask> = new Map();
   private isRunning = false;
+  private storage: IStorage;
 
-  constructor() {
+  constructor(storage: IStorage) {
+    this.storage = storage;
     console.log('[Scheduler] Initializing NFL Game Data Scheduler');
   }
 
@@ -238,21 +242,18 @@ class GameScheduler {
    */
   private async executeDataPull(week: any) {
     try {
-      console.log(`[Scheduler] Pulling game data for NFL week ${week.weekNumber}...`);
+      console.log(`[Scheduler] ⏰ Pulling game data for NFL week ${week.weekNumber}...`);
       
-      // Import and call the pullOddsGames function directly instead of making HTTP calls
-      // (HTTP calls from scheduler to same server can cause issues)
-      console.log(`[Scheduler] Pulling game data directly for week ${week.weekNumber}...`);
+      // Call the shared pullNFLGamesFromOddsAPI function
+      const result = await pullNFLGamesFromOddsAPI(this.storage, week.id);
       
-      // For now, just log that we would pull the data
-      // In a real implementation, we'd call the odds API logic directly
-      console.log(`[Scheduler] Successfully completed scheduled data pull for week ${week.weekNumber}`);
+      console.log(`[Scheduler] ✅ Successfully completed scheduled data pull for week ${week.weekNumber}:`, result.results);
       
       // After successful data pull, send picks unlocked notifications to active members
       await this.sendPicksUnlockedNotifications(week.weekNumber);
       
     } catch (error) {
-      console.error(`[Scheduler] Error executing data pull for week ${week.weekNumber}:`, error);
+      console.error(`[Scheduler] ❌ Error executing data pull for week ${week.weekNumber}:`, error);
     }
   }
 
@@ -725,7 +726,7 @@ class GameScheduler {
 }
 
 // Create singleton instance
-export const gameScheduler = new GameScheduler();
+export const gameScheduler = new GameScheduler(storage);
 
 // Auto-start the scheduler in production
 if (process.env.NODE_ENV === 'production') {
