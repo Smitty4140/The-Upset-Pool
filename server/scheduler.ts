@@ -135,6 +135,7 @@ class GameScheduler {
         job.destroy();
         console.log(`[Scheduler] ✅ Completed and removed job for week ${week.weekNumber}`);
       }, {
+        timezone: 'America/New_York',
         scheduled: true
       });
 
@@ -143,7 +144,7 @@ class GameScheduler {
       
       this.scheduledJobs.set(weekKey, job);
       console.log(`[Scheduler] Scheduled data pull for week ${week.weekNumber} at ${pullTime.toISOString()}`);
-      console.log(`[Scheduler] Job status - Week ${week.weekNumber}: scheduled=${cronExpression} (cron pattern is in ET, no timezone conversion)`);
+      console.log(`[Scheduler] Job status - Week ${week.weekNumber}: scheduled=${cronExpression}, timezone=America/New_York`);
 
     } catch (error) {
       console.error(`[Scheduler] Error scheduling week ${week.weekNumber}:`, error);
@@ -201,6 +202,7 @@ class GameScheduler {
         job.destroy();
         console.log(`[Scheduler] ✅ Completed and removed results job for week ${week.weekNumber}`);
       }, {
+        timezone: 'America/New_York',
         scheduled: true
       });
 
@@ -209,7 +211,7 @@ class GameScheduler {
       
       this.scheduledJobs.set(weekKey, job);
       console.log(`[Scheduler] Scheduled results pull for week ${week.weekNumber} at ${resultsPullTime.toISOString()}`);
-      console.log(`[Scheduler] Job status - Results week ${week.weekNumber}: scheduled=${cronExpression} (cron pattern is in ET, no timezone conversion)`);
+      console.log(`[Scheduler] Job status - Results week ${week.weekNumber}: scheduled=${cronExpression}, timezone=America/New_York`);
 
     } catch (error) {
       console.error(`[Scheduler] Error scheduling results pull for week ${week.weekNumber}:`, error);

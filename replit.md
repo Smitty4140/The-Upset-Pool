@@ -117,15 +117,22 @@ Preferred communication style: Simple, everyday language.
   - Users can now swipe left/right to view all columns (Place, Pooler, Score, Every Week Eligible) on mobile devices
   - Enhanced both the component leaderboard and dedicated leaderboard page with overflow-x-auto containers
   - Improved mobile user experience without breaking desktop layout
-- **Scheduler Timezone Fix (COMPREHENSIVE)**: Fixed critical bugs with picks locking/spreads pulling 1 hour late and jobs not executing
-  - **Issue 1**: Cron expressions generated in UTC but executed in ET, causing 1-hour offset
-    - Fix: Created `timezoneUtils.ts` with shared ET→UTC conversion functions
-    - Now properly converts dates to Eastern Time before generating cron expressions
-  - **Issue 2**: Database picksLockAt values were incorrect (12:59 PM instead of 1:00 PM ET)
-    - Fix: Backfilled all 18 weeks with correct times (17:00 UTC for EDT weeks, 18:00 UTC for EST weeks)
-    - Updated toggle-lock endpoint to use shared timezone utility
-  - **Issue 3**: Cron jobs scheduled but not executing
-    - Fix: Added explicit `job.start()` calls and execution logging with ⏰/✅ markers
-    - Added `scheduled: true` option to cron.schedule configuration
-  - **Result**: Backend and frontend now sync perfectly - picks lock at exactly 1:00 PM Eastern Time
-  - Automatically handles daylight saving time transitions (EDT/EST)
+- **Scheduler Timezone Fix (COMPREHENSIVE)**: Fixed critical bugs with picks locking/spreads pulling and automated job execution
+  - **Issue 1**: Database picksLockAt values needed DST-aware calculation
+    - Fix: Created `timezoneUtils.ts` with shared ET→UTC conversion functions (`easternTimeToUTC`, `getPicksLockTimeForSunday`)
+    - Automatically detects EDT (UTC-4) vs EST (UTC-5) and converts correctly
+    - Database values: 17:00 UTC for EDT weeks (Sep-Oct), 18:00 UTC for EST weeks (Nov-Jan)
+  - **Issue 2**: Cron jobs generated ET expressions but needed timezone context
+    - Fix: `getCronExpression` converts Date to ET components for cron pattern
+    - Cron jobs configured with `timezone: 'America/New_York'` to interpret patterns in ET
+    - Pattern "0 13 2 11" with timezone ET = Sunday Nov 2 at 1:00 PM ET (correct)
+  - **Issue 3**: Automated spread pulling via scheduled jobs
+    - Created shared `pullNFLGamesFromOddsAPI` function in `nflDataPuller.ts`
+    - Manual admin button and scheduler both use identical API call logic
+    - When countdown reaches 0, scheduler automatically triggers spread pull from The Odds API
+    - Jobs execute with ⏰/✅ logging markers for monitoring
+  - **Locking Mechanisms**:
+    - Week-level lock: `picksLockAt` enforces Sunday 1:00 PM ET deadline for all games in that week
+    - Game-specific lock: Individual `gameTime` prevents picks after each game's kickoff
+    - Both mechanisms properly handle EDT/EST transitions
+  - **Result**: All countdowns, locks, and automated jobs occur at correct ET times without duplication
