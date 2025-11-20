@@ -110,7 +110,7 @@ class GameScheduler {
 
       const firstGame = games[0];
       const firstGameTime = new Date(firstGame.gameTime);
-      const pullTime = new Date(firstGameTime.getTime() - (8 * 60 * 60 * 1000)); // 8 hours before
+      const pullTime = new Date(firstGameTime.getTime() - (12 * 60 * 60 * 1000)); // 12 hours before
       const currentTime = new Date();
 
       console.log(`[Scheduler] Week ${week.weekNumber}: First game at ${firstGameTime.toISOString()}, picks open (data pull) scheduled for ${pullTime.toISOString()}`);

@@ -46,13 +46,13 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick, sel
     return weekGames.some(game => parseFloat(game.spread || '0') !== 0);
   }, [weekGames]);
 
-  // Calculate data pull time (8 hours before first game, matching backend scheduler)
+  // Calculate data pull time (12 hours before first game, matching backend scheduler)
   const dataPullTime = useMemo(() => {
     if (!weekGames || weekGames.length === 0) return null;
     const firstGame = weekGames.sort((a, b) => new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime())[0];
     if (!firstGame) return null;
     const firstGameTime = new Date(firstGame.gameTime);
-    return new Date(firstGameTime.getTime() - (8 * 60 * 60 * 1000)); // 8 hours before (matches backend scheduler)
+    return new Date(firstGameTime.getTime() - (12 * 60 * 60 * 1000)); // 12 hours before (matches backend scheduler)
   }, [weekGames]);
 
   // Countdown to picks lock for the display week
