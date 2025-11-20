@@ -2784,6 +2784,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test that cron jobs actually execute (schedules one for 2 minutes from now)
+  app.post('/api/admin/scheduler/test-cron', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const { gameScheduler } = await import("./scheduler.js");
+      const result = await gameScheduler.testCronExecution();
+      
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (error) {
+      console.error("Error testing cron execution:", error);
+      res.status(500).json({ message: "Failed to test cron execution" });
+    }
+  });
+
   // Weekly email reminder endpoints (admin only)
   app.post('/api/admin/scheduler/test-weekly-emails', isAuthenticated, isSuperUser, async (req: any, res) => {
     try {

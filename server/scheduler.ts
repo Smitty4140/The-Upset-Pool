@@ -124,10 +124,14 @@ class GameScheduler {
 
       // Schedule the data pull
       const cronExpression = this.getCronExpression(pullTime);
-      console.log(`[Scheduler] Scheduling data pull for week ${week.weekNumber} with cron: ${cronExpression}`);
+      const etTime = pullTime.toLocaleString('en-US', { timeZone: 'America/New_York', hour12: false });
+      console.log(`[Scheduler] 📅 Scheduling data pull for week ${week.weekNumber}`);
+      console.log(`[Scheduler]    UTC Time: ${pullTime.toISOString()}`);
+      console.log(`[Scheduler]    ET Time: ${etTime}`);
+      console.log(`[Scheduler]    Cron expression: ${cronExpression} (interpreted in America/New_York timezone)`);
 
       const job = cron.schedule(cronExpression, async () => {
-        console.log(`[Scheduler] ⏰ EXECUTING scheduled data pull for week ${week.weekNumber} at ${new Date().toISOString()}`);
+        console.log(`[Scheduler] ⏰⏰⏰ CRON JOB FIRING - Data pull for week ${week.weekNumber} at ${new Date().toISOString()}`);
         await this.executeDataPull(week);
         
         // Remove the job after execution
@@ -135,16 +139,16 @@ class GameScheduler {
         job.destroy();
         console.log(`[Scheduler] ✅ Completed and removed job for week ${week.weekNumber}`);
       }, {
-        timezone: 'America/New_York',
-        scheduled: true
+        timezone: 'America/New_York'
       });
 
-      // Explicitly start the job
+      // Store the job BEFORE starting it
+      this.scheduledJobs.set(weekKey, job);
+      
+      // Start the job
       job.start();
       
-      this.scheduledJobs.set(weekKey, job);
-      console.log(`[Scheduler] Scheduled data pull for week ${week.weekNumber} at ${pullTime.toISOString()}`);
-      console.log(`[Scheduler] Job status - Week ${week.weekNumber}: scheduled=${cronExpression}, timezone=America/New_York`);
+      console.log(`[Scheduler] ✓ Job registered and started for week ${week.weekNumber}`);
 
     } catch (error) {
       console.error(`[Scheduler] Error scheduling week ${week.weekNumber}:`, error);
@@ -202,8 +206,7 @@ class GameScheduler {
         job.destroy();
         console.log(`[Scheduler] ✅ Completed and removed results job for week ${week.weekNumber}`);
       }, {
-        timezone: 'America/New_York',
-        scheduled: true
+        timezone: 'America/New_York'
       });
 
       // Explicitly start the job
@@ -324,6 +327,34 @@ class GameScheduler {
       console.error('[Scheduler] Test failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Test that cron jobs actually execute by scheduling one for 2 minutes from now
+   */
+  async testCronExecution() {
+    const testTime = new Date(Date.now() + (2 * 60 * 1000)); // 2 minutes from now
+    const cronExpression = this.getCronExpression(testTime);
+    
+    console.log(`[Scheduler] 🧪 TEST: Scheduling test cron job for ${testTime.toISOString()} (2 minutes from now)`);
+    console.log(`[Scheduler] 🧪 TEST: Cron expression: ${cronExpression}`);
+    
+    const job = cron.schedule(cronExpression, () => {
+      console.log(`[Scheduler] ✅✅✅ TEST CRON JOB EXECUTED SUCCESSFULLY at ${new Date().toISOString()} ✅✅✅`);
+      console.log(`[Scheduler] 🎉 This confirms that cron jobs ARE firing correctly!`);
+      job.destroy();
+    }, {
+      timezone: 'America/New_York'
+    });
+    
+    job.start();
+    
+    return {
+      message: 'Test cron job scheduled - watch the logs in ~2 minutes for confirmation',
+      scheduledFor: testTime.toISOString(),
+      cronExpression,
+      expectedExecutionTime: testTime.toLocaleString('en-US', { timeZone: 'America/New_York' })
+    };
   }
 
   /**
