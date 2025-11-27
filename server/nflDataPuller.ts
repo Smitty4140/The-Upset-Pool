@@ -150,15 +150,25 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
         if (existingGames.length > 0) {
           // Update existing game
           const gameId = existingGames[0].id;
+          const existingGame = existingGames[0];
+          
+          // Only update spread if it hasn't been set yet (is 0)
+          // Once spreads are pulled from The Odds API, they should never be updated
+          const updateObj: any = {
+            gameTime: gameTime,
+            updatedAt: new Date()
+          };
+          
+          if (existingGame.spread === '0' || existingGame.spread === 0 || !existingGame.spread) {
+            updateObj.spread = homeSpread.toString();
+          }
+          
           await db.update(nflGames)
-            .set({
-              spread: homeSpread.toString(),
-              gameTime: gameTime,
-              updatedAt: new Date()
-            })
+            .set(updateObj)
             .where(eq(nflGames.id, gameId));
           
-          console.log(`[NFLDataPuller] Updated game ID ${gameId}: ${homeTeam.name} vs ${awayTeam.name}`);
+          const updateMsg = updateObj.spread ? ` with spread ${homeSpread}` : ' (spread already set, keeping existing)';
+          console.log(`[NFLDataPuller] Updated game ID ${gameId}: ${homeTeam.name} vs ${awayTeam.name}${updateMsg}`);
           results.gamesUpdated++;
         } else {
           // Create new game
