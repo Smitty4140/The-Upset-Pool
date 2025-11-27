@@ -42,23 +42,29 @@ class GameScheduler {
       timezone: 'America/New_York'
     });
 
-    // Schedule daily results pulls at 1 AM, 5 PM, and 8 PM ET
-    cron.schedule('0 1 * * *', async () => {
-      console.log('[Scheduler] Executing daily results pull at 1 AM ET...');
+    // Schedule hourly results pulls during game windows:
+    // Sunday 1pm-11pm ET (right after picks lock at 1pm)
+    cron.schedule('0 13-23 * * 0', async () => {
+      const hour = new Date().toLocaleString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
+      console.log(`[Scheduler] Executing Sunday results pull at ${hour} ET...`);
       await this.executeDailyResultsPull();
     }, {
       timezone: 'America/New_York'
     });
 
-    cron.schedule('0 17 * * *', async () => {
-      console.log('[Scheduler] Executing daily results pull at 5 PM ET...');
+    // Monday all day (every hour)
+    cron.schedule('0 * * * 1', async () => {
+      const hour = new Date().toLocaleString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
+      console.log(`[Scheduler] Executing Monday results pull at ${hour} ET...`);
       await this.executeDailyResultsPull();
     }, {
       timezone: 'America/New_York'
     });
 
-    cron.schedule('0 20 * * *', async () => {
-      console.log('[Scheduler] Executing daily results pull at 8 PM ET...');
+    // Tuesday 12am-1am ET (final pulls)
+    cron.schedule('0 0-1 * * 2', async () => {
+      const hour = new Date().toLocaleString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
+      console.log(`[Scheduler] Executing Tuesday results pull at ${hour} ET...`);
       await this.executeDailyResultsPull();
     }, {
       timezone: 'America/New_York'
