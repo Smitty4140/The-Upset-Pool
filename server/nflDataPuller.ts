@@ -11,22 +11,18 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
   try {
     console.log('[NFLDataPuller] Starting NFL games data pull...');
     
-    // Get the target week (either specified or current active week)
-    let targetWeek;
+    // Get all NFL weeks to match games to the correct week
+    const allWeeks = await storage.getNFLWeeks();
+    
+    // If a specific week is provided, validate it exists
     if (weekId) {
-      const allWeeks = await storage.getNFLWeeks();
-      targetWeek = allWeeks.find(w => w.id === weekId);
+      const targetWeek = allWeeks.find(w => w.id === weekId);
       if (!targetWeek) {
         throw new Error(`Week ID ${weekId} not found`);
       }
-    } else {
-      targetWeek = await storage.getCurrentNFLWeek();
-      if (!targetWeek) {
-        throw new Error('No active NFL week found');
-      }
     }
     
-    console.log(`[NFLDataPuller] Pulling data for Week ${targetWeek.weekNumber}`);
+    console.log(`[NFLDataPuller] Pulling data for all upcoming games...`);
     
     if (!process.env.THE_ODDS_API_KEY) {
       throw new Error('The Odds API key is not configured');
@@ -62,9 +58,43 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
       teamNameMap.set(team.name.toLowerCase(), team);
     });
     
+    // Helper function to find the correct week for a game based on its commence time
+    function findWeekForGame(gameTime: Date): typeof allWeeks[0] | null {
+      const gameDate = new Date(gameTime);
+      // Use date string comparison (YYYY-MM-DD format)
+      const gameDateStr = gameDate.toISOString().split('T')[0];
+      
+      for (const week of allWeeks) {
+        // Convert dates to string format for comparison
+        const startDateStr = new Date(week.startDate).toISOString().split('T')[0];
+        const endDateStr = new Date(week.endDate).toISOString().split('T')[0];
+        
+        // Check if game date falls within week's date range
+        if (gameDateStr >= startDateStr && gameDateStr <= endDateStr) {
+          return week;
+        }
+      }
+      return null;
+    }
+    
     // Process each game from the API
     for (const game of oddsData) {
       try {
+        // Determine which week this game belongs to
+        const gameTime = new Date(game.commence_time);
+        const gameWeek = findWeekForGame(gameTime);
+        
+        if (!gameWeek) {
+          console.log(`[NFLDataPuller] Could not find week for game at ${gameTime}: ${game.home_team} vs ${game.away_team}`);
+          results.errors++;
+          continue;
+        }
+        
+        // If a specific weekId was provided, only process games from that week
+        if (weekId && gameWeek.id !== weekId) {
+          continue;
+        }
+        
         // Extract the DraftKings spread information
         const draftKings = game.bookmakers.find((b: any) => b.key === 'draftkings');
         const bookmaker = draftKings || game.bookmakers[0]; // Fallback to first bookmaker if DraftKings not found
@@ -90,7 +120,7 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
         }
         
         const homeSpread = parseFloat(homeOutcome.point) || 0;
-        console.log(`[NFLDataPuller] Game: ${game.home_team} vs ${game.away_team}, Spread: ${homeSpread}`);
+        console.log(`[NFLDataPuller] Game: ${game.home_team} vs ${game.away_team}, Spread: ${homeSpread}, Week: ${gameWeek.weekNumber}`);
         
         // Find team IDs
         const homeTeam = teamNameMap.get(game.home_team.toLowerCase());
@@ -108,10 +138,10 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
           continue;
         }
         
-        // Check if game exists
+        // Check if game exists in the correct week
         const existingGames = await db.select().from(nflGames).where(
           and(
-            eq(nflGames.weekId, targetWeek.id),
+            eq(nflGames.weekId, gameWeek.id),
             eq(nflGames.homeTeamId, homeTeam.id),
             eq(nflGames.awayTeamId, awayTeam.id)
           )
@@ -123,7 +153,7 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
           await db.update(nflGames)
             .set({
               spread: homeSpread.toString(),
-              gameTime: new Date(game.commence_time),
+              gameTime: gameTime,
               updatedAt: new Date()
             })
             .where(eq(nflGames.id, gameId));
@@ -133,17 +163,17 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
         } else {
           // Create new game
           const [newGame] = await db.insert(nflGames).values({
-            weekId: targetWeek.id,
+            weekId: gameWeek.id,
             homeTeamId: homeTeam.id,
             awayTeamId: awayTeam.id,
             spread: homeSpread.toString(),
             homeTeamRecord: "0-0",
             awayTeamRecord: "0-0",
-            gameTime: new Date(game.commence_time),
+            gameTime: gameTime,
             completed: false
           }).returning();
           
-          console.log(`[NFLDataPuller] Created game ID ${newGame.id}: ${homeTeam.name} vs ${awayTeam.name}`);
+          console.log(`[NFLDataPuller] Created game ID ${newGame.id}: ${homeTeam.name} vs ${awayTeam.name} in Week ${gameWeek.weekNumber}`);
           results.gamesCreated++;
         }
       } catch (error) {
@@ -152,10 +182,9 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
       }
     }
     
-    console.log(`[NFLDataPuller] ✅ NFL games sync completed for Week ${targetWeek.weekNumber}:`, results);
+    console.log(`[NFLDataPuller] ✅ NFL games sync completed:`, results);
     return {
       success: true,
-      weekNumber: targetWeek.weekNumber,
       results
     };
     
