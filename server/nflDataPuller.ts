@@ -123,7 +123,7 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
           await db.update(nflGames)
             .set({
               spread: homeSpread.toString(),
-              gameTime: game.commence_time,
+              gameTime: new Date(game.commence_time),
               updatedAt: new Date()
             })
             .where(eq(nflGames.id, gameId));
@@ -139,7 +139,7 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
             spread: homeSpread.toString(),
             homeTeamRecord: "0-0",
             awayTeamRecord: "0-0",
-            gameTime: game.commence_time,
+            gameTime: new Date(game.commence_time),
             completed: false
           }).returning();
           
