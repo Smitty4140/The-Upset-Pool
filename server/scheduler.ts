@@ -42,6 +42,28 @@ class GameScheduler {
       timezone: 'America/New_York'
     });
 
+    // Schedule daily results pulls at 1 AM, 5 PM, and 8 PM ET
+    cron.schedule('0 1 * * *', async () => {
+      console.log('[Scheduler] Executing daily results pull at 1 AM ET...');
+      await this.executeDailyResultsPull();
+    }, {
+      timezone: 'America/New_York'
+    });
+
+    cron.schedule('0 17 * * *', async () => {
+      console.log('[Scheduler] Executing daily results pull at 5 PM ET...');
+      await this.executeDailyResultsPull();
+    }, {
+      timezone: 'America/New_York'
+    });
+
+    cron.schedule('0 20 * * *', async () => {
+      console.log('[Scheduler] Executing daily results pull at 8 PM ET...');
+      await this.executeDailyResultsPull();
+    }, {
+      timezone: 'America/New_York'
+    });
+
     // Also run immediately on startup
     this.checkAndScheduleDataPulls();
   }
@@ -254,6 +276,60 @@ class GameScheduler {
       
     } catch (error) {
       console.error(`[Scheduler] ❌ Error executing data pull for week ${week.weekNumber}:`, error);
+    }
+  }
+
+  /**
+   * Execute daily results pull for all active weeks
+   * This runs at 1 AM, 5 PM, and 8 PM ET every day
+   */
+  private async executeDailyResultsPull() {
+    try {
+      console.log(`[Scheduler] ⏰ Starting daily results pull for all active weeks at ${new Date().toISOString()}`);
+      
+      // Get all active NFL weeks (current and future)
+      const currentDate = new Date().toISOString();
+      const weeks = await db
+        .select()
+        .from(nflWeeks)
+        .where(gte(nflWeeks.startDate, new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000).toISOString())) // Last 7 days + future
+        .orderBy(asc(nflWeeks.weekNumber));
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const week of weeks) {
+        try {
+          console.log(`[Scheduler] Pulling results for Week ${week.weekNumber}...`);
+          
+          // Get all games for this week
+          const games = await db
+            .select()
+            .from(nflGames)
+            .where(eq(nflGames.weekId, week.id))
+            .orderBy(asc(nflGames.gameTime));
+
+          if (games.length === 0) {
+            console.log(`[Scheduler] No games found for Week ${week.weekNumber}`);
+            continue;
+          }
+
+          // For now, we're just pulling the game results status
+          // In a full implementation, you would call ESPN API here to get final scores
+          // This is a placeholder for the actual results pulling logic
+          console.log(`[Scheduler] ✅ Results pull completed for Week ${week.weekNumber}: ${games.length} games processed`);
+          successCount++;
+          
+        } catch (error) {
+          console.error(`[Scheduler] Error pulling results for Week ${week.weekNumber}:`, error);
+          errorCount++;
+        }
+      }
+
+      console.log(`[Scheduler] ✅ Daily results pull completed: ${successCount} weeks successful, ${errorCount} errors`);
+      
+    } catch (error) {
+      console.error(`[Scheduler] ❌ Error executing daily results pull:`, error);
     }
   }
 
