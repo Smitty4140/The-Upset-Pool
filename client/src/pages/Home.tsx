@@ -413,12 +413,25 @@ export default function Home() {
       })
     : [];
 
-  // Determine if picks should be shown (locked current week OR previous week)
-  const arePicksLocked = currentWeek && activeWeekId
-    ? // Show picks if current week is locked OR if viewing a previous week
-      new Date() >= new Date(currentWeek.picksLockAt) || 
-      (selectedWeekDetails && selectedWeekDetails.weekNumber < currentWeek.weekNumber)
-    : false;
+  // Determine if picks should be shown (locked) based on the SELECTED week's lock time
+  const arePicksLocked = (() => {
+    if (!currentWeek || !activeWeekId) return false;
+    
+    const now = new Date();
+    
+    // If viewing a previous week, picks are always visible (already locked)
+    if (selectedWeekDetails && selectedWeekDetails.weekNumber < currentWeek.weekNumber) {
+      return true;
+    }
+    
+    // For current or future weeks, check if that week's lock time has passed
+    if (selectedWeekDetails && selectedWeekDetails.picksLockAt) {
+      return now >= new Date(selectedWeekDetails.picksLockAt);
+    }
+    
+    // Fallback: check current week's lock time
+    return now >= new Date(currentWeek.picksLockAt);
+  })();
 
   // Determine if the selected week allows picks (only current week + not locked)
   const canMakePicks = activeWeekId === pickableWeekId && !arePicksLocked;
