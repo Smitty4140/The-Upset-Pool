@@ -5,7 +5,7 @@ import { setupAuth, isAuthenticated } from "./auth";
 
 import { z } from "zod";
 import { userPickFormSchema } from "@shared/schema";
-import { eq, and, sql, asc, desc } from "drizzle-orm";
+import { eq, and, sql, asc, desc, lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, pool } from "./db";
 import { userPicks, nflGames, nflWeeks, users, nflTeams } from "@shared/schema";
@@ -849,6 +849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all picks for the current week in a league
+  // SECURITY: Only return picks if the week is locked (past picksLockAt time)
   app.get('/api/leagues/:id/picks', async (req, res) => {
     try {
       const leagueId = parseInt(req.params.id);
@@ -862,6 +863,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No active NFL week found" });
       }
       
+      // SECURITY CHECK: Only return picks if the week is locked
+      const now = new Date();
+      const lockTime = new Date(currentWeek.picksLockAt);
+      if (now < lockTime) {
+        // Week is not locked yet - don't return any picks
+        return res.json([]);
+      }
+      
       const picks = await storage.getUserPicksForWeek(currentWeek.id, leagueId);
       res.json(picks);
     } catch (error) {
@@ -871,6 +880,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all picks for a specific user in a league (for accordion view)
+  // SECURITY: Only returns picks from weeks that are locked (past picksLockAt time)
   app.get('/api/league/:leagueId/user/:userId/picks', async (req, res) => {
     try {
       const leagueId = parseInt(req.params.leagueId);
@@ -880,10 +890,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid league ID or user ID" });
       }
       
-      // Get current week to filter out if not locked
-      const currentWeek = await storage.getCurrentNFLWeek();
+      // SECURITY: Only query picks from weeks where picksLockAt is in the past
+      const now = new Date();
       
-      // Get all picks for this user in this league with separate queries for home/away teams
+      // Get picks ONLY from locked weeks (security filter at database level)
       const rawPicks = await db
         .select({
           id: userPicks.id,
@@ -908,7 +918,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(nflTeams, eq(userPicks.pickedTeamId, nflTeams.id))
         .where(and(
           eq(userPicks.userId, userId),
-          eq(userPicks.leagueId, leagueId)
+          eq(userPicks.leagueId, leagueId),
+          lt(nflWeeks.picksLockAt, now) // SECURITY: Only return picks from locked weeks
         ))
         .orderBy(desc(nflWeeks.weekNumber));
       
@@ -946,20 +957,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
       
-      // Filter out current week if picks are not locked
-      const now = new Date();
-      const filteredPicks = allPicks.filter(pick => {
-        // If this is the current week
-        if (currentWeek && pick.weekId === currentWeek.id) {
-          // Only show if picks are locked (past lock time)
-          const lockTime = new Date(pick.picksLockAt);
-          return now >= lockTime;
-        }
-        // Show all other weeks
-        return true;
-      });
-      
-      res.json(filteredPicks);
+      res.json(allPicks);
     } catch (error) {
       console.error("Error fetching user picks for accordion:", error);
       res.status(500).json({ message: "Failed to fetch user picks" });
