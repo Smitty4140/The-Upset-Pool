@@ -881,6 +881,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get all picks for a specific user in a league (for accordion view)
   // SECURITY: Only returns picks from weeks that are locked (past picksLockAt time)
+  // OPTIMIZED: Single query with JOINs to eliminate N+1 problem
   app.get('/api/league/:leagueId/user/:userId/picks', async (req, res) => {
     try {
       const leagueId = parseInt(req.params.leagueId);
@@ -893,16 +894,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // SECURITY: Only query picks from weeks where picksLockAt is in the past
       const now = new Date();
       
-      // Get picks ONLY from locked weeks (security filter at database level)
+      // Use table aliases to join both home and away teams in single query
+      const pickedTeamAlias = alias(nflTeams, 'pickedTeam');
+      const homeTeamAlias = alias(nflTeams, 'homeTeam');
+      const awayTeamAlias = alias(nflTeams, 'awayTeam');
+      
+      // Get picks ONLY from locked weeks with all data in single query
       const rawPicks = await db
         .select({
           id: userPicks.id,
           weekId: userPicks.weekId,
           weekNumber: nflWeeks.weekNumber,
           pickedTeamId: userPicks.pickedTeamId,
-          pickedTeamName: nflTeams.name,
-          pickedTeamAbbreviation: nflTeams.abbreviation,
-          pickedTeamLogoUrl: nflTeams.logoUrl,
+          pickedTeamName: pickedTeamAlias.name,
+          pickedTeamAbbreviation: pickedTeamAlias.abbreviation,
+          pickedTeamLogoUrl: pickedTeamAlias.logoUrl,
           gameId: userPicks.gameId,
           spread: nflGames.spread,
           won: userPicks.won,
@@ -911,11 +917,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gameTime: nflGames.gameTime,
           homeTeamId: nflGames.homeTeamId,
           awayTeamId: nflGames.awayTeamId,
+          homeTeamName: homeTeamAlias.name,
+          awayTeamName: awayTeamAlias.name,
         })
         .from(userPicks)
         .innerJoin(nflWeeks, eq(userPicks.weekId, nflWeeks.id))
         .innerJoin(nflGames, eq(userPicks.gameId, nflGames.id))
-        .innerJoin(nflTeams, eq(userPicks.pickedTeamId, nflTeams.id))
+        .innerJoin(pickedTeamAlias, eq(userPicks.pickedTeamId, pickedTeamAlias.id))
+        .innerJoin(homeTeamAlias, eq(nflGames.homeTeamId, homeTeamAlias.id))
+        .innerJoin(awayTeamAlias, eq(nflGames.awayTeamId, awayTeamAlias.id))
         .where(and(
           eq(userPicks.userId, userId),
           eq(userPicks.leagueId, leagueId),
@@ -923,39 +933,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ))
         .orderBy(desc(nflWeeks.weekNumber));
       
-      // Get opponent team names
-      const allPicks = await Promise.all(
-        rawPicks.map(async (pick) => {
-          const opponentTeamId = pick.homeTeamId === pick.pickedTeamId ? pick.awayTeamId : pick.homeTeamId;
-          const opponentTeam = await db
-            .select({ name: nflTeams.name })
-            .from(nflTeams)
-            .where(eq(nflTeams.id, opponentTeamId))
-            .limit(1);
-          
-          // Convert boolean won to result string
-          let result: string | null = null;
-          if (pick.won === true) {
-            result = 'win';
-          } else if (pick.won === false) {
-            result = 'loss';
-          }
-          
-          return {
-            id: pick.id,
-            weekId: pick.weekId,
-            weekNumber: pick.weekNumber,
-            pickedTeamName: pick.pickedTeamName,
-            pickedTeamAbbreviation: pick.pickedTeamAbbreviation,
-            pickedTeamLogoUrl: pick.pickedTeamLogoUrl,
-            spread: pick.spread,
-            result: result,
-            pointsEarned: pick.pointsEarned,
-            picksLockAt: pick.picksLockAt,
-            opponentTeamName: opponentTeam[0]?.name || 'Unknown'
-          };
-        })
-      );
+      // Transform results - opponent is already in the data, no extra queries needed
+      const allPicks = rawPicks.map(pick => {
+        // Opponent is the team that wasn't picked
+        const opponentTeamName = pick.homeTeamId === pick.pickedTeamId 
+          ? pick.awayTeamName 
+          : pick.homeTeamName;
+        
+        // Convert boolean won to result string
+        let result: string | null = null;
+        if (pick.won === true) {
+          result = 'win';
+        } else if (pick.won === false) {
+          result = 'loss';
+        }
+        
+        return {
+          id: pick.id,
+          weekId: pick.weekId,
+          weekNumber: pick.weekNumber,
+          pickedTeamName: pick.pickedTeamName,
+          pickedTeamAbbreviation: pick.pickedTeamAbbreviation,
+          pickedTeamLogoUrl: pick.pickedTeamLogoUrl,
+          spread: pick.spread,
+          result: result,
+          pointsEarned: pick.pointsEarned,
+          picksLockAt: pick.picksLockAt,
+          opponentTeamName: opponentTeamName || 'Unknown'
+        };
+      });
       
       res.json(allPicks);
     } catch (error) {
