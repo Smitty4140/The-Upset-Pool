@@ -202,15 +202,16 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
   }));
 
   // Prepare winning picks by team data for chart
-  const winningPicksByTeam = weeklyPicks?.reduce((acc: Record<string, { wins: number; total: number; points: number }>, pick) => {
+  const winningPicksByTeam = weeklyPicks?.reduce((acc: Record<string, { wins: number; total: number; points: number; spread: number }>, pick) => {
     const teamName = pick.pickedTeam.name;
     if (!acc[teamName]) {
-      acc[teamName] = { wins: 0, total: 0, points: 0 };
+      acc[teamName] = { wins: 0, total: 0, points: 0, spread: 0 };
     }
     acc[teamName].total++;
     if (pick.won) {
       acc[teamName].wins++;
       acc[teamName].points += Number(pick.pointsEarned || 0);
+      acc[teamName].spread = Math.abs(Number(pick.spreadAtTimeOfPick));
     }
     return acc;
   }, {}) || {};
@@ -221,9 +222,20 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
       name: name.length > 12 ? name.substring(0, 10) + '...' : name,
       fullName: name,
       wins: data.wins,
-      points: data.points
+      points: data.points,
+      spread: data.spread
     }))
     .sort((a, b) => b.points - a.points);
+
+  // Prepare winning spreads data for bar chart (sorted by spread value)
+  const winningSpreadsData = Object.entries(winningPicksByTeam)
+    .filter(([_, data]) => data.wins > 0)
+    .map(([name, data]) => ({
+      name: name.length > 12 ? name.substring(0, 10) + '...' : name,
+      fullName: name,
+      spread: data.spread
+    }))
+    .sort((a, b) => b.spread - a.spread);
 
   // Colors for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
@@ -344,38 +356,39 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
             </CardContent>
           </Card>
 
-          {/* Win Rate Pie Chart */}
+          {/* Winning Spreads Bar Chart */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center text-base">
-                <PieChart className="mr-2 h-5 w-5 text-blue-600" />
-                Week Results Breakdown
+                <BarChart3 className="mr-2 h-5 w-5 text-blue-600" />
+                Winning Team Spreads
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPieChart>
-                    <Pie
-                      data={[
-                        { name: 'Winning Picks', value: weeklyStats.totalWinningPicks, color: '#22c55e' },
-                        { name: 'Losing Picks', value: weeklyStats.totalPicks - weeklyStats.totalWinningPicks, color: '#ef4444' }
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      dataKey="value"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      labelLine={true}
-                    >
-                      <Cell fill="#22c55e" />
-                      <Cell fill="#ef4444" />
-                    </Pie>
-                    <Tooltip formatter={(value) => [`${value} picks`, 'Count']} />
-                    <Legend />
-                  </RechartsPieChart>
+                  <BarChart
+                    data={winningSpreadsData}
+                    margin={{ top: 10, right: 20, left: 10, bottom: 40 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="name" 
+                      angle={-45} 
+                      textAnchor="end" 
+                      height={50}
+                      fontSize={11}
+                    />
+                    <YAxis fontSize={11} label={{ value: 'Spread', angle: -90, position: 'insideLeft', fontSize: 11 }} />
+                    <Tooltip 
+                      formatter={(value) => [`+${value}`, 'Spread']}
+                      labelFormatter={(label) => {
+                        const team = winningSpreadsData.find(t => t.name === label);
+                        return team?.fullName || label;
+                      }}
+                    />
+                    <Bar dataKey="spread" fill="#3b82f6" name="spread" radius={[4, 4, 0, 0]} />
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
