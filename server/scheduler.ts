@@ -44,7 +44,7 @@ class GameScheduler {
     });
 
     // Schedule hourly results pulls during game windows:
-    // Sunday 1pm-11pm ET (right after picks lock at 1pm)
+    // Sunday 1pm-midnight ET (right after picks lock at 1pm)
     cron.schedule('0 13-23 * * 0', async () => {
       const hour = new Date().toLocaleString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
       console.log(`[Scheduler] Executing Sunday results pull at ${hour} ET...`);
@@ -53,8 +53,8 @@ class GameScheduler {
       timezone: 'America/New_York'
     });
 
-    // Monday all day (every hour)
-    cron.schedule('0 * * * 1', async () => {
+    // Monday 8pm-11pm ET (Monday Night Football window)
+    cron.schedule('0 20-23 * * 1', async () => {
       const hour = new Date().toLocaleString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
       console.log(`[Scheduler] Executing Monday results pull at ${hour} ET...`);
       await this.executeDailyResultsPull();
@@ -62,7 +62,7 @@ class GameScheduler {
       timezone: 'America/New_York'
     });
 
-    // Tuesday 12am-1am ET (final pulls)
+    // Tuesday 12am-1am ET (final Monday Night Football results)
     cron.schedule('0 0-1 * * 2', async () => {
       const hour = new Date().toLocaleString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
       console.log(`[Scheduler] Executing Tuesday results pull at ${hour} ET...`);
