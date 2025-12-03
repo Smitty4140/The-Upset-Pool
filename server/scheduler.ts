@@ -3,6 +3,7 @@ import { db } from './db.js';
 import { nflWeeks, nflGames, users, leagueMembers, leagues, userPicks, nflTeams } from '../shared/schema.js';
 import { sendWeeklyPickConfirmationEmail, sendWeeklyPickReminderEmail, sendPicksUnlockedEmail } from './email.js';
 import { pullNFLGamesFromOddsAPI } from './nflDataPuller.js';
+import { pullNFLResultsFromESPN, pullResultsForActiveWeeks } from './espnResultsPuller.js';
 import type { IStorage } from './storage.js';
 import { storage } from './storage.js';
 import { eq, and, gte, lte, asc } from 'drizzle-orm';
@@ -251,17 +252,15 @@ class GameScheduler {
    */
   private async executeResultsPull(week: any) {
     try {
-      console.log(`[Scheduler] Pulling game results for NFL week ${week.weekNumber}...`);
+      console.log(`[Scheduler] ⏰ Pulling game results for NFL week ${week.weekNumber}...`);
       
-      // Import and call the results API logic directly
-      console.log(`[Scheduler] Pulling game results directly for week ${week.weekNumber}...`);
+      // Call the shared ESPN results puller function
+      const result = await pullNFLResultsFromESPN(this.storage, week.id);
       
-      // For now, just log that we would pull the results
-      // In a real implementation, we'd call the ESPN API logic directly
-      console.log(`[Scheduler] Successfully completed scheduled results pull for week ${week.weekNumber}`);
+      console.log(`[Scheduler] ✅ Successfully completed results pull for week ${week.weekNumber}:`, result.results);
       
     } catch (error) {
-      console.error(`[Scheduler] Error executing results pull for week ${week.weekNumber}:`, error);
+      console.error(`[Scheduler] ❌ Error executing results pull for week ${week.weekNumber}:`, error);
     }
   }
 
@@ -286,56 +285,20 @@ class GameScheduler {
   }
 
   /**
-   * Execute daily results pull for all active weeks
-   * This runs at 1 AM, 5 PM, and 8 PM ET every day
+   * Execute hourly results pull for all active weeks
+   * This runs hourly during game windows: Sun 1pm-11pm, Mon all day, Tue 12am-1am ET
    */
   private async executeDailyResultsPull() {
     try {
-      console.log(`[Scheduler] ⏰ Starting daily results pull for all active weeks at ${new Date().toISOString()}`);
+      console.log(`[Scheduler] ⏰ Starting hourly results pull at ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })} ET`);
       
-      // Get all active NFL weeks (current and future)
-      const currentDate = new Date().toISOString();
-      const weeks = await db
-        .select()
-        .from(nflWeeks)
-        .where(gte(nflWeeks.startDate, new Date(new Date().getTime() - 7 * 24 * 60 * 60 * 1000).toISOString())) // Last 7 days + future
-        .orderBy(asc(nflWeeks.weekNumber));
-
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (const week of weeks) {
-        try {
-          console.log(`[Scheduler] Pulling results for Week ${week.weekNumber}...`);
-          
-          // Get all games for this week
-          const games = await db
-            .select()
-            .from(nflGames)
-            .where(eq(nflGames.weekId, week.id))
-            .orderBy(asc(nflGames.gameTime));
-
-          if (games.length === 0) {
-            console.log(`[Scheduler] No games found for Week ${week.weekNumber}`);
-            continue;
-          }
-
-          // For now, we're just pulling the game results status
-          // In a full implementation, you would call ESPN API here to get final scores
-          // This is a placeholder for the actual results pulling logic
-          console.log(`[Scheduler] ✅ Results pull completed for Week ${week.weekNumber}: ${games.length} games processed`);
-          successCount++;
-          
-        } catch (error) {
-          console.error(`[Scheduler] Error pulling results for Week ${week.weekNumber}:`, error);
-          errorCount++;
-        }
-      }
-
-      console.log(`[Scheduler] ✅ Daily results pull completed: ${successCount} weeks successful, ${errorCount} errors`);
+      // Call the shared ESPN results puller for all active weeks
+      const result = await pullResultsForActiveWeeks(this.storage);
+      
+      console.log(`[Scheduler] ✅ Hourly results pull completed: ${result.weeksProcessed} weeks processed`);
       
     } catch (error) {
-      console.error(`[Scheduler] ❌ Error executing daily results pull:`, error);
+      console.error(`[Scheduler] ❌ Error executing hourly results pull:`, error);
     }
   }
 

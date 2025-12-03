@@ -12,6 +12,7 @@ import { userPicks, nflGames, nflWeeks, users, nflTeams } from "@shared/schema";
 import emailRoutes from "./routes/email";
 import { sendWelcomeEmail } from "./email";
 import { pullNFLGamesFromOddsAPI } from "./nflDataPuller";
+import { pullNFLResultsFromESPN } from "./espnResultsPuller";
 
 // Super user configuration - only this account has access to system admin functions
 const SUPER_USER_ID = "user_1753731196994_qfjmyp5i2";
@@ -1580,116 +1581,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Unauthorized: Admin access required" });
       }
       
-      // Get the week
-      const week = await storage.getNFLWeek(parseInt(weekId));
-      if (!week) {
-        return res.status(404).json({ message: "NFL week not found" });
-      }
-      
-      // Get current season year
-      const currentYear = new Date().getFullYear();
-      
-      // Fetch game results from ESPN API
-      const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${currentYear}&seasontype=2&week=${week.weekNumber}`;
-      const response = await fetch(espnUrl);
-      
-      if (!response.ok) {
-        return res.status(response.status).json({ 
-          message: `Failed to fetch from ESPN API: ${response.statusText}` 
-        });
-      }
-      
-      const espnData = await response.json();
-      
-      // Get NFL teams for mapping
-      const teams = await storage.getNFLTeams();
-      const teamNameMap = new Map();
-      teams.forEach(team => {
-        teamNameMap.set(team.name.toLowerCase(), team);
-        // Also add common ESPN variations
-        teamNameMap.set(team.abbreviation?.toLowerCase(), team);
-      });
-      
-      // Track results
-      const results = {
-        gamesFound: espnData.events?.length || 0,
-        gamesUpdated: 0,
-        errors: 0
-      };
-      
-      // Process each game from ESPN
-      for (const event of espnData.events || []) {
-        try {
-          const competition = event.competitions[0];
-          const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
-          const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
-          
-          if (!homeTeam || !awayTeam) {
-            console.log(`Missing team data for game: ${event.name}`);
-            results.errors++;
-            continue;
-          }
-          
-          // Find teams in our database
-          const dbHomeTeam = teamNameMap.get(homeTeam.team.displayName.toLowerCase()) || 
-                           teamNameMap.get(homeTeam.team.abbreviation.toLowerCase());
-          const dbAwayTeam = teamNameMap.get(awayTeam.team.displayName.toLowerCase()) || 
-                           teamNameMap.get(awayTeam.team.abbreviation.toLowerCase());
-          
-          if (!dbHomeTeam || !dbAwayTeam) {
-            console.log(`Teams not found in database: ${homeTeam.team.displayName} vs ${awayTeam.team.displayName}`);
-            results.errors++;
-            continue;
-          }
-          
-          // Check if game is completed
-          if (competition.status.type.completed) {
-            const homeScore = parseInt(homeTeam.score);
-            const awayScore = parseInt(awayTeam.score);
-            const winningTeamId = homeScore > awayScore ? dbHomeTeam.id : dbAwayTeam.id;
-            
-            // Find the game in our database
-            const existingGames = await db.select().from(nflGames).where(
-              and(
-                eq(nflGames.weekId, week.id),
-                eq(nflGames.homeTeamId, dbHomeTeam.id),
-                eq(nflGames.awayTeamId, dbAwayTeam.id)
-              )
-            );
-            
-            if (existingGames.length > 0) {
-              const gameId = existingGames[0].id;
-              
-              // Update game with results
-              await db.update(nflGames)
-                .set({
-                  homeTeamScore: homeScore,
-                  awayTeamScore: awayScore,
-                  completed: true,
-                  winningTeamId: winningTeamId,
-                  updatedAt: new Date()
-                })
-                .where(eq(nflGames.id, gameId));
-              
-              console.log(`Updated game results for ${dbHomeTeam.name} vs ${dbAwayTeam.name}: ${homeScore}-${awayScore}`);
-              
-              // Process user picks for this game
-              await storage.processGameResults(gameId);
-              results.gamesUpdated++;
-            } else {
-              console.log(`Game not found in database: ${dbHomeTeam.name} vs ${dbAwayTeam.name}`);
-              results.errors++;
-            }
-          }
-        } catch (error) {
-          console.error(`Error processing game result:`, error);
-          results.errors++;
-        }
-      }
+      // Use the shared ESPN results puller function
+      const result = await pullNFLResultsFromESPN(storage, parseInt(weekId));
       
       res.json({
-        message: `Successfully updated ${results.gamesUpdated} game results for Week ${week.weekNumber}`,
-        results
+        message: `Successfully updated ${result.results.gamesUpdated} game results for Week ${result.weekNumber}`,
+        results: result.results
       });
     } catch (error) {
       console.error("Error fetching NFL game results:", error);
