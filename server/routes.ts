@@ -591,9 +591,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const isHomeUnderdog = Number(game.spread) > 0;
         const isAwayUnderdog = Number(game.spread) < 0;
         
+        // Ensure gameTime is properly formatted as ISO string with UTC timezone
+        const gameTimeDate = new Date(game.gameTime);
+        const gameTimeISO = gameTimeDate.toISOString();
+        
         return {
           ...game,
           id: game.id.toString(), // Convert ID to string for frontend compatibility
+          gameTime: gameTimeISO, // Ensure proper ISO format with Z suffix
           underdogTeamId: isHomeUnderdog ? game.homeTeamId : isAwayUnderdog ? game.awayTeamId : null,
           underdogName: isHomeUnderdog ? game.homeTeam.name : isAwayUnderdog ? game.awayTeam.name : null,
           underdogValue: Math.abs(Number(game.spread))
@@ -616,7 +621,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const games = await storage.getNFLGames(weekId);
-      res.json(games);
+      
+      // Ensure gameTime is properly formatted as ISO string with UTC timezone
+      const formattedGames = games.map(game => ({
+        ...game,
+        gameTime: new Date(game.gameTime).toISOString()
+      }));
+      
+      res.json(formattedGames);
     } catch (error) {
       console.error("Error fetching NFL games:", error);
       res.status(500).json({ message: "Failed to fetch NFL games" });
