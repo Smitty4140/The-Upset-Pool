@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { User, NFLGame, NFLTeam } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Check, X, BarChart3, PieChart, Eye } from "lucide-react";
+import { Check, X, BarChart3, PieChart, Eye, Trophy, Target, TrendingUp, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -140,6 +140,32 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
     return acc;
   }, {}) || {};
 
+  // Calculate weekly statistics
+  const weeklyStats = {
+    totalPoints: 0,
+    totalWinningPicks: 0,
+    totalPicks: weeklyPicks?.length || 0,
+    uniqueGamesWon: new Set<number>(),
+    winningPickSpreads: [] as number[],
+    hasResults: false,
+  };
+
+  weeklyPicks?.forEach(pick => {
+    if (pick.game.winningTeamId) {
+      weeklyStats.hasResults = true;
+      if (pick.won) {
+        weeklyStats.totalWinningPicks++;
+        weeklyStats.totalPoints += Number(pick.pointsEarned || 0);
+        weeklyStats.uniqueGamesWon.add(pick.gameId);
+        weeklyStats.winningPickSpreads.push(Math.abs(Number(pick.spreadAtTimeOfPick)));
+      }
+    }
+  });
+
+  const averageWinningPick = weeklyStats.winningPickSpreads.length > 0
+    ? (weeklyStats.winningPickSpreads.reduce((a, b) => a + b, 0) / weeklyStats.winningPickSpreads.length).toFixed(1)
+    : '0';
+
   // Prepare data for charts
   const picksByTeam = weeklyPicks?.reduce((acc: Record<string, number>, pick) => {
     const teamName = pick.pickedTeam.name;
@@ -174,19 +200,200 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
     name: range,
     value: count
   }));
-  
 
-  
+  // Prepare winning picks by team data for chart
+  const winningPicksByTeam = weeklyPicks?.reduce((acc: Record<string, { wins: number; total: number; points: number }>, pick) => {
+    const teamName = pick.pickedTeam.name;
+    if (!acc[teamName]) {
+      acc[teamName] = { wins: 0, total: 0, points: 0 };
+    }
+    acc[teamName].total++;
+    if (pick.won) {
+      acc[teamName].wins++;
+      acc[teamName].points += Number(pick.pointsEarned || 0);
+    }
+    return acc;
+  }, {}) || {};
+
+  const winningTeamsData = Object.entries(winningPicksByTeam)
+    .filter(([_, data]) => data.wins > 0)
+    .map(([name, data]) => ({
+      name: name.length > 12 ? name.substring(0, 10) + '...' : name,
+      fullName: name,
+      wins: data.wins,
+      points: data.points
+    }))
+    .sort((a, b) => b.points - a.points);
+
   // Colors for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
   
   return (
     <div className="space-y-6">
+      {/* Weekly Stats Summary - Only show for past weeks with results */}
+      {weeklyStats.hasResults && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-green-600 uppercase tracking-wide">Total Points</p>
+                  <p className="text-2xl font-bold text-green-700">{weeklyStats.totalPoints.toFixed(1)}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                  <Trophy className="h-5 w-5 text-green-600" />
+                </div>
+              </div>
+              <p className="text-xs text-green-600 mt-1">Earned by all poolers</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-blue-600 uppercase tracking-wide">Avg Winning Spread</p>
+                  <p className="text-2xl font-bold text-blue-700">+{averageWinningPick}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-blue-600" />
+                </div>
+              </div>
+              <p className="text-xs text-blue-600 mt-1">Points per winning pick</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-purple-600 uppercase tracking-wide">Winning Picks</p>
+                  <p className="text-2xl font-bold text-purple-700">{weeklyStats.totalWinningPicks}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
+                  <Target className="h-5 w-5 text-purple-600" />
+                </div>
+              </div>
+              <p className="text-xs text-purple-600 mt-1">
+                {weeklyStats.totalPicks > 0 
+                  ? `${((weeklyStats.totalWinningPicks / weeklyStats.totalPicks) * 100).toFixed(0)}% success rate`
+                  : 'No picks yet'
+                }
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-amber-600 uppercase tracking-wide">Unique Games Won</p>
+                  <p className="text-2xl font-bold text-amber-700">{weeklyStats.uniqueGamesWon.size}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-amber-600" />
+                </div>
+              </div>
+              <p className="text-xs text-amber-600 mt-1">Different upsets hit</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Charts Section - Show at top when we have results */}
+      {weeklyStats.hasResults && winningTeamsData.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Winning Teams Chart */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-base">
+                <Trophy className="mr-2 h-5 w-5 text-green-600" />
+                Points by Winning Team
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={winningTeamsData}
+                    margin={{ top: 10, right: 20, left: 10, bottom: 40 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="name" 
+                      angle={-45} 
+                      textAnchor="end" 
+                      height={50}
+                      fontSize={11}
+                    />
+                    <YAxis fontSize={11} />
+                    <Tooltip 
+                      formatter={(value, name) => [
+                        name === 'points' ? `${value} pts` : `${value} wins`,
+                        name === 'points' ? 'Points' : 'Wins'
+                      ]}
+                      labelFormatter={(label) => {
+                        const team = winningTeamsData.find(t => t.name === label);
+                        return team?.fullName || label;
+                      }}
+                    />
+                    <Bar dataKey="points" fill="#22c55e" name="points" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Win Rate Pie Chart */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-base">
+                <PieChart className="mr-2 h-5 w-5 text-blue-600" />
+                Week Results Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <Pie
+                      data={[
+                        { name: 'Winning Picks', value: weeklyStats.totalWinningPicks, color: '#22c55e' },
+                        { name: 'Losing Picks', value: weeklyStats.totalPicks - weeklyStats.totalWinningPicks, color: '#ef4444' }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      labelLine={true}
+                    >
+                      <Cell fill="#22c55e" />
+                      <Cell fill="#ef4444" />
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value} picks`, 'Count']} />
+                    <Legend />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Picks Table */}
       <Card className="bg-white shadow-md">
         <CardContent className="p-0">
           <div className="bg-gradient-to-r from-primary/20 to-secondary/20 px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Week {weekId} Picks</h3>
-            <p className="text-sm text-gray-500">Picks are locked! See what everyone chose.</p>
+            <p className="text-sm text-gray-500">
+              {weeklyStats.hasResults 
+                ? `Results are in! ${weeklyStats.totalWinningPicks} winning picks this week.`
+                : 'Picks are locked! See what everyone chose.'
+              }
+            </p>
           </div>
           
           <div className="overflow-x-auto">
@@ -357,80 +564,81 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        {/* Most Popular Picks Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <BarChart3 className="mr-2 h-5 w-5" />
-              Most Popular Picks
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={teamPicksData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="name" 
-                    angle={-45} 
-                    textAnchor="end" 
-                    height={60}
-                  />
-                  <YAxis />
-                  <Tooltip 
-                    formatter={(value) => [`${value} picks`, 'Count']} 
-                  />
-                  <Bar dataKey="count" fill="#8884d8" name="Number of Picks">
-                    {teamPicksData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Spread Distribution Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <PieChart className="mr-2 h-5 w-5" />
-              Spread Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsPieChart>
-                  <Pie
-                    data={spreadData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+      {/* Pre-Results Charts - Show only before games are decided */}
+      {!weeklyStats.hasResults && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          {/* Most Popular Picks Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <BarChart3 className="mr-2 h-5 w-5" />
+                Most Popular Picks
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={teamPicksData}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
                   >
-                    {spreadData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => [`${value} picks`, 'Count']} />
-                  <Legend />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="name" 
+                      angle={-45} 
+                      textAnchor="end" 
+                      height={60}
+                    />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value) => [`${value} picks`, 'Count']} 
+                    />
+                    <Bar dataKey="count" fill="#8884d8" name="Number of Picks">
+                      {teamPicksData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
 
-
-      </div>
+          {/* Spread Distribution Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <PieChart className="mr-2 h-5 w-5" />
+                Spread Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <Pie
+                      data={spreadData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={true}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {spreadData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value} picks`, 'Count']} />
+                    <Legend />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
