@@ -237,17 +237,37 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
     }))
     .sort((a, b) => b.spread - a.spread);
 
-  // Prepare team popularity data (all teams including those with 0 picks)
-  const allTeamsFromGames = new Set<string>();
+  // Prepare game popularity data (picks per game, showing underdog team)
+  // Group picks by game and count, then get all games (including those with 0 picks)
+  const picksByGame = weeklyPicks?.reduce((acc: Record<number, { count: number; underdogName: string; spread: number }>, pick) => {
+    const gameId = pick.gameId;
+    if (!acc[gameId]) {
+      acc[gameId] = { 
+        count: 0, 
+        underdogName: pick.pickedTeam.name,
+        spread: Math.abs(Number(pick.spreadAtTimeOfPick))
+      };
+    }
+    acc[gameId].count++;
+    return acc;
+  }, {}) || {};
+
+  // Get all unique games from picks to find games with 0 picks
+  const allGamesMap = new Map<number, { underdogName: string; spread: number }>();
   weeklyPicks?.forEach(pick => {
-    allTeamsFromGames.add(pick.game.homeTeam.name);
-    allTeamsFromGames.add(pick.game.awayTeam.name);
+    if (!allGamesMap.has(pick.gameId)) {
+      allGamesMap.set(pick.gameId, {
+        underdogName: pick.pickedTeam.name,
+        spread: Math.abs(Number(pick.spreadAtTimeOfPick))
+      });
+    }
   });
-  
-  const teamPopularityData = Array.from(allTeamsFromGames).map(teamName => ({
-    name: teamName.length > 12 ? teamName.substring(0, 10) + '...' : teamName,
-    fullName: teamName,
-    picks: picksByTeam[teamName] || 0
+
+  const gamePopularityData = Array.from(allGamesMap.entries()).map(([gameId, gameInfo]) => ({
+    name: gameInfo.underdogName.length > 12 ? gameInfo.underdogName.substring(0, 10) + '...' : gameInfo.underdogName,
+    fullName: gameInfo.underdogName,
+    picks: picksByGame[gameId]?.count || 0,
+    spread: gameInfo.spread
   })).sort((a, b) => b.picks - a.picks);
 
   // Colors for charts
@@ -409,19 +429,19 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
           </Card>
         </div>
 
-        {/* Team Popularity Chart - Full Width */}
+        {/* Game Popularity Chart - Full Width */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center text-base">
               <Users className="mr-2 h-5 w-5 text-purple-600" />
-              Pick Popularity by Team
+              Picks by Game (Underdog)
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={teamPopularityData}
+                  data={gamePopularityData}
                   margin={{ top: 10, right: 20, left: 10, bottom: 60 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
@@ -437,8 +457,8 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
                   <Tooltip 
                     formatter={(value) => [`${value} pick${value === 1 ? '' : 's'}`, 'Picks']}
                     labelFormatter={(label) => {
-                      const team = teamPopularityData.find(t => t.name === label);
-                      return team?.fullName || label;
+                      const game = gamePopularityData.find(t => t.name === label);
+                      return game ? `${game.fullName} (+${game.spread})` : label;
                     }}
                   />
                   <Bar dataKey="picks" fill="#8b5cf6" name="picks" radius={[4, 4, 0, 0]} />
