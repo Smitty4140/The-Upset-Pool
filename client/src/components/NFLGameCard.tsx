@@ -106,7 +106,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
     : hasGameStarted
       ? "This game has already started and is no longer available for picks"
     : isViewingFutureWeek 
-      ? "Picks are not allowed until 12 hours before the first game of the week. Spreads may change until that point."
+      ? "Picks are not allowed until 8 hours before the first game of the week. Spreads may change until that point."
       : disabled 
         ? "Picks are locked for this week"
         : null;

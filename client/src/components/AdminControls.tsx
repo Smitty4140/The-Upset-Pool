@@ -836,7 +836,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
           <div className="bg-purple-50 border border-purple-200 rounded-md p-3 mb-4 flex items-start">
             <Clock className="h-5 w-5 text-purple-500 mt-0.5 mr-2 flex-shrink-0" />
             <div className="text-sm text-purple-800">
-              The scheduler automatically pulls game data 12 hours before the first NFL game and results 5 hours after the last game of each week.
+              The scheduler automatically pulls game data 8 hours before the first NFL game and results 5 hours after the last game of each week.
               You can check the status and manually trigger pulls if needed.
             </div>
           </div>

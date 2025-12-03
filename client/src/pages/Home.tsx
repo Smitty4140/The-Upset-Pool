@@ -743,7 +743,7 @@ export default function Home() {
                           {isViewingFutureWeek && (
                             <p className="text-amber-600 font-medium">
                               You are viewing a future week. Picks will be
-                              available 12 hours before the first game.
+                              available 8 hours before the first game.
                             </p>
                           )}
                         </div>

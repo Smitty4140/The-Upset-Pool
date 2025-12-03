@@ -89,7 +89,7 @@ class GameScheduler {
   }
 
   /**
-   * Check all NFL weeks and schedule data pulls 12 hours before first game
+   * Check all NFL weeks and schedule data pulls 8 hours before first game
    */
   private async checkAndScheduleDataPulls() {
     try {
@@ -139,10 +139,10 @@ class GameScheduler {
 
       const firstGame = games[0];
       const firstGameTime = new Date(firstGame.gameTime);
-      const pullTime = new Date(firstGameTime.getTime() - (12 * 60 * 60 * 1000)); // 12 hours before
+      const pullTime = new Date(firstGameTime.getTime() - (8 * 60 * 60 * 1000)); // 8 hours before
       const currentTime = new Date();
 
-      console.log(`[Scheduler] Week ${week.weekNumber}: First game at ${firstGameTime.toISOString()}, spreads available in 12 hours (data pull) scheduled for ${pullTime.toISOString()}`);
+      console.log(`[Scheduler] Week ${week.weekNumber}: First game at ${firstGameTime.toISOString()}, spreads available in 8 hours (data pull) scheduled for ${pullTime.toISOString()}`);
 
       // If the pull time has already passed, pull immediately
       if (pullTime <= currentTime) {
@@ -340,7 +340,7 @@ class GameScheduler {
   }
 
   /**
-   * Test the scheduled job by running it as if it were 12 hours before first game
+   * Test the scheduled job by running it as if it were 8 hours before first game
    */
   async testScheduledJob() {
     try {
@@ -357,7 +357,7 @@ class GameScheduler {
         throw new Error('No NFL Week 1 found for testing');
       }
 
-      console.log(`[Scheduler] Simulating data pull for week ${testWeek[0].weekNumber} as if 12 hours before first game...`);
+      console.log(`[Scheduler] Simulating data pull for week ${testWeek[0].weekNumber} as if 8 hours before first game...`);
       await this.executeDataPull(testWeek[0]);
       
       return {
