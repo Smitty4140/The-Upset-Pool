@@ -237,6 +237,19 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
     }))
     .sort((a, b) => b.spread - a.spread);
 
+  // Prepare team popularity data (all teams including those with 0 picks)
+  const allTeamsFromGames = new Set<string>();
+  weeklyPicks?.forEach(pick => {
+    allTeamsFromGames.add(pick.game.homeTeam.name);
+    allTeamsFromGames.add(pick.game.awayTeam.name);
+  });
+  
+  const teamPopularityData = Array.from(allTeamsFromGames).map(teamName => ({
+    name: teamName.length > 12 ? teamName.substring(0, 10) + '...' : teamName,
+    fullName: teamName,
+    picks: picksByTeam[teamName] || 0
+  })).sort((a, b) => b.picks - a.picks);
+
   // Colors for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
   
@@ -314,6 +327,7 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
 
       {/* Charts Section - Show at top when we have results */}
       {weeklyStats.hasResults && winningTeamsData.length > 0 && (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Winning Teams Chart */}
           <Card>
@@ -394,6 +408,46 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
             </CardContent>
           </Card>
         </div>
+
+        {/* Team Popularity Chart - Full Width */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center text-base">
+              <Users className="mr-2 h-5 w-5 text-purple-600" />
+              Pick Popularity by Team
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={teamPopularityData}
+                  margin={{ top: 10, right: 20, left: 10, bottom: 60 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="name" 
+                    angle={-45} 
+                    textAnchor="end" 
+                    height={70}
+                    fontSize={10}
+                    interval={0}
+                  />
+                  <YAxis fontSize={11} allowDecimals={false} label={{ value: 'Picks', angle: -90, position: 'insideLeft', fontSize: 11 }} />
+                  <Tooltip 
+                    formatter={(value) => [`${value} pick${value === 1 ? '' : 's'}`, 'Picks']}
+                    labelFormatter={(label) => {
+                      const team = teamPopularityData.find(t => t.name === label);
+                      return team?.fullName || label;
+                    }}
+                  />
+                  <Bar dataKey="picks" fill="#8b5cf6" name="picks" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+        </>
       )}
 
       {/* Picks Table */}
