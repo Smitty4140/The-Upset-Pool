@@ -841,6 +841,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Get all users' picks for a specific week and league
+  // SECURITY: Only return picks if the week is locked (past picksLockAt time)
   app.get('/api/league/:leagueId/week/:weekId/picks', async (req, res) => {
     try {
       const leagueId = parseInt(req.params.leagueId);
@@ -850,7 +851,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid league ID or week ID" });
       }
       
-      // Get all picks for the week and league
+      // SECURITY CHECK: Get week info and verify it's locked before returning picks
+      const week = await storage.getNFLWeek(weekId);
+      if (!week) {
+        return res.status(404).json({ message: "Week not found" });
+      }
+      
+      const now = new Date();
+      const lockTime = new Date(week.picksLockAt);
+      if (now < lockTime) {
+        // Week is not locked yet - don't return any picks to prevent unfair advantage
+        console.log(`[Security] Blocked picks request for unlocked week ${weekId} (locks at ${lockTime.toISOString()})`);
+        return res.json([]);
+      }
+      
+      // Week is locked - safe to return picks
       const picks = await storage.getUserPicksForWeek(weekId, leagueId);
       
       res.json(picks || []);
