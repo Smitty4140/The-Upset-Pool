@@ -159,7 +159,9 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
             updatedAt: new Date()
           };
           
-          if (existingGame.spread === '0' || existingGame.spread === 0 || !existingGame.spread) {
+          // Convert spread to number for comparison (handles both string "0.0" and numeric 0)
+          const existingSpread = parseFloat(String(existingGame.spread)) || 0;
+          if (existingSpread === 0) {
             updateObj.spread = homeSpread.toString();
           }
           
