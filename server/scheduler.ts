@@ -144,9 +144,21 @@ class GameScheduler {
 
       console.log(`[Scheduler] Week ${week.weekNumber}: First game at ${firstGameTime.toISOString()}, spreads available in 8 hours (data pull) scheduled for ${pullTime.toISOString()}`);
 
-      // If the pull time has already passed, pull immediately
+      // If the pull time has already passed, check if we need to pull
       if (pullTime <= currentTime) {
-        console.log(`[Scheduler] Pull time for week ${week.weekNumber} has passed, executing immediately`);
+        // Check if spreads have already been pulled for this week
+        // A week is considered "pulled" if at least one game has a non-zero spread
+        const gamesWithSpreads = games.filter(g => {
+          const spread = parseFloat(String(g.spread)) || 0;
+          return spread !== 0;
+        });
+        
+        if (gamesWithSpreads.length > 0) {
+          console.log(`[Scheduler] Week ${week.weekNumber}: Spreads already pulled (${gamesWithSpreads.length}/${games.length} games have spreads), skipping API call`);
+          return;
+        }
+        
+        console.log(`[Scheduler] Pull time for week ${week.weekNumber} has passed and no spreads set, executing data pull`);
         await this.executeDataPull(week);
         return;
       }

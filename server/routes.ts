@@ -2225,23 +2225,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // NFL Odds API route
-  app.get('/api/nfl-odds', async (req, res) => {
-    try {
-      const apiKey = process.env.THE_ODDS_API_KEY;
-      const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds?regions=us&oddsFormat=american&apiKey=${apiKey}`);
-      
-      if (!response.ok) {
-        throw new Error(`Odds API returned status: ${response.status}`);
-      }
-      
-      const oddsData = await response.json();
-      res.json(oddsData);
-    } catch (error) {
-      console.error("Error fetching NFL odds:", error);
-      res.status(500).json({ message: "Failed to fetch NFL odds" });
-    }
-  });
+  // NFL Odds API route - DISABLED to prevent excessive API calls
+  // This endpoint was calling The Odds API on every request, using up quota
+  // Spreads are now only pulled once per week via the scheduler
+  // app.get('/api/nfl-odds', async (req, res) => { ... });
   
   // Seed NFL weeks data if needed
   app.get('/api/seed-nfl-weeks', async (_req, res) => {
