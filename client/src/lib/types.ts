@@ -98,3 +98,14 @@ export interface UserPickFormValues {
   leagueId: number;
   weekId: number;
 }
+
+// Last pick info for leaderboard display
+export type LastPickInfo = {
+  weekNumber: number;
+  pickedTeamName: string;
+  pickedTeamAbbreviation: string;
+  opponentTeamName: string;
+  spread: number;
+  result: 'win' | 'loss' | 'pending';
+  pointsEarned: number;
+} | null;

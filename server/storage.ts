@@ -21,6 +21,7 @@ import {
   userPicks,
   type User,
   type UserWithEligibility,
+  type LastPickInfo,
   type InsertUser,
   type NFLTeam,
   type InsertNFLTeam,
@@ -1017,43 +1018,109 @@ export class DatabaseStorage implements IStorage {
       })) as UserWithEligibility[];
     }
     
-    // For each user, check if they have picks for every eligible week
+    // Get the most recent locked week for last pick
+    const mostRecentLockedWeek = eligibilityWeeks.length > 0 
+      ? eligibilityWeeks[eligibilityWeeks.length - 1] 
+      : null;
+    
+    // Create aliases for the home and away team joins
+    const homeTeam = alias(nflTeams, 'homeTeam');
+    const awayTeam = alias(nflTeams, 'awayTeam');
+    const pickedTeam = alias(nflTeams, 'pickedTeam');
+    
+    // For each user, check if they have picks for every eligible week and get last pick
     const usersWithEligibility = await Promise.all(
       result.map(async (user) => {
-        if (eligibilityWeekIds.length === 0) {
-          return { ...user, everyWeekEligible: true };
+        let everyWeekEligible = true;
+        let lastPick: LastPickInfo = null;
+        
+        if (eligibilityWeekIds.length > 0) {
+          // Count picks for this user in eligible weeks for this league
+          const userPicksQuery = await db
+            .select({
+              weekId: userPicks.weekId
+            })
+            .from(userPicks)
+            .where(
+              and(
+                eq(userPicks.userId, user.id),
+                eq(userPicks.leagueId, leagueId),
+                inArray(userPicks.weekId, eligibilityWeekIds)
+              )
+            )
+            .groupBy(userPicks.weekId);
+          
+          const uniqueWeeksPicked = userPicksQuery.length;
+          const requiredWeeks = eligibilityWeekIds.length;
+          
+          everyWeekEligible = (uniqueWeeksPicked >= requiredWeeks && requiredWeeks > 0);
         }
         
-        // Count picks for this user in eligible weeks for this league
-        const userPicksQuery = await db
-          .select({
-            weekId: userPicks.weekId
-          })
-          .from(userPicks)
-          .where(
-            and(
-              eq(userPicks.userId, user.id),
-              eq(userPicks.leagueId, leagueId),
-              inArray(userPicks.weekId, eligibilityWeekIds)
+        // Get the last pick for this user (from most recent locked week)
+        if (mostRecentLockedWeek) {
+          const lastPickResult = await db
+            .select({
+              weekNumber: nflWeeks.weekNumber,
+              pickedTeamName: pickedTeam.name,
+              pickedTeamAbbreviation: pickedTeam.abbreviation,
+              homeTeamName: homeTeam.name,
+              awayTeamName: awayTeam.name,
+              homeTeamId: nflGames.homeTeamId,
+              pickedTeamId: userPicks.pickedTeamId,
+              spread: userPicks.spreadAtTimeOfPick,
+              won: userPicks.won,
+              pointsEarned: userPicks.pointsEarned,
+              gameCompleted: nflGames.completed
+            })
+            .from(userPicks)
+            .innerJoin(nflWeeks, eq(userPicks.weekId, nflWeeks.id))
+            .innerJoin(nflGames, eq(userPicks.gameId, nflGames.id))
+            .innerJoin(pickedTeam, eq(userPicks.pickedTeamId, pickedTeam.id))
+            .innerJoin(homeTeam, eq(nflGames.homeTeamId, homeTeam.id))
+            .innerJoin(awayTeam, eq(nflGames.awayTeamId, awayTeam.id))
+            .where(
+              and(
+                eq(userPicks.userId, user.id),
+                eq(userPicks.leagueId, leagueId),
+                eq(userPicks.weekId, mostRecentLockedWeek.id)
+              )
             )
-          )
-          .groupBy(userPicks.weekId);
-        
-        const uniqueWeeksPicked = userPicksQuery.length;
-        const requiredWeeks = eligibilityWeekIds.length;
-        
-        // Simple boolean check
-        const everyWeekEligible = (uniqueWeeksPicked >= requiredWeeks && requiredWeeks > 0);
-        
+            .limit(1);
+          
+          if (lastPickResult.length > 0) {
+            const pick = lastPickResult[0];
+            // Determine opponent - if picked team is home team, opponent is away team, and vice versa
+            const opponentTeamName = pick.pickedTeamId === pick.homeTeamId 
+              ? pick.awayTeamName 
+              : pick.homeTeamName;
+            
+            // Determine result
+            let result: 'win' | 'loss' | 'pending' = 'pending';
+            if (pick.gameCompleted) {
+              result = pick.won ? 'win' : 'loss';
+            }
+            
+            lastPick = {
+              weekNumber: pick.weekNumber,
+              pickedTeamName: pick.pickedTeamName,
+              pickedTeamAbbreviation: pick.pickedTeamAbbreviation,
+              opponentTeamName,
+              spread: Math.abs(Number(pick.spread)),
+              result,
+              pointsEarned: Number(pick.pointsEarned) || 0
+            };
+          }
+        }
         
         return {
           ...user,
-          everyWeekEligible
+          everyWeekEligible,
+          lastPick
         };
       })
     );
     
-    return usersWithEligibility as any;
+    return usersWithEligibility as UserWithEligibility[];
   }
 
   async processGameResults(gameId: number): Promise<void> {

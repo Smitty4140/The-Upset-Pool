@@ -213,9 +213,21 @@ export const userPicksRelations = relations(userPicks, ({ one }) => ({
 export type InsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
+// Last pick info for leaderboard display
+export type LastPickInfo = {
+  weekNumber: number;
+  pickedTeamName: string;
+  pickedTeamAbbreviation: string;
+  opponentTeamName: string;
+  spread: number;
+  result: 'win' | 'loss' | 'pending';
+  pointsEarned: number;
+} | null;
+
 // Extended User type for leaderboard with computed eligibility status
 export type UserWithEligibility = User & {
   everyWeekEligible: boolean;
+  lastPick?: LastPickInfo;
 };
 
 export type NFLTeam = typeof nflTeams.$inferSelect;
