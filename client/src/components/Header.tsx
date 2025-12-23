@@ -4,7 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import upsetPoolLogo from "@assets/Upset Pool.png";
 
 export default function Header() {
   const [location] = useLocation();
@@ -53,7 +54,7 @@ export default function Header() {
                 rel="noopener noreferrer"
                 className="flex items-center cursor-pointer"
               >
-                <Shield className="h-8 w-8 text-accent mr-2" />
+                <img src={upsetPoolLogo} alt="Upset Pool" className="h-10 w-10 mr-2" />
                 <h1 className="text-2xl font-bold text-white hover:text-gray-200 transition-colors">Upset Pool</h1>
               </a>
             </div>
