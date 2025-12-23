@@ -253,12 +253,20 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
   }, {}) || {};
 
   // Get all unique games from picks to find games with 0 picks
-  const allGamesMap = new Map<number, { underdogName: string; spread: number }>();
+  // Track underdog result: 'won' | 'lost' | 'pending'
+  const allGamesMap = new Map<number, { underdogName: string; spread: number; underdogResult: 'won' | 'lost' | 'pending' }>();
   weeklyPicks?.forEach(pick => {
     if (!allGamesMap.has(pick.gameId)) {
+      // Determine underdog result based on game status
+      let underdogResult: 'won' | 'lost' | 'pending' = 'pending';
+      if (pick.game.winningTeamId) {
+        // Game has a result - check if underdog (picked team) won
+        underdogResult = pick.won ? 'won' : 'lost';
+      }
       allGamesMap.set(pick.gameId, {
         underdogName: pick.pickedTeam.name,
-        spread: Math.abs(Number(pick.spreadAtTimeOfPick))
+        spread: Math.abs(Number(pick.spreadAtTimeOfPick)),
+        underdogResult
       });
     }
   });
@@ -267,7 +275,8 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
     name: gameInfo.underdogName.length > 12 ? gameInfo.underdogName.substring(0, 10) + '...' : gameInfo.underdogName,
     fullName: gameInfo.underdogName,
     picks: picksByGame[gameId]?.count || 0,
-    spread: gameInfo.spread
+    spread: gameInfo.spread,
+    underdogResult: gameInfo.underdogResult
   })).sort((a, b) => b.picks - a.picks);
 
   // Colors for charts
@@ -461,7 +470,17 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
                       return game ? `${game.fullName} (+${game.spread})` : label;
                     }}
                   />
-                  <Bar dataKey="picks" fill="#8b5cf6" name="picks" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="picks" name="picks" radius={[4, 4, 0, 0]}>
+                    {gamePopularityData.map((entry, index) => {
+                      let fillColor = '#9ca3af'; // gray for pending
+                      if (entry.underdogResult === 'won') {
+                        fillColor = '#22c55e'; // green for underdog won
+                      } else if (entry.underdogResult === 'lost') {
+                        fillColor = '#ef4444'; // red for underdog lost
+                      }
+                      return <Cell key={`cell-${index}`} fill={fillColor} />;
+                    })}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
