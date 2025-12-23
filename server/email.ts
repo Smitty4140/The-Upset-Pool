@@ -195,7 +195,7 @@ export async function sendWeeklyPickReminderEmail(
 
   return sendEmail({
     to: email,
-    subject: `Week ${weekNumber}: Make Your Upset Pool Pick Before 1 PM!`,
+    subject: `Upset Pool Picks Lock in 1 Hour!`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -210,7 +210,6 @@ export async function sendWeeklyPickReminderEmail(
           <div style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-radius: 16px 16px 0 0; padding: 32px 24px; text-align: center;">
             <img src="https://upsetpool.com/upset-pool-logo.png" alt="Upset Pool" style="width: 80px; height: 80px; margin-bottom: 12px;" />
             <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">NFL Upset Pool</h1>
-            <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 16px;">Week ${weekNumber}</p>
           </div>
           
           <!-- Main Content -->
