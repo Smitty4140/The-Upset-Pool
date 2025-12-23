@@ -190,55 +190,89 @@ export async function sendWeeklyPickReminderEmail(
   }>
 ): Promise<boolean> {
   const leaguesList = missingLeagues.map(league => 
-    `<li style="color: #dc2626; font-weight: 500; margin: 4px 0;">${league.leagueName}</li>`
+    `<tr><td style="padding: 8px 16px; background-color: #fef2f2; border-radius: 6px; margin: 4px 0; display: block; color: #991b1b; font-weight: 500;">${league.leagueName}</td></tr>`
   ).join('');
 
   return sendEmail({
     to: email,
-    subject: 'Reminder: Upset Pool pick needed!',
+    subject: `Week ${weekNumber}: Make Your Upset Pool Pick Before 1 PM!`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; padding: 24px; border-radius: 12px; text-align: center; margin-bottom: 24px;">
-          <h1 style="margin: 0; font-size: 24px;">🚨 NFL Upset Pool</h1>
-          <p style="margin: 8px 0 0 0; opacity: 0.9;">Pick Required - Week ${weekNumber}</p>
-        </div>
-        
-        <div style="background-color: #ffffff; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 20px;">
-          <p style="margin: 0 0 16px 0; font-size: 16px;">Hi ${username},</p>
-          <p style="margin: 0 0 20px 0; color: #4b5563;">You haven't made your Week ${weekNumber} upset pool pick yet! Don't miss out on the action.</p>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
           
-          <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
-            <p style="margin: 0 0 12px 0; color: #dc2626; font-weight: 600;">⚠️ Missing Picks For:</p>
-            <ul style="margin: 0; padding-left: 20px; color: #dc2626;">
-              ${leaguesList}
-            </ul>
+          <!-- Header with Football Theme -->
+          <div style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-radius: 16px 16px 0 0; padding: 32px 24px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 8px;">🏈</div>
+            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">NFL Upset Pool</h1>
+            <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 16px;">Week ${weekNumber} Reminder</p>
           </div>
-
-          <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0; border-radius: 0 8px 8px 0;">
-            <p style="margin: 0; color: #92400e; font-weight: 600;">⏰ Deadline Approaching</p>
-            <p style="margin: 8px 0 0 0; color: #92400e;">All picks lock at 1:00 PM EST today. Make your selection before it's too late!</p>
+          
+          <!-- Urgent Alert Banner -->
+          <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 16px 24px; text-align: center;">
+            <p style="margin: 0; color: #ffffff; font-size: 18px; font-weight: 700;">
+              ⏰ PICKS LOCK TODAY AT 1:00 PM ET
+            </p>
           </div>
-
-          <div style="background-color: #f0f9ff; padding: 16px; border-radius: 8px; margin: 20px 0;">
-            <p style="margin: 0 0 8px 0; color: #0369a1; font-weight: 600;">📋 Quick Reminder:</p>
-            <ul style="margin: 0; padding-left: 20px; color: #0369a1; font-size: 14px;">
-              <li>Pick one underdog team to win outright</li>
-              <li>Earn points equal to the spread if your team wins</li>
-              <li>No points for losses - choose wisely!</li>
-            </ul>
+          
+          <!-- Main Content -->
+          <div style="background-color: #ffffff; padding: 32px 24px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
+            
+            <p style="margin: 0 0 20px 0; font-size: 18px; color: #1f2937;">Hey ${username},</p>
+            
+            <p style="margin: 0 0 24px 0; font-size: 16px; color: #4b5563; line-height: 1.6;">
+              You still need to make your <strong>Week ${weekNumber}</strong> upset pick! Don't miss your chance to score big points.
+            </p>
+            
+            <!-- Missing Picks Section -->
+            <div style="background-color: #fafafa; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+              <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">
+                Missing Pick For:
+              </p>
+              <table style="width: 100%; border-collapse: separate; border-spacing: 0 8px;">
+                ${leaguesList}
+              </table>
+            </div>
+            
+            <!-- CTA Button -->
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="https://upsetpool.com" style="display: inline-block; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff; padding: 16px 48px; text-decoration: none; border-radius: 50px; font-weight: 700; font-size: 18px; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4); transition: transform 0.2s;">
+                Make Your Pick Now
+              </a>
+            </div>
+            
+            <!-- How It Works -->
+            <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 12px; padding: 20px; margin-top: 24px;">
+              <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">
+                How It Works
+              </p>
+              <ul style="margin: 0; padding-left: 20px; color: #1e40af; font-size: 14px; line-height: 1.8;">
+                <li>Pick one underdog team to win straight up</li>
+                <li>If they win, you earn points equal to the spread</li>
+                <li>Higher spreads = bigger risk, bigger reward!</li>
+              </ul>
+            </div>
+            
           </div>
+          
+          <!-- Footer -->
+          <div style="background-color: #1f2937; border-radius: 0 0 16px 16px; padding: 24px; text-align: center;">
+            <p style="margin: 0 0 8px 0; color: #9ca3af; font-size: 14px;">
+              Good luck with your picks!
+            </p>
+            <p style="margin: 0; color: #6b7280; font-size: 12px;">
+              NFL Upset Pool | <a href="https://upsetpool.com" style="color: #60a5fa; text-decoration: none;">upsetpool.com</a>
+            </p>
+          </div>
+          
         </div>
-
-        <div style="text-align: center; margin: 24px 0;">
-          <a href="https://nflupsetpool.com" style="display: inline-block; background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; box-shadow: 0 4px 6px rgba(220, 38, 38, 0.3);">
-            Make Your Pick Now
-          </a>
-        </div>
-
-        <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; text-align: center;">
-          <p style="margin: 0; font-size: 12px; color: #6b7280;">Don't let the underdogs slip away! Make your pick today. 🎯</p>
-        </div>
-      </div>
+      </body>
+      </html>
     `
   });
 }
