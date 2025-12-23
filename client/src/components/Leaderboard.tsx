@@ -3,7 +3,7 @@ import { UserWithEligibility } from "@shared/schema";
 import { LastPickInfo } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Trophy, Medal, Calendar, Check, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Trophy, Medal, Calendar, Check, X, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import React, { useState, useEffect } from "react";
 
 interface UserPick {
@@ -12,6 +12,7 @@ interface UserPick {
   weekNumber: number;
   pickedTeamName: string;
   pickedTeamAbbreviation: string;
+  pickedTeamLogoUrl: string;
   spread: number;
   result: string | null;
   pointsEarned: number | null;
@@ -279,6 +280,11 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                                     <div className="text-sm font-medium text-gray-500 min-w-[60px]">
                                       Week {pick.weekNumber}
                                     </div>
+                                    <img 
+                                      src={pick.pickedTeamLogoUrl} 
+                                      alt={pick.pickedTeamName}
+                                      className="h-8 w-8 object-contain"
+                                    />
                                     <div className="flex flex-col">
                                       <div className="font-semibold text-gray-900">
                                         {pick.pickedTeamName}
