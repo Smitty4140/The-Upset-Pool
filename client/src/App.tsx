@@ -7,7 +7,6 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Profile from "@/pages/Profile";
 import Rules from "@/pages/Rules";
-import LeaderboardPage from "@/pages/Leaderboard";
 import AdminDashboard from "@/pages/Admin";
 import Welcome from "@/pages/Welcome";
 import AuthPage from "@/pages/auth-page";
@@ -61,7 +60,6 @@ function Router() {
       <main className="flex-grow">
         <Switch>
           <Route path="/" component={Home} />
-          <Route path="/leaderboard" component={LeaderboardPage} />
           <Route path="/profile" component={Profile} />
           <Route path="/rules" component={Rules} />
           <Route path="/admin" component={AdminDashboard} />

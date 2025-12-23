@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { UserWithEligibility } from "@shared/schema";
+import { LastPickInfo } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Trophy, Medal, Calendar, Check, X, ChevronDown, ChevronUp, Clock } from "lucide-react";
@@ -17,6 +18,10 @@ interface UserPick {
   opponentTeamName: string;
 }
 
+interface LeaderboardUser extends UserWithEligibility {
+  lastPick?: LastPickInfo;
+}
+
 type LeaderboardProps = {
   leagueId: number;
 };
@@ -25,7 +30,7 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [userPicksCache, setUserPicksCache] = useState<Record<string, UserPick[]>>({});
   
-  const { data: leaderboard, isLoading } = useQuery<UserWithEligibility[]>({
+  const { data: leaderboard, isLoading } = useQuery<LeaderboardUser[]>({
     queryKey: [`/api/league/${leagueId}/leaderboard`],
   });
 
@@ -58,27 +63,27 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
   const currentUserPicks = expandedUserId ? (userPicksCache[expandedUserId] || userPicks || []) : [];
 
   // Function to calculate proper rankings with ties
-  const calculateRankings = (users: UserWithEligibility[]) => {
+  const calculateRankings = (users: LeaderboardUser[]) => {
     if (!users || users.length === 0) return [];
     
     // Sort users by points (descending)
     const sortedUsers = [...users].sort((a, b) => {
-      const aPoints = parseFloat(a.totalPoints || '0');
-      const bPoints = parseFloat(b.totalPoints || '0');
+      const aPoints = Number(a.totalPoints) || 0;
+      const bPoints = Number(b.totalPoints) || 0;
       return bPoints - aPoints;
     });
     
     // Calculate rankings with proper tie handling
-    const rankedUsers = [];
+    const rankedUsers: (LeaderboardUser & { rank: number })[] = [];
     let currentRank = 1;
     
     for (let i = 0; i < sortedUsers.length; i++) {
       const user = sortedUsers[i];
-      const currentPoints = parseFloat(user.totalPoints || '0');
+      const currentPoints = Number(user.totalPoints) || 0;
       
       // If this isn't the first user and points are different from previous user
       if (i > 0) {
-        const previousPoints = parseFloat(sortedUsers[i - 1].totalPoints || '0');
+        const previousPoints = Number(sortedUsers[i - 1].totalPoints) || 0;
         if (currentPoints !== previousPoints) {
           currentRank = i + 1; // Set rank to position + 1
         }
@@ -153,6 +158,7 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
               <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Place</th>
               <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
               <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pooler</th>
+              <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Pick</th>
               <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Every Week Eligible</th>
               <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-12"></th>
             </tr>
@@ -195,6 +201,35 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                         <span className="font-medium">{user.username}</span>
                       </div>
                     </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm" data-testid={`last-pick-${user.id}`}>
+                      {user.lastPick ? (
+                        <div className="flex items-center space-x-2">
+                          <div className="flex flex-col">
+                            <div className="flex items-center space-x-1">
+                              <span className="font-semibold text-gray-900">{user.lastPick.pickedTeamAbbreviation}</span>
+                              <span className="text-gray-400 text-xs">+{user.lastPick.spread}</span>
+                            </div>
+                            <span className="text-xs text-gray-500">Wk {user.lastPick.weekNumber}</span>
+                          </div>
+                          {user.lastPick.result === 'win' ? (
+                            <div className="flex items-center text-green-600" title={`Won +${user.lastPick.pointsEarned} pts`}>
+                              <Check className="h-4 w-4" />
+                              <span className="text-xs font-medium ml-0.5">+{user.lastPick.pointsEarned}</span>
+                            </div>
+                          ) : user.lastPick.result === 'loss' ? (
+                            <div className="flex items-center text-red-600" title="Lost">
+                              <X className="h-4 w-4" />
+                            </div>
+                          ) : (
+                            <div className="flex items-center text-gray-400" title="Pending">
+                              <Clock className="h-4 w-4" />
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-xs">No pick</span>
+                      )}
+                    </td>
                     <td className="px-3 py-4 whitespace-nowrap text-center">
                       {user.everyWeekEligible ? (
                         <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center text-green-600">
@@ -218,7 +253,7 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                   </tr>
                   {expandedUserId === user.id && (
                     <tr>
-                      <td colSpan={5} className="px-3 py-4 bg-gray-50">
+                      <td colSpan={6} className="px-3 py-4 bg-gray-50">
                         <div className="animate-in slide-in-from-top-2 duration-200">
                           <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
                             <Calendar className="h-4 w-4 mr-2" />
@@ -285,7 +320,7 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
               ))
             ) : (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center">
+                <td colSpan={6} className="px-3 py-8 text-center">
                   <div className="flex flex-col items-center text-gray-500">
                     <Trophy className="h-10 w-10 text-gray-300 mb-2" />
                     <p className="font-medium">No entries yet</p>
