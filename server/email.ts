@@ -206,38 +206,21 @@ export async function sendWeeklyPickReminderEmail(
       <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
         <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
           
-          <!-- Header with Football Theme -->
+          <!-- Header with Logo -->
           <div style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-radius: 16px 16px 0 0; padding: 32px 24px; text-align: center;">
-            <div style="font-size: 48px; margin-bottom: 8px;">🏈</div>
+            <img src="https://upsetpool.com/upset-pool-logo.png" alt="Upset Pool" style="width: 80px; height: 80px; margin-bottom: 12px;" />
             <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">NFL Upset Pool</h1>
-            <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 16px;">Week ${weekNumber} Reminder</p>
-          </div>
-          
-          <!-- Urgent Alert Banner -->
-          <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 16px 24px; text-align: center;">
-            <p style="margin: 0; color: #ffffff; font-size: 18px; font-weight: 700;">
-              ⏰ PICKS LOCK TODAY AT 1:00 PM ET
-            </p>
+            <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 16px;">Week ${weekNumber}</p>
           </div>
           
           <!-- Main Content -->
           <div style="background-color: #ffffff; padding: 32px 24px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
             
-            <p style="margin: 0 0 20px 0; font-size: 18px; color: #1f2937;">Hey ${username},</p>
+            <p style="margin: 0 0 20px 0; font-size: 20px; color: #1f2937; font-weight: 600;">Upset Poolers,</p>
             
-            <p style="margin: 0 0 24px 0; font-size: 16px; color: #4b5563; line-height: 1.6;">
-              You still need to make your <strong>Week ${weekNumber}</strong> upset pick! Don't miss your chance to score big points.
+            <p style="margin: 0 0 24px 0; font-size: 18px; color: #4b5563; line-height: 1.6;">
+              One hour until picks are <strong style="color: #dc2626;">LOCKED IN!</strong> Good luck!
             </p>
-            
-            <!-- Missing Picks Section -->
-            <div style="background-color: #fafafa; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-              <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">
-                Missing Pick For:
-              </p>
-              <table style="width: 100%; border-collapse: separate; border-spacing: 0 8px;">
-                ${leaguesList}
-              </table>
-            </div>
             
             <!-- CTA Button -->
             <div style="text-align: center; margin: 32px 0;">
@@ -250,9 +233,6 @@ export async function sendWeeklyPickReminderEmail(
           
           <!-- Footer -->
           <div style="background-color: #1f2937; border-radius: 0 0 16px 16px; padding: 24px; text-align: center;">
-            <p style="margin: 0 0 8px 0; color: #9ca3af; font-size: 14px;">
-              Good luck with your picks!
-            </p>
             <p style="margin: 0; color: #6b7280; font-size: 12px;">
               NFL Upset Pool | <a href="https://upsetpool.com" style="color: #60a5fa; text-decoration: none;">upsetpool.com</a>
             </p>
