@@ -104,6 +104,7 @@ export type LastPickInfo = {
   weekNumber: number;
   pickedTeamName: string;
   pickedTeamAbbreviation: string;
+  pickedTeamLogoUrl: string;
   opponentTeamName: string;
   spread: number;
   result: 'win' | 'loss' | 'pending';

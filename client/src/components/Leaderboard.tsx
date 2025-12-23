@@ -3,7 +3,7 @@ import { UserWithEligibility } from "@shared/schema";
 import { LastPickInfo } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Trophy, Medal, Calendar, Check, X, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { Trophy, Medal, Calendar, Check, X, ChevronDown, ChevronUp } from "lucide-react";
 import React, { useState, useEffect } from "react";
 
 interface UserPick {
@@ -203,31 +203,33 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm" data-testid={`last-pick-${user.id}`}>
                       {user.lastPick ? (
-                        <div className="flex items-center space-x-2">
-                          <div className="flex flex-col">
-                            <div className="flex items-center space-x-1">
-                              <span className="font-semibold text-gray-900">{user.lastPick.pickedTeamAbbreviation}</span>
-                              <span className="text-gray-400 text-xs">+{user.lastPick.spread}</span>
-                            </div>
-                            <span className="text-xs text-gray-500">Wk {user.lastPick.weekNumber}</span>
-                          </div>
-                          {user.lastPick.result === 'win' ? (
-                            <div className="flex items-center text-green-600" title={`Won +${user.lastPick.pointsEarned} pts`}>
-                              <Check className="h-4 w-4" />
-                              <span className="text-xs font-medium ml-0.5">+{user.lastPick.pointsEarned}</span>
-                            </div>
-                          ) : user.lastPick.result === 'loss' ? (
-                            <div className="flex items-center text-red-600" title="Lost">
-                              <X className="h-4 w-4" />
-                            </div>
-                          ) : (
-                            <div className="flex items-center text-gray-400" title="Pending">
-                              <Clock className="h-4 w-4" />
-                            </div>
-                          )}
+                        <div 
+                          className={`inline-flex items-center space-x-1.5 px-2 py-1 rounded-md border ${
+                            user.lastPick.result === 'win' 
+                              ? 'bg-green-50 border-green-200' 
+                              : user.lastPick.result === 'loss' 
+                                ? 'bg-red-50 border-red-200' 
+                                : 'bg-gray-50 border-gray-200'
+                          }`}
+                          title={`${user.lastPick.pickedTeamName} vs ${user.lastPick.opponentTeamName} (Week ${user.lastPick.weekNumber})`}
+                        >
+                          <img 
+                            src={user.lastPick.pickedTeamLogoUrl} 
+                            alt={user.lastPick.pickedTeamAbbreviation}
+                            className="h-5 w-5 object-contain"
+                          />
+                          <span className={`text-xs font-bold ${
+                            user.lastPick.result === 'win' 
+                              ? 'text-green-700' 
+                              : user.lastPick.result === 'loss' 
+                                ? 'text-red-700' 
+                                : 'text-gray-600'
+                          }`}>
+                            +{user.lastPick.spread}
+                          </span>
                         </div>
                       ) : (
-                        <span className="text-gray-400 text-xs">No pick</span>
+                        <span className="text-gray-400 text-xs">-</span>
                       )}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-center">
