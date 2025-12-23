@@ -38,7 +38,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     }];
     
     sendSmtpEmail.subject = params.subject;
-    sendSmtpEmail.textContent = params.text || '';
+    sendSmtpEmail.textContent = params.text || 'View this email in HTML format for the full experience.';
     sendSmtpEmail.htmlContent = params.html || params.text || '';
 
     const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
