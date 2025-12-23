@@ -246,18 +246,6 @@ export async function sendWeeklyPickReminderEmail(
               </a>
             </div>
             
-            <!-- How It Works -->
-            <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 12px; padding: 20px; margin-top: 24px;">
-              <p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">
-                How It Works
-              </p>
-              <ul style="margin: 0; padding-left: 20px; color: #1e40af; font-size: 14px; line-height: 1.8;">
-                <li>Pick one underdog team to win straight up</li>
-                <li>If they win, you earn points equal to the spread</li>
-                <li>Higher spreads = bigger risk, bigger reward!</li>
-              </ul>
-            </div>
-            
           </div>
           
           <!-- Footer -->
