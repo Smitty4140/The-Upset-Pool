@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Menu, X } from "lucide-react";
-import upsetPoolLogo from "@assets/Upset Pool.png";
+import upsetPoolLogo from "@assets/UP_Logo_1766504481761.png";
 
 export default function Header() {
   const [location] = useLocation();
