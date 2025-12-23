@@ -29,8 +29,8 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     
     sendSmtpEmail.sender = {
-      name: 'NFL Upset Pool',
-      email: process.env.BREVO_FROM_EMAIL || 'notifications@nflupsetpool.com'
+      name: 'The Upset Pool',
+      email: process.env.BREVO_FROM_EMAIL || 'samsemail123456789@gmail.com'
     };
     
     sendSmtpEmail.to = [{
