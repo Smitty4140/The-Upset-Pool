@@ -288,8 +288,8 @@ class GameScheduler {
       
       console.log(`[Scheduler] ✅ Successfully completed scheduled data pull for week ${week.weekNumber}:`, result.results);
       
-      // After successful data pull, send picks unlocked notifications to active members
-      await this.sendPicksUnlockedNotifications(week.weekNumber);
+      // DISABLED: Picks unlocked notifications - uncomment to re-enable
+      // await this.sendPicksUnlockedNotifications(week.weekNumber);
       
     } catch (error) {
       console.error(`[Scheduler] ❌ Error executing data pull for week ${week.weekNumber}:`, error);

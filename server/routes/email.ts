@@ -35,12 +35,12 @@ router.post("/verify-email", isAuthenticated, async (req: any, res) => {
     // For demo purposes, we'll just send an email with a simulated verification link
     const verificationLink = `https://${req.hostname}/verify-email?token=${verificationToken}&userId=${userId}`;
     
-    // Send welcome email with verification link
-    const emailSent = await sendWelcomeEmail(user.email, user.username);
-    
-    if (!emailSent) {
-      return res.status(500).json({ message: "Failed to send verification email" });
-    }
+    // DISABLED: Welcome email - uncomment to re-enable
+    // const emailSent = await sendWelcomeEmail(user.email, user.username);
+    // if (!emailSent) {
+    //   return res.status(500).json({ message: "Failed to send verification email" });
+    // }
+    const emailSent = true; // Placeholder while welcome emails are disabled
     
     // For demo purposes, automatically verify the email
     // In a real app, the user would need to click the link in the email
