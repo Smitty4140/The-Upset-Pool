@@ -70,7 +70,7 @@ export async function sendWelcomeEmail(email: string, username: string): Promise
           <li>All picks lock at 1 PM EST on Sundays</li>
         </ul>
         <p>Good luck with your picks!</p>
-        <a href="https://nflupsetpool.com" style="display: inline-block; background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 15px;">Make Your First Pick</a>
+        <a href="https://www.upsetpool.com" style="display: inline-block; background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 15px;">Make Your First Pick</a>
         <p style="margin-top: 30px; font-size: 12px; color: #6b7280;">If you have any questions, please don't hesitate to contact us.</p>
       </div>
     `
@@ -91,7 +91,7 @@ export async function sendPickReminderEmail(email: string, username: string, wee
         <p>This is a friendly reminder that you haven't made your Week ${weekNumber} underdog pick yet!</p>
         <p><strong>Deadline:</strong> ${deadline}</p>
         <p>Don't miss your chance to earn points - make your selection now!</p>
-        <a href="https://nflupsetpool.com" style="display: inline-block; background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 15px;">Make Your Pick</a>
+        <a href="https://www.upsetpool.com" style="display: inline-block; background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 15px;">Make Your Pick</a>
         <p style="margin-top: 30px; font-size: 12px; color: #6b7280;">If you believe you've received this email in error, please disregard.</p>
       </div>
     `
@@ -115,7 +115,7 @@ export async function sendWeeklyResultsEmail(email: string, username: string, we
         <p>Hi ${username},</p>
         <p>${resultText}</p>
         <p>Check the leaderboard to see how you stack up against the competition!</p>
-        <a href="https://nflupsetpool.com/leaderboard" style="display: inline-block; background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 15px;">View Leaderboard</a>
+        <a href="https://www.upsetpool.com/leaderboard" style="display: inline-block; background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 15px;">View Leaderboard</a>
         <p style="margin-top: 30px; font-size: 12px; color: #6b7280;">Good luck with your Week ${weekNumber + 1} pick!</p>
       </div>
     `
@@ -165,7 +165,7 @@ export async function sendWeeklyPickConfirmationEmail(
         </div>
 
         <div style="text-align: center; margin: 24px 0;">
-          <a href="https://nflupsetpool.com" style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
+          <a href="https://www.upsetpool.com" style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
             View Upset Pool
           </a>
         </div>

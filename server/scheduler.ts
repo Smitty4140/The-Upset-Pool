@@ -482,15 +482,19 @@ class GameScheduler {
     try {
       console.log('[Scheduler] Starting weekly email reminder test (bypassing week restrictions)...');
       
-      // Get the current NFL week
+      // Get the current NFL week based on today's date (not the active flag)
+      const today = new Date().toISOString().split('T')[0];
       const currentWeek = await db
         .select()
         .from(nflWeeks)
-        .where(eq(nflWeeks.active, true))
+        .where(and(
+          lte(nflWeeks.startDate, today),
+          gte(nflWeeks.endDate, today)
+        ))
         .limit(1);
 
       if (currentWeek.length === 0) {
-        console.log('[Scheduler] No active NFL week found, skipping email reminders');
+        console.log('[Scheduler] No NFL week found for current date, skipping email reminders');
         return;
       }
 
@@ -583,15 +587,19 @@ class GameScheduler {
     try {
       console.log('[Scheduler] Starting weekly email reminder process...');
       
-      // Get the current NFL week
+      // Get the current NFL week based on today's date (not the active flag)
+      const today = new Date().toISOString().split('T')[0];
       const currentWeek = await db
         .select()
         .from(nflWeeks)
-        .where(eq(nflWeeks.active, true))
+        .where(and(
+          lte(nflWeeks.startDate, today),
+          gte(nflWeeks.endDate, today)
+        ))
         .limit(1);
 
       if (currentWeek.length === 0) {
-        console.log('[Scheduler] No active NFL week found, skipping email reminders');
+        console.log('[Scheduler] No NFL week found for current date, skipping email reminders');
         return;
       }
 

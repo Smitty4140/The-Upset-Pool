@@ -151,17 +151,17 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
           <span>As of {formatDate()}</span>
         </div>
       </div>
-      <div className="px-4 py-3">
-        <div className="overflow-x-auto">
+      <div className="px-2 sm:px-4 py-3">
+        <div className="overflow-x-auto -mx-2 sm:mx-0">
           <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Place</th>
-              <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-              <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pooler</th>
-              <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Pick</th>
-              <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Every Week Eligible</th>
-              <th scope="col" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-12"></th>
+              <th scope="col" className="px-2 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Place</th>
+              <th scope="col" className="px-2 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Score</th>
+              <th scope="col" className="px-2 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Pooler</th>
+              <th scope="col" className="hidden sm:table-cell px-2 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Last Pick</th>
+              <th scope="col" className="px-2 sm:px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Eligible</th>
+              <th scope="col" className="px-2 sm:px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-8 sm:w-12"></th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -173,36 +173,36 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                     onClick={() => handleToggleAccordion(user.id)}
                     data-testid={`leaderboard-row-${user.id}`}
                   >
-                    <td className="px-3 py-4 whitespace-nowrap text-sm">
+                    <td className="px-2 sm:px-3 py-3 sm:py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center">
                         {user.rank === 1 ? (
-                          <Medal className="h-5 w-5 text-yellow-500 mr-1" />
+                          <Medal className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
                         ) : user.rank === 2 ? (
-                          <Medal className="h-5 w-5 text-gray-400 mr-1" />
+                          <Medal className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
                         ) : user.rank === 3 ? (
-                          <Medal className="h-5 w-5 text-amber-700 mr-1" />
+                          <Medal className="h-4 w-4 sm:h-5 sm:w-5 text-amber-700" />
                         ) : (
-                          <span className="font-medium text-gray-700 mx-1">{user.rank}</span>
+                          <span className="font-medium text-gray-700 text-sm">{user.rank}</span>
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full inline-block">
-                        {user.totalPoints || "0"} pts
+                    <td className="px-2 sm:px-3 py-3 sm:py-4 whitespace-nowrap">
+                      <div className="text-xs sm:text-sm font-bold bg-blue-50 text-blue-700 px-2 sm:px-3 py-1 rounded-full inline-block">
+                        {user.totalPoints || "0"}
                       </div>
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-700">
+                    <td className="px-2 sm:px-3 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-700">
                       <div className="flex items-center">
-                        <Avatar className="h-7 w-7 mr-2 border border-gray-200">
+                        <Avatar className="h-6 w-6 sm:h-7 sm:w-7 mr-1.5 sm:mr-2 border border-gray-200 flex-shrink-0">
                           <AvatarImage src={user.profileImageUrl ?? ""} alt={user.username ?? ""} />
-                          <AvatarFallback className="bg-primary/10 text-primary">
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
                             {user.username?.[0].toUpperCase() || "?"}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="font-medium">{user.username}</span>
+                        <span className="font-medium text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{user.username}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm" data-testid={`last-pick-${user.id}`}>
+                    <td className="hidden sm:table-cell px-2 sm:px-3 py-3 sm:py-4 whitespace-nowrap text-sm" data-testid={`last-pick-${user.id}`}>
                       {user.lastPick ? (
                         <div 
                           className={`inline-flex items-center space-x-1.5 px-2 py-1 rounded-md border ${
@@ -233,24 +233,22 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                         <span className="text-gray-400 text-xs">-</span>
                       )}
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-center">
+                    <td className="px-2 sm:px-3 py-3 sm:py-4 whitespace-nowrap text-center">
                       {user.everyWeekEligible ? (
                         <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center text-green-600">
-                          <Check className="h-5 w-5" />
-                          <span className="ml-1 font-medium">Yes</span>
+                          <Check className="h-4 w-4 sm:h-5 sm:w-5" />
                         </div>
                       ) : (
                         <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center text-red-600">
-                          <X className="h-5 w-5" />
-                          <span className="ml-1 font-medium">No</span>
+                          <X className="h-4 w-4 sm:h-5 sm:w-5" />
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-center">
+                    <td className="px-1 sm:px-3 py-3 sm:py-4 whitespace-nowrap text-center">
                       {expandedUserId === user.id ? (
-                        <ChevronUp className="h-5 w-5 text-gray-400 mx-auto" />
+                        <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 mx-auto" />
                       ) : (
-                        <ChevronDown className="h-5 w-5 text-gray-400 mx-auto" />
+                        <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 mx-auto" />
                       )}
                     </td>
                   </tr>
@@ -290,7 +288,7 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                                         {pick.pickedTeamName}
                                       </div>
                                       <div className="text-xs text-gray-500">
-                                        vs {pick.opponentTeamName} (+{Math.abs(parseFloat(pick.spread))})
+                                        vs {pick.opponentTeamName} (+{Math.abs(pick.spread)})
                                       </div>
                                     </div>
                                   </div>
