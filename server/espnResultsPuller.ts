@@ -17,11 +17,12 @@ export async function pullNFLResultsFromESPN(storage: IStorage, weekId: number) 
       throw new Error(`NFL week ID ${weekId} not found`);
     }
     
-    // Get current season year
-    const currentYear = new Date().getFullYear();
+    // Use the season year from the week data, not the current calendar year
+    // This is critical because Week 18 of the 2025 season is in January 2026
+    const seasonYear = week.season;
     
     // Fetch game results from ESPN API
-    const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${currentYear}&seasontype=2&week=${week.weekNumber}`;
+    const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${seasonYear}&seasontype=2&week=${week.weekNumber}`;
     console.log(`[ESPNResultsPuller] Fetching from ESPN: ${espnUrl}`);
     
     const response = await fetch(espnUrl);
