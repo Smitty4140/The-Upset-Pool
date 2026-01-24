@@ -133,18 +133,8 @@ export function setupAuth(app: Express) {
           });
           console.log('Linked Google account to existing user:', user.id);
           
-          // Check if user is in any leagues, if not add to default
-          try {
-            const userLeagues = await storage.getUserLeagues(user.id);
-            if (userLeagues.length === 0) {
-              await storage.addUserToLeague(1, user.id); // League 1 is default
-              console.log('Added linked Google user to default league:', user.id);
-            } else {
-              console.log('Linked user already in leagues:', userLeagues.length);
-            }
-          } catch (error) {
-            console.error('Error checking/adding linked user to default league:', error);
-          }
+          // Note: Users now join leagues manually via invite code after registration
+          console.log('User needs to join a league manually:', user.id);
         } else {
           // Create new user without username - they'll need to set it
           const userId = `google_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -160,15 +150,8 @@ export function setupAuth(app: Express) {
             totalPoints: "0"
           });
 
-          console.log('Created new Google user (needs username):', user.id);
-
-          // Add user to default league
-          try {
-            await storage.addUserToLeague(1, userId); // League 1 is default
-            console.log('Added Google user to default league:', userId);
-          } catch (error) {
-            console.error('Error adding Google user to default league:', error);
-          }
+          console.log('Created new Google user (needs username and league):', user.id);
+          // Note: Users now join leagues manually via invite code after registration
         }
       }
 
@@ -238,8 +221,7 @@ export function setupAuth(app: Express) {
       req.login(newUser, (err) => {
         if (err) return next(err);
         
-        // Auto-add to default league
-        storage.addUserToLeague(1, newUser.id, false).catch(console.error);
+        // Note: Users now join leagues manually via invite code after registration
         
         res.status(201).json({
           id: newUser.id,
