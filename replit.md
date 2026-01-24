@@ -136,3 +136,9 @@ Preferred communication style: Simple, everyday language.
     - Game-specific lock: Individual `gameTime` prevents picks after each game's kickoff
     - Both mechanisms properly handle EDT/EST transitions
   - **Result**: All countdowns, locks, and automated jobs occur at correct ET times without duplication
+- **Manual League Joining**: Removed automatic league assignment for new users
+  - New users are no longer auto-added to the default NFL Upset Pool league
+  - Created JoinLeague page with invite code input and league creation option
+  - Users must manually join a league via invite code or create their own
+  - App routing redirects users without leagues to JoinLeague page after username setup
+  - Removed auto-add logic from storage.ts (createUser, upsertUser) and replitAuth.ts
