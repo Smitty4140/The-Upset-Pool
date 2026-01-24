@@ -1,6 +1,6 @@
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
@@ -13,6 +13,7 @@ import AuthPage from "@/pages/auth-page";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import SetupUsername from "@/pages/SetupUsername";
+import JoinLeague from "@/pages/JoinLeague";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +21,12 @@ import { useAuth } from "@/hooks/useAuth";
 function Router() {
   const { user, isLoading } = useAuth();
   const [location] = useLocation();
+  
+  // Fetch user's leagues
+  const { data: userLeagues, isLoading: isLoadingLeagues } = useQuery<any[]>({
+    queryKey: ["/api/user/leagues"],
+    enabled: !!user && !!user.username,
+  });
   
   // For callback path, show loading
   if (location.includes('/api/callback')) {
@@ -53,7 +60,17 @@ function Router() {
     return <SetupUsername />;
   }
   
-  // If user is logged in and has username, show regular app layout
+  // Show loading while checking leagues
+  if (isLoadingLeagues) {
+    return <div className="flex h-screen w-screen items-center justify-center">Loading...</div>;
+  }
+  
+  // Check if user needs to join a league
+  if (user && user.username && (!userLeagues || userLeagues.length === 0)) {
+    return <JoinLeague />;
+  }
+  
+  // If user is logged in, has username, and is in a league, show regular app layout
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
