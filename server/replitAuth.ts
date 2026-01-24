@@ -68,25 +68,7 @@ async function upsertUser(
     profileImageUrl: claims["profile_image_url"],
   });
 
-  try {
-    // Check if user is already in the default league (NFL Upset Pool - ID 1)
-    const userLeagues = await storage.getUserLeagues(user.id);
-    const isAlreadyInLeague = userLeagues.some(ul => ul.leagueId === 1);
-    
-    // If not in the league yet, automatically add them
-    if (!isAlreadyInLeague) {
-      console.log(`Auto-adding new user ${user.username} (${user.id}) to the NFL Upset Pool league`);
-      await storage.addLeagueMember({
-        leagueId: 1, // Default league - NFL Upset Pool
-        userId: user.id,
-        isAdmin: false,
-      });
-    }
-  } catch (error) {
-    console.error("Error adding user to default league:", error);
-    // Continue with auth flow even if league joining fails
-  }
-  
+  // Users must manually join leagues via invite code or create their own
   return user;
 }
 

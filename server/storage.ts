@@ -138,19 +138,7 @@ export class DatabaseStorage implements IStorage {
     };
     const [user] = await db.insert(users).values(normalizedUserData).returning();
     
-    // Automatically add new users to the default league (NFL Upset Pool - ID 1)
-    try {
-      console.log(`Auto-adding new user ${user.username} (${user.id}) to the NFL Upset Pool league`);
-      await this.addLeagueMember({
-        leagueId: 1, // Default league - NFL Upset Pool
-        userId: user.id,
-        isAdmin: false,
-      });
-    } catch (error) {
-      console.error("Error adding user to default league:", error);
-      // Continue with user creation even if league joining fails
-    }
-    
+    // Users must manually join leagues via invite code or create their own
     return user;
   }
 
@@ -182,24 +170,7 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
 
-    // Automatically add new users to the default league (NFL Upset Pool - ID 1)
-    try {
-      const userLeagues = await this.getUserLeagues(user.id);
-      const isAlreadyInLeague = userLeagues.some(ul => ul.leagueId === 1);
-      
-      if (!isAlreadyInLeague) {
-        console.log(`Auto-adding user ${user.username} (${user.id}) to the NFL Upset Pool league`);
-        await this.addLeagueMember({
-          leagueId: 1, // Default league - NFL Upset Pool
-          userId: user.id,
-          isAdmin: false,
-        });
-      }
-    } catch (error) {
-      console.error("Error adding user to default league:", error);
-      // Continue with user creation even if league joining fails
-    }
-
+    // Users must manually join leagues via invite code or create their own
     return user;
   }
 
