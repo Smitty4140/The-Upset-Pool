@@ -730,6 +730,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Invalid invite code" });
       }
       
+      // Check if league is archived
+      if (league.isArchived) {
+        return res.status(400).json({ message: "This league is archived and no longer accepting new members" });
+      }
+      
       // Check if user is already a member
       const existingMember = await storage.getLeagueMember(league.id, userId);
       if (existingMember) {
@@ -769,6 +774,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
+      }
+      
+      // Check if league is archived
+      if (league.isArchived) {
+        return res.status(400).json({ message: "This league is archived and no longer accepting new members" });
       }
 
       // Check if user is already a member
@@ -1733,6 +1743,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Archive or unarchive a league (admin only)
+  app.patch('/api/leagues/:leagueId/archive', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const leagueId = parseInt(req.params.leagueId);
+      const { isArchived } = req.body;
+      
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+      
+      if (typeof isArchived !== 'boolean') {
+        return res.status(400).json({ message: "isArchived must be a boolean" });
+      }
+      
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+      
+      const updatedLeague = await storage.updateLeague(leagueId, {
+        isArchived,
+        archivedAt: isArchived ? new Date() : null,
+      } as any);
+      
+      res.json({
+        message: isArchived ? "League archived successfully" : "League unarchived successfully",
+        league: updatedLeague
+      });
+    } catch (error) {
+      console.error("Error archiving league:", error);
+      res.status(500).json({ message: "Failed to archive league" });
+    }
+  });
+  
   // Super user only route to set game winner and calculate points
   app.post('/api/games/:id/result', isAuthenticated, isSuperUser, async (req: any, res) => {
     try {
@@ -2034,6 +2078,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!leagueMember.isActive) {
         return res.status(403).json({ message: "Your team is not activated. Contact your league admin to start picking upsets." });
+      }
+      
+      // Check if league is archived
+      const league = await storage.getLeague(leagueId);
+      if (league?.isArchived) {
+        return res.status(400).json({ message: "This league is archived. Picks cannot be submitted." });
       }
       
       console.log(`Parsed pick data - Game ID: ${gameId}, Team ID: ${pickedTeamId}, League ID: ${leagueId}, Week ID: ${weekId}`);
