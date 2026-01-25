@@ -241,6 +241,11 @@ export const insertNFLTeamSchema = createInsertSchema(nflTeams);
 export type League = typeof leagues.$inferSelect;
 export type InsertLeague = typeof leagues.$inferInsert;
 export const insertLeagueSchema = createInsertSchema(leagues).omit({ 
+  id: true,
+  inviteCode: true,
+  season: true,
+  isArchived: true,
+  archivedAt: true,
   createdAt: true, 
   updatedAt: true 
 });
