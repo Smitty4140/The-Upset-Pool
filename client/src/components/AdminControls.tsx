@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share, Trash2, DollarSign } from "lucide-react";
+import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share, Trash2, DollarSign, Archive } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { formatWeeklyDate } from "@/lib/formatDate";
 import { NFLWeek, League, NFLGame, NFLTeam, User } from "@/lib/types";
@@ -250,6 +250,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
   const [isLoadingGames, setIsLoadingGames] = useState(false);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [isLoadingScheduler, setIsLoadingScheduler] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
 
   // Check if current user is super user
   const { data: superUserStatus } = useQuery<{ isSuperUser: boolean }>({
@@ -696,6 +697,50 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
     }
   };
 
+  const toggleLeagueArchive = async () => {
+    if (!user || !league) return;
+    
+    const newArchiveStatus = !league.isArchived;
+    
+    setIsArchiving(true);
+    try {
+      const response = await fetch(`/api/leagues/${leagueId}/archive`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          isArchived: newArchiveStatus
+        }),
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to ${newArchiveStatus ? 'archive' : 'unarchive'} league`);
+      }
+      
+      const result = await response.json();
+      
+      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/user/leagues`] });
+      
+      toast({
+        title: "Success",
+        description: result.message || `League ${newArchiveStatus ? 'archived' : 'unarchived'} successfully`,
+        variant: "default"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || `Failed to ${newArchiveStatus ? 'archive' : 'unarchive'} league`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
   if (isLoadingAuth || isLoadingWeek || isLoadingLeague || isLoadingMembers) {
     return null; // Don't show anything while loading
   }
@@ -946,6 +991,53 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
             </Button>
           </div>
         </div>
+            
+            <Separator className="my-6" />
+            
+            {/* League Archive Section - Super User Only */}
+            <div className="mb-6">
+              <div className="text-sm font-medium mb-2">League Archive Management</div>
+              <div className={`${league?.isArchived ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'} border rounded-md p-3 mb-4 flex items-start`}>
+                <Archive className={`h-5 w-5 ${league?.isArchived ? 'text-red-500' : 'text-orange-500'} mt-0.5 mr-2 flex-shrink-0`} />
+                <div className={`text-sm ${league?.isArchived ? 'text-red-800' : 'text-orange-800'}`}>
+                  {league?.isArchived 
+                    ? `This league is archived${league?.season ? ` (Season ${league.season})` : ''}. No new members can join and no picks can be submitted. Unarchive to reactivate.`
+                    : 'Archiving a league will prevent new members from joining and block all pick submissions. Use this at the end of a season.'}
+                </div>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
+                <div className="mb-3 sm:mb-0">
+                  <div className="text-sm font-medium">
+                    Archive Status: 
+                    <span className={league?.isArchived ? " text-red-600" : " text-green-600"}>
+                      {league?.isArchived ? " Archived" : " Active"}
+                    </span>
+                  </div>
+                  {league?.archivedAt && (
+                    <div className="text-sm text-muted-foreground">
+                      Archived on: {new Date(league.archivedAt).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+                
+                <Button
+                  variant={league?.isArchived ? "default" : "destructive"}
+                  size="sm"
+                  disabled={isArchiving}
+                  onClick={toggleLeagueArchive}
+                  className="ml-auto"
+                >
+                  {isArchiving ? "Updating..." : (
+                    league?.isArchived ? (
+                      <><Archive className="h-4 w-4 mr-2" /> Unarchive League</>
+                    ) : (
+                      <><Archive className="h-4 w-4 mr-2" /> Archive League</>
+                    )
+                  )}
+                </Button>
+              </div>
+            </div>
             
             <Separator className="my-6" />
           </>

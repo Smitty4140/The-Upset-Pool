@@ -28,6 +28,9 @@ export interface League {
   name: string;
   description: string | null;
   inviteCode: string;
+  season: number | null;
+  isArchived: boolean;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
