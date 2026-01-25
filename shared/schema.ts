@@ -60,6 +60,9 @@ export const leagues = pgTable("leagues", {
   name: varchar("name").notNull(),
   description: text("description"),
   inviteCode: varchar("invite_code", { length: 6 }).notNull().unique(),
+  season: integer("season").notNull().default(2025), // NFL season year
+  isArchived: boolean("is_archived").default(false),
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
