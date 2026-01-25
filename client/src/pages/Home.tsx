@@ -391,7 +391,7 @@ export default function Home() {
                 <Skeleton className="h-8 w-full sm:w-48" />
               ) : (
                 <Select
-                  value={selectedLeagueId.toString()}
+                  value={selectedLeagueId?.toString() || ""}
                   onValueChange={(value) => setSelectedLeagueId(Number(value))}
                 >
                   <SelectTrigger className="w-full sm:w-64 max-w-xs">
