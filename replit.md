@@ -142,3 +142,10 @@ Preferred communication style: Simple, everyday language.
   - Users must manually join a league via invite code or create their own
   - App routing redirects users without leagues to JoinLeague page after username setup
   - Removed auto-add logic from storage.ts (createUser, upsertUser) and replitAuth.ts
+- **League Archiving**: Added ability to archive leagues at end of season
+  - Added season, isArchived, and archivedAt fields to leagues table
+  - Archived leagues cannot accept new members (blocked on both API endpoints)
+  - Archived leagues cannot have picks submitted (blocked on pick submission API)
+  - Super users can archive/unarchive leagues via PATCH /api/leagues/:leagueId/archive
+  - Frontend displays archived league banner with season info
+  - Pick submission is disabled for archived leagues in the UI
