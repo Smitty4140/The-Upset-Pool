@@ -181,6 +181,17 @@ export default function Home() {
     queryKey: [`/api/leagues/${leagueId}/members`],
   });
 
+  // Get current league info (including archive status)
+  const { data: currentLeagueInfo } = useQuery<{
+    id: number;
+    name: string;
+    isArchived?: boolean;
+    season?: number;
+  }>({
+    queryKey: [`/api/leagues/${leagueId}`],
+    enabled: !!leagueId,
+  });
+
   // Check user's activation status in the league
   const { data: memberStatus } = useQuery<{
     isActive: boolean;
@@ -342,8 +353,8 @@ export default function Home() {
     return now >= new Date(currentWeek.picksLockAt);
   })();
 
-  // Determine if the selected week allows picks (only current week + not locked)
-  const canMakePicks = activeWeekId === pickableWeekId && !arePicksLocked;
+  // Determine if the selected week allows picks (only current week + not locked + not archived)
+  const canMakePicks = activeWeekId === pickableWeekId && !arePicksLocked && !currentLeagueInfo?.isArchived;
 
   // Check if viewing a future week (picks not allowed yet)
   const isViewingFutureWeek =
@@ -548,8 +559,28 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Archived League Banner */}
+              {currentLeagueInfo?.isArchived && (
+                <div className="bg-gray-100 border-l-4 border-gray-500 px-6 py-4">
+                  <div className="flex items-center">
+                    <div className="flex">
+                      <Lock className="h-5 w-5 text-gray-500" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-gray-700 font-medium">
+                        League Archived
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        This league has been archived for the {currentLeagueInfo?.season || 2025} season. 
+                        Picks and member changes are no longer allowed.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Payment Warning Banner */}
-              {memberStatus && !memberStatus.hasPaid && (
+              {memberStatus && !memberStatus.hasPaid && !currentLeagueInfo?.isArchived && (
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 px-6 py-4">
                   <div className="flex items-center">
                     <div className="flex">
