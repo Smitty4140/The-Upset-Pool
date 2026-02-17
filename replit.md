@@ -149,3 +149,8 @@ Preferred communication style: Simple, everyday language.
   - Super users can archive/unarchive leagues via PATCH /api/leagues/:leagueId/archive
   - Frontend displays archived league banner with season info
   - Pick submission is disabled for archived leagues in the UI
+- **Dual Database Environment**: Separate databases for development and production
+  - Development: Neon database (DEV_DATABASE_URL env var) for testing and data manipulation
+  - Production: Replit built-in PostgreSQL database (DATABASE_URL) for live app
+  - server/db.ts automatically selects the correct database based on NODE_ENV
+  - Schema must be pushed to both databases when changes are made

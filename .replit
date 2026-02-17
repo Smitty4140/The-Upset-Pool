@@ -38,3 +38,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_sendgrid:1.0.0"]
+
+[userenv]
+
+[userenv.development]
+DEV_DATABASE_URL = "postgresql://neondb_owner:npg_Xajnz5Hy9EUh@ep-blue-star-ai2wyu6y-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
