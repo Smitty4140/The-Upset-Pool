@@ -313,7 +313,7 @@ export default function Home() {
   // Check if user's picked game has already kicked off (pick is locked for the week)
   const isPickLockedByKickoff = (() => {
     if (!userPick || !games) return false;
-    const pickedGame = games.find((g) => g.id === userPick.gameId);
+    const pickedGame = games.find((g) => String(g.id) === String(userPick.gameId));
     if (!pickedGame) return false;
     const gameTimeStr = pickedGame.gameTime;
     let kickoff: Date;
