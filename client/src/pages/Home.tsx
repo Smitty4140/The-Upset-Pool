@@ -65,6 +65,12 @@ export default function Home() {
   const [sortOption, setSortOption] = useState<SortOption>("gameTime");
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
   const [selectedLeagueId, setSelectedLeagueId] = useState<number>(1);
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentTime(new Date()), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Dynamic league ID based on user selection
   const leagueId = selectedLeagueId;
@@ -303,6 +309,21 @@ export default function Home() {
 
   // Check if user has a pick
   const hasSubmittedPick = !!userPick;
+
+  // Check if user's picked game has already kicked off (pick is locked for the week)
+  const isPickLockedByKickoff = (() => {
+    if (!userPick || !games) return false;
+    const pickedGame = games.find((g) => g.id === userPick.gameId);
+    if (!pickedGame) return false;
+    const gameTimeStr = pickedGame.gameTime;
+    let kickoff: Date;
+    if (gameTimeStr.includes('Z') || gameTimeStr.includes('+') || (gameTimeStr.includes('-') && gameTimeStr.lastIndexOf('-') > 10)) {
+      kickoff = new Date(gameTimeStr);
+    } else {
+      kickoff = new Date(gameTimeStr + 'Z');
+    }
+    return currentTime > kickoff;
+  })();
 
   // Initialize selection with user's current pick if it exists
   useEffect(() => {
@@ -621,6 +642,15 @@ export default function Home() {
                   </div>
                 ) : (
                   <>
+                    {isPickLockedByKickoff && !arePicksLocked && (
+                      <div className="mb-4 bg-amber-50 border border-amber-300 rounded-lg p-4 flex items-center gap-3">
+                        <Lock className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                        <div>
+                          <p className="font-semibold text-amber-800">Your pick is locked for the week</p>
+                          <p className="text-sm text-amber-700">Your selected game has kicked off. You can no longer change your pick this week.</p>
+                        </div>
+                      </div>
+                    )}
                     {sortedGames && sortedGames.length > 0 ? (
                       <form
                         id="pick-form"
@@ -645,6 +675,7 @@ export default function Home() {
                               isInactive={
                                 memberStatus ? !memberStatus.isActive : null
                               }
+                              isPickLockedByKickoff={isPickLockedByKickoff}
                             />
                           ))}
                         </div>

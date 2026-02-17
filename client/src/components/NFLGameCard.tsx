@@ -21,9 +21,10 @@ type NFLGameCardProps = {
   isViewingFutureWeek?: boolean;
   isSubmitting?: boolean;
   isInactive?: boolean;
+  isPickLockedByKickoff?: boolean;
 };
 
-export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false, isInactive = false }: NFLGameCardProps) {
+export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false, isInactive = false, isPickLockedByKickoff = false }: NFLGameCardProps) {
   // State to track current time for automatic refresh (triggers re-renders)
   const [, setCurrentTime] = useState<Date>(new Date());
   
@@ -82,11 +83,12 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   const isGameSelected = selectedTeamId !== null && 
                         selectedGameId === game.id;
   
+  const isFullyLocked = disabled || isViewingFutureWeek || isInactive || hasGameStarted || isPickLockedByKickoff;
+
   // Always select the underdog team regardless of which team is clicked
   const handleHomeTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (disabled || isViewingFutureWeek || isInactive || hasGameStarted) return;
-    // Always select the underdog team
+    if (isFullyLocked) return;
     if (underdogTeamId) {
       onSelect(game.id, underdogTeamId);
     }
@@ -94,8 +96,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   
   const handleAwayTeamClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (disabled || isViewingFutureWeek || isInactive || hasGameStarted) return;
-    // Always select the underdog team
+    if (isFullyLocked) return;
     if (underdogTeamId) {
       onSelect(game.id, underdogTeamId);
     }
@@ -103,6 +104,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
 
   const tooltipContent = isInactive
     ? "Your team is not activated. Contact your league admin to start picking upsets."
+    : isPickLockedByKickoff
+      ? "Your pick is locked — your selected game has already kicked off"
     : hasGameStarted
       ? "This game has already started and is no longer available for picks"
     : isViewingFutureWeek 
@@ -114,17 +117,17 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   const gameCard = (
     <div 
       className={`game-card transition-all duration-150 ease-in-out border rounded-lg mb-4 last:mb-0 overflow-hidden shadow-sm 
-        ${!disabled && !isViewingFutureWeek && !isInactive && !hasGameStarted ? 'hover:shadow-md' : ''} 
+        ${!isFullyLocked ? 'hover:shadow-md' : ''} 
         ${isGameSelected ? 'border-primary border-2 shadow-md relative' : 'border-gray-200'}
-        ${disabled || isViewingFutureWeek || isInactive || hasGameStarted ? 'opacity-75' : ''}
-        ${isViewingFutureWeek || isInactive || hasGameStarted ? 'cursor-not-allowed' : ''}
-        ${hasGameStarted ? 'bg-gray-50 border-gray-300' : ''}`}
+        ${isFullyLocked ? 'opacity-75' : ''}
+        ${isFullyLocked ? 'cursor-not-allowed' : ''}
+        ${hasGameStarted || (isPickLockedByKickoff && !isGameSelected) ? 'bg-gray-50 border-gray-300' : ''}`}
     >
       {/* Selected Game indicator at the top */}
       {isGameSelected && (
-        <div className="bg-green-600 text-white text-sm font-bold text-center py-2 flex items-center justify-center space-x-1">
-          <Check size={16} />
-          <span>Selected Game</span>
+        <div className={`${isPickLockedByKickoff ? 'bg-amber-600' : 'bg-green-600'} text-white text-sm font-bold text-center py-2 flex items-center justify-center space-x-1`}>
+          {isPickLockedByKickoff ? <Lock size={16} /> : <Check size={16} />}
+          <span>{isPickLockedByKickoff ? 'Pick Locked' : 'Selected Game'}</span>
         </div>
       )}
       
@@ -146,8 +149,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         {/* Away Team Row */}
         <div 
           className={`px-4 py-4 flex items-center justify-between transition-colors ${
-            !disabled && !isViewingFutureWeek && !isInactive && !hasGameStarted ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
-          } ${disabled || isViewingFutureWeek || isInactive || hasGameStarted ? 'opacity-60' : ''
+            !isFullyLocked ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
+          } ${isFullyLocked ? 'opacity-60' : ''
           }`} 
           onClick={handleAwayTeamClick}
         >
@@ -182,8 +185,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         {/* Home Team Row */}
         <div 
           className={`px-4 py-4 flex items-center justify-between transition-colors ${
-            !disabled && !isViewingFutureWeek && !isInactive && !hasGameStarted ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
-          } ${disabled || isViewingFutureWeek || isInactive || hasGameStarted ? 'opacity-60' : ''
+            !isFullyLocked ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
+          } ${isFullyLocked ? 'opacity-60' : ''
           }`} 
           onClick={handleHomeTeamClick}
         >
@@ -212,7 +215,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
       </div>
       
       {/* Submit button at the bottom when game is selected */}
-      {isGameSelected && onSubmit && !disabled && !isViewingFutureWeek && !isInactive && !hasGameStarted && (
+      {isGameSelected && onSubmit && !isFullyLocked && (
         <div className="bg-gray-50 px-4 py-3 border-t border-gray-100">
           <Button 
             onClick={(e) => {
