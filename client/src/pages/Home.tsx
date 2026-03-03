@@ -21,7 +21,9 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -96,17 +98,37 @@ export default function Home() {
     }
   }, [userLeagues]); // Remove selectedLeagueId dependency to prevent re-triggering
 
-  // Get all NFL weeks
+  // Get current league info (including archive status and season)
+  // Placed before week queries so season is available for filtering
+  const { data: currentLeagueInfo } = useQuery<{
+    id: number;
+    name: string;
+    isArchived?: boolean;
+    season?: number;
+  }>({
+    queryKey: [`/api/leagues/${leagueId}`],
+    enabled: !!leagueId,
+  });
+
+  // The season for the currently selected league — used to scope week queries
+  const leagueSeason = currentLeagueInfo?.season;
+
+  // Reset selected week whenever the user switches leagues
+  useEffect(() => {
+    setSelectedWeekId(null);
+  }, [leagueId]);
+
+  // Get all NFL weeks scoped to this league's season
   const { data: allWeeks, isLoading: isLoadingAllWeeks } = useQuery<NFLWeek[]>({
-    queryKey: ["/api/nfl-weeks"],
+    queryKey: [leagueSeason ? `/api/nfl-weeks?season=${leagueSeason}` : "/api/nfl-weeks"],
   });
 
-  // Get the current NFL week
+  // Get the current NFL week scoped to this league's season
   const { data: currentWeek, isLoading: isLoadingWeek } = useQuery<NFLWeek>({
-    queryKey: ["/api/nfl-weeks/current"],
+    queryKey: [leagueSeason ? `/api/nfl-weeks/current?season=${leagueSeason}` : "/api/nfl-weeks/current"],
   });
 
-  // Set selected week when current week loads
+  // Set selected week when current week loads (or reloads after league switch)
   useEffect(() => {
     if (currentWeek?.id && !selectedWeekId) {
       setSelectedWeekId(currentWeek.id);
@@ -185,17 +207,6 @@ export default function Home() {
   // Get league members to check admin status
   const { data: leagueMembers, isLoading: isLoadingMembers } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/members`],
-  });
-
-  // Get current league info (including archive status)
-  const { data: currentLeagueInfo } = useQuery<{
-    id: number;
-    name: string;
-    isArchived?: boolean;
-    season?: number;
-  }>({
-    queryKey: [`/api/leagues/${leagueId}`],
-    enabled: !!leagueId,
   });
 
   // Check user's activation status in the league
@@ -419,25 +430,54 @@ export default function Home() {
                     <SelectValue placeholder="Select a league" />
                   </SelectTrigger>
                   <SelectContent>
-                    {userLeagues &&
-                      Array.isArray(userLeagues) &&
-                      userLeagues.map((membership: any) => (
-                        <SelectItem
-                          key={membership.league?.id || membership.id}
-                          value={(
-                            membership.league?.id || membership.id
-                          ).toString()}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="truncate">
-                              {membership.league?.name || membership.name}
-                            </span>
-                            {membership.isAdmin && (
-                              <Trophy className="h-3 w-3 text-yellow-600 flex-shrink-0" />
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
+                    {(() => {
+                      const memberships = userLeagues && Array.isArray(userLeagues) ? userLeagues : [];
+                      const activeLeagues = memberships.filter((m: any) => !m.league?.isArchived);
+                      const archivedLeagues = memberships.filter((m: any) => m.league?.isArchived);
+
+                      const renderItem = (membership: any) => {
+                        const leagueId = membership.league?.id || membership.id;
+                        const leagueName = membership.league?.name || membership.name;
+                        const isArchived = membership.league?.isArchived;
+                        const season = membership.league?.season;
+                        return (
+                          <SelectItem key={leagueId} value={leagueId.toString()}>
+                            <div className="flex items-center gap-2">
+                              {isArchived && <Lock className="h-3 w-3 text-gray-400 flex-shrink-0" />}
+                              <span className={`truncate ${isArchived ? "text-gray-500" : ""}`}>
+                                {leagueName}{isArchived && season ? ` — ${season}` : ""}
+                              </span>
+                              {membership.isAdmin && !isArchived && (
+                                <Trophy className="h-3 w-3 text-yellow-600 flex-shrink-0" />
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      };
+
+                      return (
+                        <>
+                          {activeLeagues.length > 0 && (
+                            <SelectGroup>
+                              {archivedLeagues.length > 0 && (
+                                <SelectLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                  Active Leagues
+                                </SelectLabel>
+                              )}
+                              {activeLeagues.map(renderItem)}
+                            </SelectGroup>
+                          )}
+                          {archivedLeagues.length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                                Past Seasons
+                              </SelectLabel>
+                              {archivedLeagues.map(renderItem)}
+                            </SelectGroup>
+                          )}
+                        </>
+                      );
+                    })()}
                   </SelectContent>
                 </Select>
               )}
