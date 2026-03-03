@@ -74,7 +74,9 @@ export interface IStorage {
 
   // NFL Week operations
   getNFLWeeks(): Promise<NFLWeek[]>;
+  getNFLWeeksBySeason(season: number): Promise<NFLWeek[]>;
   getCurrentNFLWeek(): Promise<NFLWeek | undefined>;
+  getCurrentNFLWeekForSeason(season: number): Promise<NFLWeek | undefined>;
   getNFLWeek(id: number): Promise<NFLWeek | undefined>;
   createNFLWeek(week: InsertNFLWeek): Promise<NFLWeek>;
   updateNFLWeek(id: number, week: Partial<InsertNFLWeek>): Promise<NFLWeek | undefined>;
@@ -352,6 +354,14 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(nflWeeks).orderBy(nflWeeks.season, nflWeeks.weekNumber);
   }
 
+  async getNFLWeeksBySeason(season: number): Promise<NFLWeek[]> {
+    return await db
+      .select()
+      .from(nflWeeks)
+      .where(eq(nflWeeks.season, season))
+      .orderBy(nflWeeks.weekNumber);
+  }
+
   async getCurrentNFLWeek(): Promise<NFLWeek | undefined> {
     const now = new Date().toISOString().split('T')[0]; // Get YYYY-MM-DD format
     const [week] = await db
@@ -376,6 +386,50 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     
     return upcomingWeek;
+  }
+
+  async getCurrentNFLWeekForSeason(season: number): Promise<NFLWeek | undefined> {
+    const now = new Date().toISOString().split('T')[0];
+
+    // Try to find an active week in this season
+    const [activeWeek] = await db
+      .select()
+      .from(nflWeeks)
+      .where(
+        and(
+          eq(nflWeeks.season, season),
+          gte(nflWeeks.endDate, now),
+          lte(nflWeeks.startDate, now)
+        )
+      )
+      .limit(1);
+
+    if (activeWeek) return activeWeek;
+
+    // Try the next upcoming week in this season
+    const [upcomingWeek] = await db
+      .select()
+      .from(nflWeeks)
+      .where(
+        and(
+          eq(nflWeeks.season, season),
+          gte(nflWeeks.startDate, now)
+        )
+      )
+      .orderBy(nflWeeks.startDate)
+      .limit(1);
+
+    if (upcomingWeek) return upcomingWeek;
+
+    // Season is in the past — return the last week of that season
+    const [lastWeek] = await db
+      .select()
+      .from(nflWeeks)
+      .where(eq(nflWeeks.season, season))
+      .orderBy(desc(nflWeeks.weekNumber))
+      .limit(1);
+
+    return lastWeek;
   }
 
   async getNFLWeek(id: number): Promise<NFLWeek | undefined> {

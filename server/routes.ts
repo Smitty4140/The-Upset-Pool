@@ -266,9 +266,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all NFL weeks
-  app.get('/api/nfl-weeks', async (_req, res) => {
+  app.get('/api/nfl-weeks', async (req, res) => {
     try {
-      const weeks = await storage.getNFLWeeks();
+      const seasonParam = req.query.season as string | undefined;
+      let weeks;
+      if (seasonParam) {
+        const season = parseInt(seasonParam);
+        if (isNaN(season)) {
+          return res.status(400).json({ message: "Invalid season parameter" });
+        }
+        weeks = await storage.getNFLWeeksBySeason(season);
+      } else {
+        weeks = await storage.getNFLWeeks();
+      }
       res.json(weeks);
     } catch (error) {
       console.error("Error fetching NFL weeks:", error);
@@ -538,9 +548,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get current NFL week
-  app.get('/api/nfl-weeks/current', async (_req, res) => {
+  app.get('/api/nfl-weeks/current', async (req, res) => {
     try {
-      const currentWeek = await storage.getCurrentNFLWeek();
+      const seasonParam = req.query.season as string | undefined;
+      let currentWeek;
+      if (seasonParam) {
+        const season = parseInt(seasonParam);
+        if (isNaN(season)) {
+          return res.status(400).json({ message: "Invalid season parameter" });
+        }
+        currentWeek = await storage.getCurrentNFLWeekForSeason(season);
+      } else {
+        currentWeek = await storage.getCurrentNFLWeek();
+      }
       if (!currentWeek) {
         return res.status(404).json({ message: "No active NFL week found" });
       }
