@@ -551,7 +551,7 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
                               {user.username}
                             </span>
                           </div>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 flex-shrink-0 ml-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 flex-shrink-0 ml-2">
                             {user.totalPoints || 0} pts
                           </span>
                         </div>
@@ -607,7 +607,7 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
                               {getOrdinalSuffix(user.standing)}
                             </td>
                             <td className="px-3 py-4 whitespace-nowrap">
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-700">
                                 {user.totalPoints || 0} pts
                               </span>
                             </td>
