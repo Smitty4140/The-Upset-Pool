@@ -501,172 +501,204 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
               }
             </p>
           </div>
-          
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Standing
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Season Total
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Player
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Pick
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Opponent
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Spread
-                  </th>
-                  <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {rankedLeaderboard?.map((user) => {
-                  const userPick = Object.values(usersWithPicks).find(
-                    (pick) => pick.userId === user.id
-                  );
-                  
-                  // Format standing with ordinal suffix
-                  const getOrdinalSuffix = (num: number) => {
-                    const j = num % 10;
-                    const k = num % 100;
-                    if (j === 1 && k !== 11) return `${num}st`;
-                    if (j === 2 && k !== 12) return `${num}nd`;
-                    if (j === 3 && k !== 13) return `${num}rd`;
-                    return `${num}th`;
-                  };
-                  
-                  return (
-                    <tr key={user.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {getOrdinalSuffix(user.standing)}
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">
+
+          {(() => {
+            const getOrdinalSuffix = (num: number) => {
+              const j = num % 10, k = num % 100;
+              if (j === 1 && k !== 11) return `${num}st`;
+              if (j === 2 && k !== 12) return `${num}nd`;
+              if (j === 3 && k !== 13) return `${num}rd`;
+              return `${num}th`;
+            };
+
+            const renderResultBadge = (userPick: UserPick | undefined) => {
+              if (!userPick) return <span className="text-gray-400 text-xs">—</span>;
+              if (!userPick.game.winningTeamId) {
+                return (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                    Pending
+                  </span>
+                );
+              }
+              return userPick.won ? (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  <Check className="h-3 w-3 mr-1" />
+                  +{userPick.pointsEarned}
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                  <X className="h-3 w-3 mr-1" />
+                  Loss
+                </span>
+              );
+            };
+
+            return (
+              <>
+                {/* ── Mobile card list (hidden on sm+) ── */}
+                <div className="sm:hidden divide-y divide-gray-100">
+                  {rankedLeaderboard?.map((user) => {
+                    const userPick = Object.values(usersWithPicks).find(p => p.userId === user.id);
+                    return (
+                      <div key={user.id} className="px-4 py-3 space-y-1.5">
+                        {/* Line 1: standing + name | pts */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs font-semibold text-gray-400 w-7 flex-shrink-0">
+                              {getOrdinalSuffix(user.standing)}
+                            </span>
+                            <span className="font-medium text-gray-900 text-sm truncate">
+                              {user.username}
+                            </span>
+                          </div>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 flex-shrink-0 ml-2">
                             {user.totalPoints || 0} pts
                           </span>
                         </div>
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <Avatar className="h-8 w-8 mr-2 border border-gray-200">
-                            <AvatarImage src={user.profileImageUrl || ""} alt={user.username} />
-                            <AvatarFallback className="bg-primary/10 text-primary">
-                              {user.username?.[0].toUpperCase() || "?"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium text-gray-900">{user.username}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        {userPick ? (
-                          <div className="flex items-center">
-                            <div 
-                              className="h-8 w-8 rounded-full flex items-center justify-center mr-2" 
-                              style={{ backgroundColor: userPick.pickedTeam.primaryColor || '#e5e7eb' }}
-                            >
-                              <img
-                                src={userPick.pickedTeam.logoUrl || ''}
-                                alt={userPick.pickedTeam.name}
-                                className="h-6 w-6 object-contain"
-                              />
-                            </div>
-                            <span className="font-medium">{userPick.pickedTeam.name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-500 italic">No pick</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        {userPick ? (
-                          <div className="flex items-center">
-                            <div 
-                              className="h-7 w-7 rounded-full flex items-center justify-center mr-2" 
-                              style={{ 
-                                backgroundColor: 
-                                  (userPick.pickedTeamId === userPick.game.homeTeamId 
-                                    ? userPick.game.awayTeam.primaryColor 
-                                    : userPick.game.homeTeam.primaryColor) || '#e5e7eb' 
-                              }}
-                            >
-                              <img
-                                src={
-                                  userPick.pickedTeamId === userPick.game.homeTeamId 
-                                    ? userPick.game.awayTeam.logoUrl 
-                                    : userPick.game.homeTeam.logoUrl
-                                }
-                                alt={
-                                  userPick.pickedTeamId === userPick.game.homeTeamId 
-                                    ? userPick.game.awayTeam.name 
-                                    : userPick.game.homeTeam.name
-                                }
-                                className="h-5 w-5 object-contain"
-                              />
-                            </div>
-                            <span className="text-sm">
-                              {
-                                userPick.pickedTeamId === userPick.game.homeTeamId 
-                                  ? userPick.game.awayTeam.name 
-                                  : userPick.game.homeTeam.name
-                              }
-                            </span>
-                          </div>
-                        ) : (
-                          <span>-</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        {userPick ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {userPick.spreadAtTimeOfPick > 0 ? '+' : ''}{userPick.spreadAtTimeOfPick}
-                          </span>
-                        ) : (
-                          <span>-</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        {userPick ? (
-                          userPick.game.winningTeamId ? (
-                            // Game has a result
-                            userPick.won ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <Check className="h-3 w-3 mr-1" />
-                                Winner (+{userPick.pointsEarned})
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                <X className="h-3 w-3 mr-1" />
-                                Loser
-                              </span>
-                            )
+                        {/* Line 2: team dot + name + spread | result badge */}
+                        <div className="flex items-center justify-between pl-9">
+                          {userPick ? (
+                            <>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <div
+                                  className="w-3 h-3 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: userPick.pickedTeam.primaryColor || '#e5e7eb' }}
+                                />
+                                <span className="text-sm text-gray-700 truncate">
+                                  {userPick.pickedTeam.name}
+                                </span>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 flex-shrink-0">
+                                  {Number(userPick.spreadAtTimeOfPick) > 0 ? '+' : ''}{userPick.spreadAtTimeOfPick}
+                                </span>
+                              </div>
+                              <div className="flex-shrink-0 ml-2">
+                                {renderResultBadge(userPick)}
+                              </div>
+                            </>
                           ) : (
-                            // No result yet
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              Result Pending
-                            </span>
-                          )
-                        ) : (
-                          <span>-</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                            <span className="text-sm text-gray-400 italic">No pick</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* ── Desktop table (hidden on mobile) ── */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Standing</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Season Total</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pick</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opponent</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Spread</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {rankedLeaderboard?.map((user) => {
+                        const userPick = Object.values(usersWithPicks).find(p => p.userId === user.id);
+                        return (
+                          <tr key={user.id} className="hover:bg-gray-50">
+                            <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {getOrdinalSuffix(user.standing)}
+                            </td>
+                            <td className="px-3 py-4 whitespace-nowrap">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">
+                                {user.totalPoints || 0} pts
+                              </span>
+                            </td>
+                            <td className="px-3 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <Avatar className="h-8 w-8 mr-2 border border-gray-200">
+                                  <AvatarImage src={user.profileImageUrl || ""} alt={user.username} />
+                                  <AvatarFallback className="bg-primary/10 text-primary">
+                                    {user.username?.[0].toUpperCase() || "?"}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="font-medium text-gray-900">{user.username}</div>
+                              </div>
+                            </td>
+                            <td className="px-3 py-4 whitespace-nowrap">
+                              {userPick ? (
+                                <div className="flex items-center">
+                                  <div
+                                    className="h-8 w-8 rounded-full flex items-center justify-center mr-2"
+                                    style={{ backgroundColor: userPick.pickedTeam.primaryColor || '#e5e7eb' }}
+                                  >
+                                    <img src={userPick.pickedTeam.logoUrl || ''} alt={userPick.pickedTeam.name} className="h-6 w-6 object-contain" />
+                                  </div>
+                                  <span className="font-medium">{userPick.pickedTeam.name}</span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-500 italic">No pick</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-4 whitespace-nowrap">
+                              {userPick ? (
+                                <div className="flex items-center">
+                                  <div
+                                    className="h-7 w-7 rounded-full flex items-center justify-center mr-2"
+                                    style={{ backgroundColor: (userPick.pickedTeamId === userPick.game.homeTeamId ? userPick.game.awayTeam.primaryColor : userPick.game.homeTeam.primaryColor) || '#e5e7eb' }}
+                                  >
+                                    <img
+                                      src={userPick.pickedTeamId === userPick.game.homeTeamId ? userPick.game.awayTeam.logoUrl : userPick.game.homeTeam.logoUrl}
+                                      alt={userPick.pickedTeamId === userPick.game.homeTeamId ? userPick.game.awayTeam.name : userPick.game.homeTeam.name}
+                                      className="h-5 w-5 object-contain"
+                                    />
+                                  </div>
+                                  <span className="text-sm">
+                                    {userPick.pickedTeamId === userPick.game.homeTeamId ? userPick.game.awayTeam.name : userPick.game.homeTeam.name}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span>-</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-4 whitespace-nowrap">
+                              {userPick ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {Number(userPick.spreadAtTimeOfPick) > 0 ? '+' : ''}{userPick.spreadAtTimeOfPick}
+                                </span>
+                              ) : (
+                                <span>-</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-4 whitespace-nowrap">
+                              {userPick ? (
+                                userPick.game.winningTeamId ? (
+                                  userPick.won ? (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                      <Check className="h-3 w-3 mr-1" />
+                                      Winner (+{userPick.pointsEarned})
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                      <X className="h-3 w-3 mr-1" />
+                                      Loser
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                    Result Pending
+                                  </span>
+                                )
+                              ) : (
+                                <span>-</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            );
+          })()}
         </CardContent>
       </Card>
 
