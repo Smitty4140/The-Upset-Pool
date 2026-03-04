@@ -86,13 +86,14 @@ export default function Home() {
   });
 
   // Set default league when user leagues load (only on initial load)
+  // Prefer the first active (non-archived) league; fall back to first league if all archived
   useEffect(() => {
     if (userLeagues && Array.isArray(userLeagues) && userLeagues.length > 0) {
-      // Only set default if we're still on the initial default (1) and haven't made a selection yet
       if (selectedLeagueId === 1) {
-        const firstLeague = userLeagues[0];
-        if (firstLeague?.league?.id) {
-          setSelectedLeagueId(firstLeague.league.id);
+        const activeLeague = userLeagues.find((m: any) => !m.league?.isArchived);
+        const defaultLeague = activeLeague || userLeagues[0];
+        if (defaultLeague?.league?.id) {
+          setSelectedLeagueId(defaultLeague.league.id);
         }
       }
     }
