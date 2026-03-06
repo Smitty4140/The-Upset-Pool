@@ -116,7 +116,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
 
   const gameCard = (
     <div 
-      className={`game-card transition-all duration-150 ease-in-out border rounded-lg mb-4 last:mb-0 overflow-hidden shadow-sm 
+      className={`game-card transition-all duration-150 ease-in-out border rounded-lg overflow-hidden shadow-sm 
         ${!isFullyLocked ? 'hover:shadow-md' : ''} 
         ${isGameSelected ? 'border-primary border-2 shadow-md relative' : 'border-gray-200'}
         ${isFullyLocked ? 'opacity-75' : ''}
