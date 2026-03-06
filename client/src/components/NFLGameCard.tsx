@@ -15,6 +15,7 @@ type NFLGameCardProps = {
   game: NFLGame;
   selectedTeamId: number | null;
   selectedGameId: string | null;
+  submittedPickGameId?: string | null;
   onSelect: (gameId: string, teamId: number) => void;
   onSubmit?: () => void;
   disabled?: boolean;
@@ -24,7 +25,7 @@ type NFLGameCardProps = {
   isPickLockedByKickoff?: boolean;
 };
 
-export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false, isInactive = false, isPickLockedByKickoff = false }: NFLGameCardProps) {
+export default function NFLGameCard({ game, selectedTeamId, selectedGameId, submittedPickGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false, isInactive = false, isPickLockedByKickoff = false }: NFLGameCardProps) {
   // State to track current time for automatic refresh (triggers re-renders)
   const [, setCurrentTime] = useState<Date>(new Date());
   
@@ -82,6 +83,12 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
   // Only consider a game selected if both the game ID and team ID match
   const isGameSelected = selectedTeamId !== null && 
                         selectedGameId === game.id;
+
+  // True when this game has an already-submitted pick (may differ from current local selection)
+  const isSubmittedPick = !!submittedPickGameId && String(submittedPickGameId) === String(game.id);
+
+  // Show the selected/submitted highlight if either locally selected or already submitted
+  const showHighlight = isGameSelected || isSubmittedPick;
   
   const isFullyLocked = disabled || isViewingFutureWeek || isInactive || hasGameStarted || isPickLockedByKickoff;
 
@@ -118,13 +125,13 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
     <div 
       className={`game-card transition-all duration-150 ease-in-out border rounded-lg overflow-hidden shadow-sm 
         ${!isFullyLocked ? 'hover:shadow-md' : ''} 
-        ${isGameSelected ? 'border-primary border-2 shadow-md relative' : 'border-gray-200'}
+        ${showHighlight ? 'border-primary border-2 shadow-md relative' : 'border-gray-200'}
         ${isFullyLocked ? 'opacity-75' : ''}
         ${isFullyLocked ? 'cursor-not-allowed' : ''}
-        ${hasGameStarted || (isPickLockedByKickoff && !isGameSelected) ? 'bg-gray-50 border-gray-300' : ''}`}
+        ${hasGameStarted || (isPickLockedByKickoff && !showHighlight) ? 'bg-gray-50 border-gray-300' : ''}`}
     >
-      {/* Selected Game indicator at the top */}
-      {isGameSelected && (
+      {/* Selected / submitted pick indicator at the top */}
+      {showHighlight && (
         <div className={`${isPickLockedByKickoff ? 'bg-amber-600' : 'bg-green-600'} text-white text-sm font-bold text-center py-2 flex items-center justify-center space-x-1`}>
           {isPickLockedByKickoff ? <Lock size={16} /> : <Check size={16} />}
           <span>{isPickLockedByKickoff ? 'Pick Locked' : 'Selected Game'}</span>
@@ -214,8 +221,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, onSe
         </div>
       </div>
       
-      {/* Submit button at the bottom when game is selected */}
-      {isGameSelected && onSubmit && !isFullyLocked && (
+      {/* Submit button at the bottom only when newly selected (not already submitted) */}
+      {isGameSelected && !isSubmittedPick && onSubmit && !isFullyLocked && (
         <div className="bg-gray-50 px-4 py-3 border-t border-gray-100">
           <Button 
             onClick={(e) => {
