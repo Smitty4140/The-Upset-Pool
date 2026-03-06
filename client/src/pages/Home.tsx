@@ -340,7 +340,7 @@ export default function Home() {
   // Initialize selection with user's current pick if it exists
   useEffect(() => {
     if (userPick) {
-      setSelectedGameId(userPick.gameId);
+      setSelectedGameId(String(userPick.gameId));
       setSelectedTeamId(userPick.pickedTeamId);
     }
   }, [userPick]);
@@ -708,6 +708,7 @@ export default function Home() {
                               game={game}
                               selectedTeamId={selectedTeamId}
                               selectedGameId={selectedGameId}
+                              submittedPickGameId={selectedWeekPick?.gameId ? String(selectedWeekPick.gameId) : null}
                               onSelect={handleTeamSelection}
                               onSubmit={handleSubmitPick}
                               disabled={!canMakePicks || !isAuthenticated}
