@@ -97,6 +97,8 @@ export const nflWeeks = pgTable("nfl_weeks", {
 }, (table) => {
   return {
     weekSeason: unique().on(table.weekNumber, table.season),
+    picksLockAtIdx: index("idx_nfl_weeks_picks_lock_at").on(table.picksLockAt),
+    seasonActiveIdx: index("idx_nfl_weeks_season_active").on(table.season, table.active),
   };
 });
 
@@ -116,6 +118,10 @@ export const nflGames = pgTable("nfl_games", {
   winningTeamId: integer("winning_team_id").references(() => nflTeams.id), // The team that won the game
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => {
+  return {
+    weekIdIdx: index("idx_nfl_games_week_id").on(table.weekId),
+  };
 });
 
 // User Picks table
@@ -135,6 +141,8 @@ export const userPicks = pgTable("user_picks", {
 }, (table) => {
   return {
     userWeekLeague: unique().on(table.userId, table.weekId, table.leagueId),
+    leagueWeekIdx: index("idx_user_picks_league_week").on(table.leagueId, table.weekId),
+    userLeagueIdx: index("idx_user_picks_user_league").on(table.userId, table.leagueId),
   };
 });
 

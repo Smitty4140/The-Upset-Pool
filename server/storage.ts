@@ -1065,101 +1065,92 @@ export class DatabaseStorage implements IStorage {
     const homeTeam = alias(nflTeams, 'homeTeam');
     const awayTeam = alias(nflTeams, 'awayTeam');
     const pickedTeam = alias(nflTeams, 'pickedTeam');
-    
-    // For each user, check if they have picks for every eligible week and get last pick
-    const usersWithEligibility = await Promise.all(
-      result.map(async (user) => {
-        let everyWeekEligible = true;
-        let lastPick: LastPickInfo = null;
-        
-        if (eligibilityWeekIds.length > 0) {
-          // Count picks for this user in eligible weeks for this league
-          const userPicksQuery = await db
-            .select({
-              weekId: userPicks.weekId
-            })
-            .from(userPicks)
-            .where(
-              and(
-                eq(userPicks.userId, user.id),
-                eq(userPicks.leagueId, leagueId),
-                inArray(userPicks.weekId, eligibilityWeekIds)
-              )
+
+    // ── Bulk query 1: count distinct weeks picked per user in eligible weeks ──
+    // Replaces N separate per-user eligibility queries with one query for all users
+    const eligibilityCountsRaw = eligibilityWeekIds.length > 0
+      ? await db
+          .select({
+            userId: userPicks.userId,
+            weeksPicked: sql<number>`COUNT(DISTINCT ${userPicks.weekId})`.as('weeks_picked')
+          })
+          .from(userPicks)
+          .where(
+            and(
+              eq(userPicks.leagueId, leagueId),
+              inArray(userPicks.weekId, eligibilityWeekIds)
             )
-            .groupBy(userPicks.weekId);
-          
-          const uniqueWeeksPicked = userPicksQuery.length;
-          const requiredWeeks = eligibilityWeekIds.length;
-          
-          everyWeekEligible = (uniqueWeeksPicked >= requiredWeeks && requiredWeeks > 0);
-        }
-        
-        // Get the last pick for this user (from most recent locked week)
-        if (mostRecentLockedWeek) {
-          const lastPickResult = await db
-            .select({
-              weekNumber: nflWeeks.weekNumber,
-              pickedTeamName: pickedTeam.name,
-              pickedTeamAbbreviation: pickedTeam.abbreviation,
-              pickedTeamLogoUrl: pickedTeam.logoUrl,
-              homeTeamName: homeTeam.name,
-              awayTeamName: awayTeam.name,
-              homeTeamId: nflGames.homeTeamId,
-              pickedTeamId: userPicks.pickedTeamId,
-              spread: userPicks.spreadAtTimeOfPick,
-              won: userPicks.won,
-              pointsEarned: userPicks.pointsEarned,
-              gameCompleted: nflGames.completed
-            })
-            .from(userPicks)
-            .innerJoin(nflWeeks, eq(userPicks.weekId, nflWeeks.id))
-            .innerJoin(nflGames, eq(userPicks.gameId, nflGames.id))
-            .innerJoin(pickedTeam, eq(userPicks.pickedTeamId, pickedTeam.id))
-            .innerJoin(homeTeam, eq(nflGames.homeTeamId, homeTeam.id))
-            .innerJoin(awayTeam, eq(nflGames.awayTeamId, awayTeam.id))
-            .where(
-              and(
-                eq(userPicks.userId, user.id),
-                eq(userPicks.leagueId, leagueId),
-                eq(userPicks.weekId, mostRecentLockedWeek.id)
-              )
-            )
-            .limit(1);
-          
-          if (lastPickResult.length > 0) {
-            const pick = lastPickResult[0];
-            // Determine opponent - if picked team is home team, opponent is away team, and vice versa
-            const opponentTeamName = pick.pickedTeamId === pick.homeTeamId 
-              ? pick.awayTeamName 
-              : pick.homeTeamName;
-            
-            // Determine result
-            let result: 'win' | 'loss' | 'pending' = 'pending';
-            if (pick.gameCompleted) {
-              result = pick.won ? 'win' : 'loss';
-            }
-            
-            lastPick = {
-              weekNumber: pick.weekNumber,
-              pickedTeamName: pick.pickedTeamName,
-              pickedTeamAbbreviation: pick.pickedTeamAbbreviation,
-              pickedTeamLogoUrl: pick.pickedTeamLogoUrl,
-              opponentTeamName,
-              spread: Math.abs(Number(pick.spread)),
-              result,
-              pointsEarned: Number(pick.pointsEarned) || 0
-            };
-          }
-        }
-        
-        return {
-          ...user,
-          everyWeekEligible,
-          lastPick
-        };
-      })
+          )
+          .groupBy(userPicks.userId)
+      : [];
+
+    const requiredWeeks = eligibilityWeekIds.length;
+    const eligibilityMap = new Map<string, number>(
+      eligibilityCountsRaw.map(r => [r.userId, Number(r.weeksPicked)])
     );
-    
+
+    // ── Bulk query 2: fetch all users' most-recent-week picks in one query ──
+    // Replaces N separate per-user last-pick queries with one query for all users
+    const lastPicksRaw = mostRecentLockedWeek
+      ? await db
+          .select({
+            userId: userPicks.userId,
+            weekNumber: nflWeeks.weekNumber,
+            pickedTeamName: pickedTeam.name,
+            pickedTeamAbbreviation: pickedTeam.abbreviation,
+            pickedTeamLogoUrl: pickedTeam.logoUrl,
+            homeTeamName: homeTeam.name,
+            awayTeamName: awayTeam.name,
+            homeTeamId: nflGames.homeTeamId,
+            pickedTeamId: userPicks.pickedTeamId,
+            spread: userPicks.spreadAtTimeOfPick,
+            won: userPicks.won,
+            pointsEarned: userPicks.pointsEarned,
+            gameCompleted: nflGames.completed
+          })
+          .from(userPicks)
+          .innerJoin(nflWeeks, eq(userPicks.weekId, nflWeeks.id))
+          .innerJoin(nflGames, eq(userPicks.gameId, nflGames.id))
+          .innerJoin(pickedTeam, eq(userPicks.pickedTeamId, pickedTeam.id))
+          .innerJoin(homeTeam, eq(nflGames.homeTeamId, homeTeam.id))
+          .innerJoin(awayTeam, eq(nflGames.awayTeamId, awayTeam.id))
+          .where(
+            and(
+              eq(userPicks.leagueId, leagueId),
+              eq(userPicks.weekId, mostRecentLockedWeek.id)
+            )
+          )
+      : [];
+
+    const lastPickMap = new Map<string, LastPickInfo>();
+    for (const pick of lastPicksRaw) {
+      const opponentTeamName = pick.pickedTeamId === pick.homeTeamId
+        ? pick.awayTeamName
+        : pick.homeTeamName;
+      let pickResult: 'win' | 'loss' | 'pending' = 'pending';
+      if (pick.gameCompleted) {
+        pickResult = pick.won ? 'win' : 'loss';
+      }
+      lastPickMap.set(pick.userId, {
+        weekNumber: pick.weekNumber,
+        pickedTeamName: pick.pickedTeamName,
+        pickedTeamAbbreviation: pick.pickedTeamAbbreviation,
+        pickedTeamLogoUrl: pick.pickedTeamLogoUrl,
+        opponentTeamName,
+        spread: Math.abs(Number(pick.spread)),
+        result: pickResult,
+        pointsEarned: Number(pick.pointsEarned) || 0
+      });
+    }
+
+    // ── Assemble final result entirely in-memory (no more per-user queries) ──
+    const usersWithEligibility = result.map(user => {
+      const weeksPicked = eligibilityMap.get(user.id) ?? 0;
+      const everyWeekEligible = requiredWeeks === 0 || weeksPicked >= requiredWeeks;
+      const lastPick: LastPickInfo = lastPickMap.get(user.id) ?? null;
+      return { ...user, everyWeekEligible, lastPick };
+    });
+
     return usersWithEligibility as UserWithEligibility[];
   }
 

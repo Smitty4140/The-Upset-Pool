@@ -18,5 +18,5 @@ if (!connectionString) {
 
 console.log(`[Database] Using ${isDev && process.env.DEV_DATABASE_URL ? 'DEVELOPMENT (Neon)' : 'PRODUCTION (Replit)'} database`);
 
-export const pool = new Pool({ connectionString });
+export const pool = new Pool({ connectionString, max: 10 });
 export const db = drizzle({ client: pool, schema });
