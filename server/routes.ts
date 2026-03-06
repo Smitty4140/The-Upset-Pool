@@ -1877,42 +1877,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Auto-add new users to the default league (NFL Upset Pool)
-  // This is triggered when a new user is created during auth setup
-  app.post('/api/auto-add-to-league', async (req, res) => {
-    try {
-      const { userId } = req.body;
-      if (!userId) {
-        return res.status(400).json({ message: "User ID is required" });
-      }
-      
-      // Default to NFL Upset Pool league (ID 1)
-      const leagueId = 1;
-      
-      // Check if user is already a member
-      const userLeagues = await storage.getUserLeagues(userId);
-      const isAlreadyMember = userLeagues.some(ul => ul.leagueId === leagueId);
-      
-      if (isAlreadyMember) {
-        return res.status(200).json({ message: "User is already a member of this league" });
-      }
-      
-      // Add user to league
-      const leagueMember = await storage.addLeagueMember({
-        leagueId,
-        userId,
-        isAdmin: false,
-      });
-      
-      res.status(201).json(leagueMember);
-    } catch (error) {
-      console.error("Error auto-adding user to league:", error);
-      res.status(500).json({ message: "Failed to add user to league" });
-    }
-  });
-  
   // Sync NFL games from The Odds API to our database - improved version
-  app.get('/api/sync-nfl-games', async (req, res) => {
+  app.get('/api/sync-nfl-games', isAuthenticated, isSuperUser, async (req, res) => {
     try {
       // Get current week
       const currentWeek = await storage.getCurrentNFLWeek();
@@ -2370,10 +2336,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
   
   // Admin endpoint to pull games from The Odds API and populate the database
-  app.post('/api/admin/pull-games', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/pull-games', isAuthenticated, isSuperUser, async (req: any, res) => {
     try {
-      // Verify the user is an admin
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       
       // Use the shared function to pull game data
       const result = await pullNFLGamesFromOddsAPI(storage);
