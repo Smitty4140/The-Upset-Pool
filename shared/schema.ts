@@ -14,7 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // Session storage table for Replit Auth
 export const sessions = pgTable(
@@ -60,7 +60,7 @@ export const leagues = pgTable("leagues", {
   name: varchar("name").notNull(),
   description: text("description"),
   inviteCode: varchar("invite_code", { length: 6 }).notNull().unique(),
-  season: integer("season").notNull().default(2025), // NFL season year
+  season: integer("season").notNull().default(sql`EXTRACT(YEAR FROM NOW())::int`), // NFL season year
   isArchived: boolean("is_archived").default(false),
   archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").defaultNow(),

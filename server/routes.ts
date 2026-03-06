@@ -702,7 +702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/leagues', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { name, description } = req.body;
+      const { name, description, season: seasonParam } = req.body;
       
       // Validate input
       if (!name || name.trim().length === 0) {
@@ -713,10 +713,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "League name must be 100 characters or less" });
       }
       
+      const season = seasonParam ? parseInt(seasonParam) : new Date().getFullYear();
+      
       // Create the league
       const newLeague = await storage.createLeague({
         name: name.trim(),
         description: description?.trim() || null,
+        season,
       });
       
       // Add the creator as an admin member
