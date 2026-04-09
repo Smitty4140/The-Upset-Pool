@@ -28,8 +28,9 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Camera, Loader2, LogOut } from "lucide-react";
+import { Camera, Loader2, LogOut, Pencil, X } from "lucide-react";
 import { useState, useEffect } from "react";
+import { Badge } from "@/components/ui/badge";
 
 const profileFormSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters").max(50),
@@ -43,6 +44,7 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>;
 export default function Profile() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
 
   const form = useForm<ProfileFormValues>({
@@ -76,6 +78,7 @@ export default function Profile() {
         description: "Your profile has been updated successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setIsEditing(false);
     },
     onError: (error) => {
       toast({
@@ -105,6 +108,18 @@ export default function Profile() {
       });
     },
   });
+
+  const handleCancel = () => {
+    if (user) {
+      form.reset({
+        username: user.username,
+        email: user.email || "",
+        profileImageUrl: user.profileImageUrl || "",
+        receiveNotifications: true,
+      });
+    }
+    setIsEditing(false);
+  };
 
   if (isLoading) {
     return (
@@ -153,130 +168,192 @@ export default function Profile() {
       <div className="max-w-3xl mx-auto">
         <h1 className="text-2xl font-bold mb-4">Profile</h1>
         <Card>
-          <CardHeader>
-            <CardTitle>Your Account</CardTitle>
-            <CardDescription>View and manage your Upset Pool account details</CardDescription>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardTitle>Your Account</CardTitle>
+              <CardDescription>View and manage your Upset Pool account details</CardDescription>
+            </div>
+            {!isEditing && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+                className="flex-shrink-0"
+              >
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                Edit Profile
+              </Button>
+            )}
           </CardHeader>
+
           <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit((data) => updateProfile(data))} className="space-y-6">
-                {/* Avatar + username row */}
-                <div className="flex items-start gap-4">
-                  <div className="relative flex-shrink-0">
-                    <Avatar className="h-16 w-16">
-                      <AvatarImage src={form.watch("profileImageUrl") || ""} alt={user?.username || "User"} />
-                      <AvatarFallback className="text-lg">
-                        {user?.username ? user.username[0].toUpperCase() : "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="icon"
-                          className="absolute -bottom-2 -right-2 h-7 w-7 rounded-full"
-                        >
-                          <Camera className="h-3.5 w-3.5" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Update Profile Image</DialogTitle>
-                          <DialogDescription>Enter the URL of your profile image</DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div className="flex justify-center mb-4">
-                            <Avatar className="h-24 w-24">
-                              <AvatarImage src={form.watch("profileImageUrl") || ""} alt={user?.username || "User"} />
-                              <AvatarFallback className="text-lg">
-                                {user?.username ? user.username[0].toUpperCase() : "U"}
-                              </AvatarFallback>
-                            </Avatar>
-                          </div>
-                          <FormField
-                            control={form.control}
-                            name="profileImageUrl"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Image URL</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="https://example.com/image.jpg" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" type="button" onClick={() => setIsAvatarDialogOpen(false)}>
-                            Done
+            {isEditing ? (
+              /* ── Edit mode ── */
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit((data) => updateProfile(data))} className="space-y-6">
+                  <div className="flex items-start gap-4">
+                    <div className="relative flex-shrink-0">
+                      <Avatar className="h-16 w-16">
+                        <AvatarImage src={form.watch("profileImageUrl") || ""} alt={user?.username || "User"} />
+                        <AvatarFallback className="text-lg">
+                          {user?.username ? user.username[0].toUpperCase() : "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="icon"
+                            className="absolute -bottom-2 -right-2 h-7 w-7 rounded-full"
+                          >
+                            <Camera className="h-3.5 w-3.5" />
                           </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Update Profile Image</DialogTitle>
+                            <DialogDescription>Enter the URL of your profile image</DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <div className="flex justify-center mb-4">
+                              <Avatar className="h-24 w-24">
+                                <AvatarImage src={form.watch("profileImageUrl") || ""} alt={user?.username || "User"} />
+                                <AvatarFallback className="text-lg">
+                                  {user?.username ? user.username[0].toUpperCase() : "U"}
+                                </AvatarFallback>
+                              </Avatar>
+                            </div>
+                            <FormField
+                              control={form.control}
+                              name="profileImageUrl"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Image URL</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="https://example.com/image.jpg" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          <DialogFooter>
+                            <Button variant="outline" type="button" onClick={() => setIsAvatarDialogOpen(false)}>
+                              Done
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <FormField
+                        control={form.control}
+                        name="username"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Username</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Username" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <FormField
-                      control={form.control}
-                      name="username"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Username</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Username" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="you@example.com" {...field} value={field.value || ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="receiveNotifications"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                          <FormLabel>Email Notifications</FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            Receive game reminders and weekly results
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <Button type="submit" disabled={isPending}>
+                      {isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Changes"
                       )}
-                    />
+                    </Button>
+                    <Button type="button" variant="outline" onClick={handleCancel} disabled={isPending}>
+                      <X className="h-4 w-4 mr-1.5" />
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            ) : (
+              /* ── Read-only view ── */
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-16 w-16 flex-shrink-0">
+                    <AvatarImage src={user?.profileImageUrl || ""} alt={user?.username || "User"} />
+                    <AvatarFallback className="text-lg">
+                      {user?.username ? user.username[0].toUpperCase() : "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-lg font-semibold">{user?.username}</p>
+                    <p className="text-sm text-muted-foreground">{user?.email || "No email set"}</p>
                   </div>
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email Address</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} value={field.value || ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Username</p>
+                      <p className="font-medium">{user?.username}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Email</p>
+                      <p className="font-medium">{user?.email || <span className="text-muted-foreground italic">Not set</span>}</p>
+                    </div>
+                  </div>
 
-                <FormField
-                  control={form.control}
-                  name="receiveNotifications"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                      <div className="space-y-0.5">
-                        <FormLabel>Email Notifications</FormLabel>
-                        <div className="text-sm text-muted-foreground">
-                          Receive game reminders and weekly results
-                        </div>
-                      </div>
-                      <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <p className="text-sm font-medium">Email Notifications</p>
+                      <p className="text-sm text-muted-foreground">Game reminders and weekly results</p>
+                    </div>
+                    <Badge variant={form.getValues("receiveNotifications") ? "default" : "secondary"}>
+                      {form.getValues("receiveNotifications") ? "On" : "Off"}
+                    </Badge>
+                  </div>
+                </div>
 
-                <div className="flex items-center gap-3 pt-2">
-                  <Button type="submit" disabled={isPending}>
-                    {isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      "Save Changes"
-                    )}
-                  </Button>
+                <div className="pt-2 border-t">
                   <Button
                     type="button"
                     variant="outline"
@@ -296,8 +373,8 @@ export default function Profile() {
                     )}
                   </Button>
                 </div>
-              </form>
-            </Form>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
