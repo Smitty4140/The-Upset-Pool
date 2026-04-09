@@ -797,7 +797,7 @@ function LeagueProfile({ leagueId, memberStatus, onLeagueLeft }: {
   const [nicknameInput, setNicknameInput] = useState("");
   const [isEditing, setIsEditing] = useState(false);
 
-  const { data: member, refetch: refetchMember } = useQuery<{ isActive: boolean; isAdmin: boolean; nickname?: string | null }>({
+  const { data: member, refetch: refetchMember } = useQuery<{ isActive: boolean; isAdmin: boolean; nickname?: string | null; isSoleAdmin?: boolean }>({
     queryKey: [`/api/league/${leagueId}/member-status`],
     enabled: !!user,
   });
@@ -922,16 +922,18 @@ function LeagueProfile({ leagueId, memberStatus, onLeagueLeft }: {
               <div className="flex-1">
                 <p className="text-sm font-medium text-red-800">Leave League</p>
                 <p className="text-xs text-red-600 mt-0.5">
-                  {member?.isAdmin
-                    ? "As the admin, you can only leave if there are other admins. Transfer admin rights first if needed."
-                    : "Once you leave, you will need an invite code to rejoin."}
+                  {member?.isSoleAdmin
+                    ? "You are the only admin. Transfer admin rights to another member before leaving."
+                    : member?.isAdmin
+                      ? "As an admin, you can leave since other admins exist."
+                      : "Once you leave, you will need an invite code to rejoin."}
                 </p>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="mt-2 text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
+                  className="mt-2 text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleLeaveLeague}
-                  disabled={leaveLeagueMutation.isPending}
+                  disabled={leaveLeagueMutation.isPending || !!member?.isSoleAdmin}
                 >
                   {leaveLeagueMutation.isPending ? (
                     <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />

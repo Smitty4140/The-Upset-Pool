@@ -319,11 +319,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!leagueMember) {
         return res.status(404).json({ message: "Not a member of this league" });
       }
+
+      // Check if the member is the sole admin
+      let isSoleAdmin = false;
+      if (leagueMember.isAdmin) {
+        const allMembers = await storage.getLeagueMembers(leagueId);
+        const adminCount = allMembers.filter(m => m.isAdmin && m.isActive).length;
+        isSoleAdmin = adminCount === 1;
+      }
       
       res.json({ 
         isActive: leagueMember.isActive,
         isAdmin: leagueMember.isAdmin,
         nickname: leagueMember.nickname ?? null,
+        isSoleAdmin,
       });
     } catch (error) {
       console.error("Error fetching member status:", error);
