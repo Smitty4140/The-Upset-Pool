@@ -1188,7 +1188,7 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
   };
 
   const handleRemoveMember = (userId: string, username: string) => {
-    if (window.confirm(`Are you sure you want to remove ${username} from this league? This action cannot be undone.`)) {
+    if (window.confirm(`Are you sure you want to remove "${username}" from this league? This action cannot be undone.`)) {
       removeMemberMutation.mutate(userId);
     }
   };
@@ -1235,7 +1235,12 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
               <TableRow key={member.id}>
                 <TableCell>
                   <div className="flex items-center space-x-2">
-                    <div className="font-medium">{member.user?.username || member.user?.email}</div>
+                    <div>
+                      <div className="font-medium">{(member as any).nickname || member.user?.username || member.user?.email}</div>
+                      {(member as any).nickname && (member as any).nickname !== member.user?.username && (
+                        <div className="text-xs text-gray-500">{member.user?.username}</div>
+                      )}
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell className="text-sm text-gray-600">
@@ -1313,7 +1318,7 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleRemoveMember(member.userId, member.user?.username || member.user?.email || 'User')}
+                    onClick={() => handleRemoveMember(member.userId, (member as any).nickname || member.user?.username || member.user?.email || 'User')}
                     disabled={removeMemberMutation.isPending || toggleActivationMutation.isPending || toggleAdminMutation.isPending}
                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
                   >

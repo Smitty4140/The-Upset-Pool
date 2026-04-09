@@ -5,15 +5,16 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { Users, Plus, Hash } from "lucide-react";
 
 const joinLeagueSchema = z.object({
   inviteCode: z.string().min(1, "Please enter a league invite code"),
+  nickname: z.string().min(3, "Nickname must be at least 3 characters").max(25, "Nickname must be 25 characters or fewer"),
 });
 
 type JoinLeagueFormValues = z.infer<typeof joinLeagueSchema>;
@@ -24,16 +25,19 @@ export default function JoinLeague() {
   const [showCreateLeague, setShowCreateLeague] = useState(false);
   const [leagueName, setLeagueName] = useState("");
 
+  const { data: authUser } = useQuery<any>({ queryKey: ["/api/auth/user"] });
+
   const form = useForm<JoinLeagueFormValues>({
     resolver: zodResolver(joinLeagueSchema),
     defaultValues: {
       inviteCode: "",
+      nickname: authUser?.username || "",
     },
   });
 
   const joinLeagueMutation = useMutation({
     mutationFn: async (data: JoinLeagueFormValues) => {
-      const response = await apiRequest('POST', '/api/leagues/join', { inviteCode: data.inviteCode });
+      const response = await apiRequest('POST', '/api/leagues/join', { inviteCode: data.inviteCode, nickname: data.nickname });
       return response.json();
     },
     onSuccess: (data: any) => {
@@ -110,6 +114,26 @@ export default function JoinLeague() {
                         />
                       </div>
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="nickname"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>League Nickname</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="text"
+                        placeholder="Your name in this league"
+                        maxLength={25}
+                      />
+                    </FormControl>
+                    <FormDescription>How you'll appear on the leaderboard (3–25 characters).</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

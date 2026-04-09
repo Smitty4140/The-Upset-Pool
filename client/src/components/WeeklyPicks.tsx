@@ -548,7 +548,7 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
                               {getOrdinalSuffix(user.standing)}
                             </span>
                             <span className="font-medium text-gray-900 text-sm truncate">
-                              {user.username}
+                              {(user as any).nickname ?? user.username}
                             </span>
                           </div>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 flex-shrink-0 ml-2">
@@ -616,10 +616,10 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
                                 <Avatar className="h-8 w-8 mr-2 border border-gray-200">
                                   <AvatarImage src={user.profileImageUrl || ""} alt={user.username} />
                                   <AvatarFallback className="bg-primary/10 text-primary">
-                                    {user.username?.[0].toUpperCase() || "?"}
+                                    {((user as any).nickname ?? user.username)?.[0].toUpperCase() || "?"}
                                   </AvatarFallback>
                                 </Avatar>
-                                <div className="font-medium text-gray-900">{user.username}</div>
+                                <div className="font-medium text-gray-900">{(user as any).nickname ?? user.username}</div>
                               </div>
                             </td>
                             <td className="px-3 py-4 whitespace-nowrap">

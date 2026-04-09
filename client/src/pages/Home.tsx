@@ -18,6 +18,8 @@ import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -45,12 +47,16 @@ import {
   Clock,
   X,
   UserX,
+  User as UserIcon,
+  LogOut,
+  Pencil,
+  AlertTriangle,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
 
-type Tab = "spreads" | "leaderboard" | "weeklypicks" | "results" | "admin";
+type Tab = "spreads" | "leaderboard" | "weeklypicks" | "results" | "admin" | "profile";
 type SortOption = "spread" | "homeUnderdog" | "gameTime";
 
 export default function Home() {
@@ -767,7 +773,174 @@ export default function Home() {
         {activeTab === "leaderboard" && (
           <Leaderboard leagueId={leagueId} />
         )}
+
+        {activeTab === "profile" && (
+          <LeagueProfile leagueId={leagueId} memberStatus={memberStatus} onLeagueLeft={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/user/leagues"] });
+            setSelectedLeagueId(1);
+          }} />
+        )}
       </div>
+    </div>
+  );
+}
+
+function LeagueProfile({ leagueId, memberStatus, onLeagueLeft }: {
+  leagueId: number;
+  memberStatus?: { isActive: boolean; isAdmin: boolean; nickname?: string | null } | null;
+  onLeagueLeft?: () => void;
+}) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [nicknameInput, setNicknameInput] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+
+  const { data: member, refetch: refetchMember } = useQuery<{ isActive: boolean; isAdmin: boolean; nickname?: string | null }>({
+    queryKey: [`/api/league/${leagueId}/member-status`],
+    enabled: !!user,
+  });
+
+  const currentNickname = member?.nickname || user?.username || "";
+
+  const updateNicknameMutation = useMutation({
+    mutationFn: async (nickname: string) => {
+      const response = await apiRequest("PATCH", `/api/leagues/${leagueId}/nickname`, { nickname });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Nickname updated", description: "Your nickname has been updated for this league." });
+      setIsEditing(false);
+      refetchMember();
+      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/members`] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update nickname", variant: "destructive" });
+    },
+  });
+
+  const leaveLeagueMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("DELETE", `/api/leagues/${leagueId}/leave`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Left league", description: "You have left the league." });
+      onLeagueLeft?.();
+    },
+    onError: (error: any) => {
+      toast({ title: "Cannot leave", description: error.message || "Failed to leave league", variant: "destructive" });
+    },
+  });
+
+  const handleEditNickname = () => {
+    setNicknameInput(currentNickname);
+    setIsEditing(true);
+  };
+
+  const handleSaveNickname = () => {
+    if (!nicknameInput.trim()) return;
+    updateNicknameMutation.mutate(nicknameInput.trim());
+  };
+
+  const handleLeaveLeague = () => {
+    if (window.confirm("Are you sure you want to leave this league? This action cannot be undone.")) {
+      leaveLeagueMutation.mutate();
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <UserIcon className="h-5 w-5 text-primary" />
+            League Profile
+          </CardTitle>
+          <CardDescription>
+            Manage your display name and membership for this league.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-medium text-gray-700">League Nickname</span>
+              {!isEditing && (
+                <Button variant="ghost" size="sm" onClick={handleEditNickname}>
+                  <Pencil className="h-3.5 w-3.5 mr-1" />
+                  Edit
+                </Button>
+              )}
+            </div>
+            {isEditing ? (
+              <div className="flex gap-2">
+                <Input
+                  value={nicknameInput}
+                  onChange={(e) => setNicknameInput(e.target.value)}
+                  maxLength={25}
+                  placeholder="Enter nickname (3–25 characters)"
+                  className="flex-1"
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSaveNickname(); if (e.key === "Escape") setIsEditing(false); }}
+                />
+                <Button
+                  onClick={handleSaveNickname}
+                  disabled={updateNicknameMutation.isPending || nicknameInput.trim().length < 3}
+                  size="sm"
+                >
+                  {updateNicknameMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={user?.profileImageUrl || ""} />
+                  <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                    {currentNickname?.[0]?.toUpperCase() || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-semibold text-gray-900">{currentNickname}</p>
+                  {member?.nickname && member.nickname !== user?.username && (
+                    <p className="text-xs text-gray-500">Global username: {user?.username}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-gray-500">This name is shown on the leaderboard and weekly picks for this league only.</p>
+          </div>
+
+          <div className="border-t pt-4">
+            <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-800">Leave League</p>
+                <p className="text-xs text-red-600 mt-0.5">
+                  {member?.isAdmin
+                    ? "As the admin, you can only leave if there are other admins. Transfer admin rights first if needed."
+                    : "Once you leave, you will need an invite code to rejoin."}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
+                  onClick={handleLeaveLeague}
+                  disabled={leaveLeagueMutation.isPending}
+                >
+                  {leaveLeagueMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <LogOut className="h-4 w-4 mr-1.5" />
+                  )}
+                  Leave League
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

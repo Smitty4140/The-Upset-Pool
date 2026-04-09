@@ -194,12 +194,12 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                     <td className="px-1 sm:px-3 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-700">
                       <div className="flex items-center">
                         <Avatar className="h-5 w-5 sm:h-7 sm:w-7 mr-1 sm:mr-2 border border-gray-200 flex-shrink-0">
-                          <AvatarImage src={user.profileImageUrl ?? ""} alt={user.username ?? ""} />
+                          <AvatarImage src={user.profileImageUrl ?? ""} alt={(user as any).nickname ?? user.username ?? ""} />
                           <AvatarFallback className="bg-primary/10 text-primary text-[10px] sm:text-xs">
-                            {user.username?.[0].toUpperCase() || "?"}
+                            {((user as any).nickname ?? user.username)?.[0].toUpperCase() || "?"}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="font-medium text-xs sm:text-sm truncate max-w-[60px] sm:max-w-none">{user.username}</span>
+                        <span className="font-medium text-xs sm:text-sm truncate max-w-[60px] sm:max-w-none">{(user as any).nickname ?? user.username}</span>
                       </div>
                     </td>
                     <td className="px-1 sm:px-3 py-3 sm:py-4 whitespace-nowrap text-sm" data-testid={`last-pick-${user.id}`}>
@@ -258,7 +258,7 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                         <div className="animate-in slide-in-from-top-2 duration-200">
                           <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
                             <Calendar className="h-4 w-4 mr-2" />
-                            Weekly Picks for {user.username}
+                            Weekly Picks for {(user as any).nickname ?? user.username}
                           </h4>
                           {isLoadingPicks && !userPicksCache[user.id] ? (
                             <div className="space-y-2">

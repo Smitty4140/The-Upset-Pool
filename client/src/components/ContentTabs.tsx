@@ -1,7 +1,7 @@
-import { Eye, Shield, Trophy, Flag, UserCog, ChevronDown } from "lucide-react";
+import { Eye, Shield, Trophy, Flag, UserCog, ChevronDown, User } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
-type Tab = "spreads" | "leaderboard" | "weeklypicks" | "results" | "admin";
+type Tab = "spreads" | "leaderboard" | "weeklypicks" | "results" | "admin" | "profile";
 
 type ContentTabsProps = {
   activeTab: Tab;
@@ -15,6 +15,7 @@ const TAB_CONFIG: { id: Tab; label: string; icon: React.ReactNode; adminOnly?: b
   { id: "spreads",     label: "Game Spreads",  icon: <Shield className="h-4 w-4" /> },
   { id: "weeklypicks", label: "Weekly Picks",  icon: <Eye className="h-4 w-4" /> },
   { id: "leaderboard", label: "Leaderboard",   icon: <Trophy className="h-4 w-4" /> },
+  { id: "profile",     label: "Profile",       icon: <User className="h-4 w-4" /> },
   { id: "results",     label: "Results",       icon: <Flag className="h-4 w-4" />, superUserOnly: true },
   { id: "admin",       label: "Admin",         icon: <UserCog className="h-4 w-4" />, adminOnly: true },
 ];

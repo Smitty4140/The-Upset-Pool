@@ -878,6 +878,7 @@ export class DatabaseStorage implements IStorage {
           user_receiveNotifications: users.receiveNotifications,
           user_createdAt: users.createdAt,
           user_updatedAt: users.updatedAt,
+          user_nickname: leagueMembers.nickname,
           // Picked team fields
           pickedTeam_id: pickedTeamAlias.id,
           pickedTeam_name: pickedTeamAlias.name,
@@ -913,6 +914,10 @@ export class DatabaseStorage implements IStorage {
         })
         .from(userPicks)
         .innerJoin(users, eq(userPicks.userId, users.id))
+        .leftJoin(leagueMembers, and(
+          eq(leagueMembers.userId, userPicks.userId),
+          eq(leagueMembers.leagueId, userPicks.leagueId)
+        ))
         .innerJoin(pickedTeamAlias, eq(userPicks.pickedTeamId, pickedTeamAlias.id))
         .innerJoin(nflGames, eq(userPicks.gameId, nflGames.id))
         .innerJoin(homeTeamAlias, eq(nflGames.homeTeamId, homeTeamAlias.id))
@@ -951,6 +956,7 @@ export class DatabaseStorage implements IStorage {
           receiveNotifications: row.user_receiveNotifications,
           createdAt: row.user_createdAt,
           updatedAt: row.user_updatedAt,
+          nickname: row.user_nickname ?? null,
         },
         pickedTeam: {
           id: row.pickedTeam_id,
@@ -1023,16 +1029,20 @@ export class DatabaseStorage implements IStorage {
         receiveNotifications: users.receiveNotifications,
         createdAt: users.createdAt,
         updatedAt: users.updatedAt,
+        nickname: leagueMembers.nickname,
         totalPoints: sql<string>`COALESCE(SUM(${userPicks.pointsEarned}), 0)`.as('totalPoints')
       })
       .from(users)
-      .innerJoin(leagueMembers, eq(users.id, leagueMembers.userId))
+      .innerJoin(leagueMembers, and(
+        eq(users.id, leagueMembers.userId),
+        eq(leagueMembers.leagueId, leagueId)
+      ))
       .leftJoin(userPicks, and(
         eq(userPicks.userId, users.id),
         eq(userPicks.leagueId, leagueId)
       ))
       .where(eq(leagueMembers.leagueId, leagueId))
-      .groupBy(users.id, users.username, users.email, users.firstName, users.lastName, users.profileImageUrl, users.emailVerified, users.receiveNotifications, users.createdAt, users.updatedAt)
+      .groupBy(users.id, users.username, users.email, users.firstName, users.lastName, users.profileImageUrl, users.emailVerified, users.receiveNotifications, users.createdAt, users.updatedAt, leagueMembers.nickname)
       .orderBy(desc(sql`COALESCE(SUM(${userPicks.pointsEarned}), 0)`));
     
     // Get weeks for eligibility calculation:
