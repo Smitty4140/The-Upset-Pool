@@ -17,6 +17,25 @@ import { pullNFLResultsFromESPN } from "./espnResultsPuller";
 // Super user configuration - only this account has access to system admin functions
 const SUPER_USER_ID = "user_1753731196994_qfjmyp5i2";
 
+// Shared nickname validation: 3-25 characters, letters/numbers/spaces/hyphens/underscores
+const NICKNAME_REGEX = /^[a-zA-Z0-9 _-]+$/;
+function validateNickname(nickname: unknown): { valid: true; value: string } | { valid: false; error: string } {
+  if (!nickname || typeof nickname !== "string" || nickname.trim().length === 0) {
+    return { valid: false, error: "Nickname is required" };
+  }
+  const trimmed = nickname.trim();
+  if (trimmed.length < 3) {
+    return { valid: false, error: "Nickname must be at least 3 characters" };
+  }
+  if (trimmed.length > 25) {
+    return { valid: false, error: "Nickname must be 25 characters or fewer" };
+  }
+  if (!NICKNAME_REGEX.test(trimmed)) {
+    return { valid: false, error: "Nickname may only contain letters, numbers, spaces, hyphens, and underscores" };
+  }
+  return { valid: true, value: trimmed };
+}
+
 // Middleware to check if user is super user
 function isSuperUser(req: any, res: any, next: any) {
   if (!req.user) {
@@ -728,19 +747,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "You are already a member of this league" });
       }
       
-      // Add user to league with optional nickname
+      // Validate required nickname
       const { nickname } = req.body;
-      const user = await storage.getUser(userId);
-      const resolvedNickname = (nickname && nickname.trim().length > 0)
-        ? nickname.trim()
-        : (user?.username || null);
+      const nicknameResult = validateNickname(nickname);
+      if (!nicknameResult.valid) {
+        return res.status(400).json({ message: nicknameResult.error });
+      }
 
       const newMember = await storage.addLeagueMember({
         leagueId: league.id,
         userId,
         isAdmin: false,
         isActive: true,
-        nickname: resolvedNickname,
+        nickname: nicknameResult.value,
       });
       
       res.json({
@@ -763,12 +782,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const userId = req.user.id;
       const { nickname } = req.body;
-
-      if (!nickname || nickname.trim().length < 3) {
-        return res.status(400).json({ message: "Nickname must be at least 3 characters" });
-      }
-      if (nickname.trim().length > 25) {
-        return res.status(400).json({ message: "Nickname must be 25 characters or fewer" });
+      const nicknameResult = validateNickname(nickname);
+      if (!nicknameResult.valid) {
+        return res.status(400).json({ message: nicknameResult.error });
       }
 
       const member = await storage.getLeagueMember(leagueId, userId);
@@ -777,7 +793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updated = await storage.updateLeagueMember(leagueId, userId, {
-        nickname: nickname.trim(),
+        nickname: nicknameResult.value,
       });
       res.json({ message: "Nickname updated", member: updated });
     } catch (error) {

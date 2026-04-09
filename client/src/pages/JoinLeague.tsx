@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,10 +11,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { Users, Plus, Hash } from "lucide-react";
+import { User } from "@/lib/types";
+import { nicknameSchema } from "@/lib/nicknameSchema";
 
 const joinLeagueSchema = z.object({
   inviteCode: z.string().min(1, "Please enter a league invite code"),
-  nickname: z.string().min(3, "Nickname must be at least 3 characters").max(25, "Nickname must be 25 characters or fewer"),
+  nickname: nicknameSchema,
 });
 
 type JoinLeagueFormValues = z.infer<typeof joinLeagueSchema>;
@@ -25,22 +27,29 @@ export default function JoinLeague() {
   const [showCreateLeague, setShowCreateLeague] = useState(false);
   const [leagueName, setLeagueName] = useState("");
 
-  const { data: authUser } = useQuery<any>({ queryKey: ["/api/auth/user"] });
+  const { data: authUser } = useQuery<User>({ queryKey: ["/api/auth/user"] });
 
   const form = useForm<JoinLeagueFormValues>({
     resolver: zodResolver(joinLeagueSchema),
     defaultValues: {
       inviteCode: "",
-      nickname: authUser?.username || "",
+      nickname: "",
     },
   });
+
+  // Prefill nickname with global username once user data loads
+  useEffect(() => {
+    if (authUser?.username && !form.getValues("nickname")) {
+      form.setValue("nickname", authUser.username, { shouldValidate: false });
+    }
+  }, [authUser?.username, form]);
 
   const joinLeagueMutation = useMutation({
     mutationFn: async (data: JoinLeagueFormValues) => {
       const response = await apiRequest('POST', '/api/leagues/join', { inviteCode: data.inviteCode, nickname: data.nickname });
       return response.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { message?: string }) => {
       toast({
         title: "Welcome to the league!",
         description: data.message || "You've successfully joined the league.",
@@ -63,7 +72,7 @@ export default function JoinLeague() {
       const response = await apiRequest('POST', '/api/leagues', { name });
       return response.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { name: string; inviteCode: string }) => {
       toast({
         title: "League created!",
         description: `Your league "${data.name}" has been created. Invite code: ${data.inviteCode}`,
