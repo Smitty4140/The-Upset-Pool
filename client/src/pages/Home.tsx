@@ -44,6 +44,7 @@ import {
   ChevronUp,
   Clock,
   X,
+  UserX,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
@@ -619,6 +620,23 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+
+              {/* Inactive Member Banner */}
+              {memberStatus && !memberStatus.isActive && !currentLeagueInfo?.isArchived && (
+                <div className="bg-red-50 border-l-4 border-red-500 px-6 py-4">
+                  <div className="flex items-center">
+                    <UserX className="h-5 w-5 text-red-500 flex-shrink-0" />
+                    <div className="ml-3">
+                      <p className="text-sm text-red-700 font-medium">
+                        Your account is not active in this league
+                      </p>
+                      <p className="text-sm text-red-600 mt-1">
+                        You cannot submit picks until your account is activated. Please reach out to your league administrator to get access.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Archived League Banner */}
               {currentLeagueInfo?.isArchived && (
