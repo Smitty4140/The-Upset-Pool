@@ -74,6 +74,7 @@ export const leagueMembers = pgTable("league_members", {
   userId: varchar("user_id").notNull().references(() => users.id),
   isAdmin: boolean("is_admin").default(false),
   isActive: boolean("is_active").default(true), // Whether the member can make picks
+  nickname: varchar("nickname"), // Per-league display name (falls back to users.username)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => {
@@ -239,6 +240,7 @@ export type LastPickInfo = {
 export type UserWithEligibility = User & {
   everyWeekEligible: boolean;
   lastPick?: LastPickInfo;
+  nickname?: string | null; // Per-league display name from league_members
 };
 
 export type NFLTeam = typeof nflTeams.$inferSelect;

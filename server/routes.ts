@@ -304,6 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ 
         isActive: leagueMember.isActive,
         isAdmin: leagueMember.isAdmin,
+        nickname: leagueMember.nickname ?? null,
       });
     } catch (error) {
       console.error("Error fetching member status:", error);
@@ -725,12 +726,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "You are already a member of this league" });
       }
       
-      // Add user to league
+      // Add user to league with optional nickname
+      const { nickname } = req.body;
+      const user = await storage.getUser(userId);
+      const resolvedNickname = (nickname && nickname.trim().length > 0)
+        ? nickname.trim()
+        : (user?.username || null);
+
       const newMember = await storage.addLeagueMember({
         leagueId: league.id,
         userId,
         isAdmin: false,
         isActive: true,
+        nickname: resolvedNickname,
       });
       
       res.json({
@@ -741,6 +749,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error joining league:", error);
       res.status(500).json({ message: "Failed to join league" });
+    }
+  });
+
+  // Update current user's nickname in a league
+  app.patch('/api/leagues/:leagueId/nickname', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = parseInt(req.params.leagueId);
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+      const userId = req.user.id;
+      const { nickname } = req.body;
+
+      if (!nickname || nickname.trim().length < 3) {
+        return res.status(400).json({ message: "Nickname must be at least 3 characters" });
+      }
+      if (nickname.trim().length > 25) {
+        return res.status(400).json({ message: "Nickname must be 25 characters or fewer" });
+      }
+
+      const member = await storage.getLeagueMember(leagueId, userId);
+      if (!member) {
+        return res.status(403).json({ message: "You are not a member of this league" });
+      }
+
+      const updated = await storage.updateLeagueMember(leagueId, userId, {
+        nickname: nickname.trim(),
+      });
+      res.json({ message: "Nickname updated", member: updated });
+    } catch (error) {
+      console.error("Error updating nickname:", error);
+      res.status(500).json({ message: "Failed to update nickname" });
+    }
+  });
+
+  // Leave a league (cannot leave if sole admin)
+  app.delete('/api/leagues/:leagueId/leave', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = parseInt(req.params.leagueId);
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+      const userId = req.user.id;
+
+      const member = await storage.getLeagueMember(leagueId, userId);
+      if (!member) {
+        return res.status(404).json({ message: "You are not a member of this league" });
+      }
+
+      // Block if sole admin
+      if (member.isAdmin) {
+        const allMembers = await storage.getLeagueMembers(leagueId);
+        const adminCount = allMembers.filter(m => m.isAdmin).length;
+        if (adminCount <= 1) {
+          return res.status(400).json({
+            message: "You are the only admin. Transfer admin rights to another member before leaving."
+          });
+        }
+      }
+
+      await storage.removeLeagueMember(leagueId, userId);
+      res.json({ message: "You have left the league" });
+    } catch (error) {
+      console.error("Error leaving league:", error);
+      res.status(500).json({ message: "Failed to leave league" });
     }
   });
 

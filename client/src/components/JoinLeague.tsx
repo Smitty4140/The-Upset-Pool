@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +20,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
@@ -28,6 +30,7 @@ import { UserPlus, Loader2 } from "lucide-react";
 
 const joinLeagueSchema = z.object({
   inviteCode: z.string().min(1, "Invite code is required").max(6, "Invite code must be 6 characters").toUpperCase(),
+  nickname: z.string().min(3, "Nickname must be at least 3 characters").max(25, "Nickname must be 25 characters or fewer"),
 });
 
 type JoinLeagueFormData = z.infer<typeof joinLeagueSchema>;
@@ -39,17 +42,19 @@ interface JoinLeagueProps {
 export default function JoinLeague({ onLeagueJoined }: JoinLeagueProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const form = useForm<JoinLeagueFormData>({
     resolver: zodResolver(joinLeagueSchema),
     defaultValues: {
       inviteCode: "",
+      nickname: user?.username || "",
     },
   });
 
   const joinLeagueMutation = useMutation({
     mutationFn: async (data: JoinLeagueFormData) => {
-      const response = await apiRequest("POST", "/api/leagues/join", data);
+      const response = await apiRequest("POST", "/api/leagues/join", { inviteCode: data.inviteCode, nickname: data.nickname });
       return await response.json();
     },
     onSuccess: (result: any) => {
@@ -133,6 +138,24 @@ export default function JoinLeague({ onLeagueJoined }: JoinLeagueProps) {
                       style={{ textTransform: 'uppercase' }}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="nickname"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>League Nickname</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="How you'll appear in this league"
+                      {...field}
+                      maxLength={25}
+                    />
+                  </FormControl>
+                  <FormDescription>Your display name in this league (3–25 characters).</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
