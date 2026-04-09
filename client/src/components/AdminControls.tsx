@@ -4,30 +4,21 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share, Trash2, Archive } from "lucide-react";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatWeeklyDate } from "@/lib/formatDate";
-import { NFLWeek, League, NFLGame, NFLTeam, User } from "@/lib/types";
+import { NFLWeek, League, NFLGame, NFLTeam, User, LeagueMember } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
+
+interface SchedulerStatus {
+  isRunning: boolean;
+  jobCount: number;
+}
 
 interface GameResultsManagerProps {
   weekId: number;
@@ -297,7 +288,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
     data: schedulerStatus, 
     isLoading: isLoadingSchedulerStatus,
     refetch: refetchSchedulerStatus
-  } = useQuery({
+  } = useQuery<SchedulerStatus>({
     queryKey: ["/api/admin/scheduler/status"],
     enabled: !!isAdmin,
     refetchInterval: 30000, // Refresh every 30 seconds
@@ -890,12 +881,12 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
             <div className="mb-3 sm:mb-0">
               <div className="text-sm font-medium">
                 Scheduler Status: 
-                <span className={(schedulerStatus as any)?.isRunning ? " text-green-600" : " text-red-600"}>
-                  {isLoadingSchedulerStatus ? " Loading..." : ((schedulerStatus as any)?.isRunning ? " Running" : " Stopped")}
+                <span className={schedulerStatus?.isRunning ? " text-green-600" : " text-red-600"}>
+                  {isLoadingSchedulerStatus ? " Loading..." : (schedulerStatus?.isRunning ? " Running" : " Stopped")}
                 </span>
               </div>
               <div className="text-sm text-muted-foreground">
-                {schedulerStatus && `${(schedulerStatus as any).jobCount || 0} scheduled job${(schedulerStatus as any).jobCount !== 1 ? 's' : ''}`}
+                {schedulerStatus && `${schedulerStatus.jobCount || 0} scheduled job${schedulerStatus.jobCount !== 1 ? 's' : ''}`}
               </div>
             </div>
             
@@ -1100,7 +1091,7 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
   const { toast } = useToast();
   
   // Fetch all league members with user details
-  const { data: leagueMembers, isLoading, refetch } = useQuery<any[]>({
+  const { data: leagueMembers, isLoading, refetch } = useQuery<LeagueMember[]>({
     queryKey: [`/api/leagues/${leagueId}/members`],
   });
 
@@ -1236,8 +1227,8 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
                 <TableCell>
                   <div className="flex items-center space-x-2">
                     <div>
-                      <div className="font-medium">{(member as any).nickname || member.user?.username || member.user?.email}</div>
-                      {(member as any).nickname && (member as any).nickname !== member.user?.username && (
+                      <div className="font-medium">{member.nickname || member.user?.username || member.user?.email}</div>
+                      {member.nickname && member.nickname !== member.user?.username && (
                         <div className="text-xs text-gray-500">{member.user?.username}</div>
                       )}
                     </div>
@@ -1318,7 +1309,7 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleRemoveMember(member.userId, (member as any).nickname || member.user?.username || member.user?.email || 'User')}
+                    onClick={() => handleRemoveMember(member.userId, member.nickname || member.user?.username || member.user?.email || 'User')}
                     disabled={removeMemberMutation.isPending || toggleActivationMutation.isPending || toggleAdminMutation.isPending}
                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
                   >

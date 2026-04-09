@@ -11,6 +11,7 @@ export interface User {
   totalPoints: number;
   createdAt: string;
   updatedAt: string;
+  nickname?: string | null; // Per-league display name (present on leaderboard/picks responses)
 }
 
 export interface NFLTeam {
@@ -40,6 +41,8 @@ export interface LeagueMember {
   leagueId: number;
   userId: string;
   isAdmin: boolean;
+  isActive: boolean;
+  nickname: string | null;
   createdAt: string;
   updatedAt: string;
   league?: League;

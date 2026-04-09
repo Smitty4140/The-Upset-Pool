@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import LeagueHeader from "@/components/LeagueHeader";
@@ -792,6 +793,7 @@ function LeagueProfile({ leagueId, memberStatus, onLeagueLeft }: {
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [nicknameInput, setNicknameInput] = useState("");
   const [isEditing, setIsEditing] = useState(false);
 
@@ -814,7 +816,7 @@ function LeagueProfile({ leagueId, memberStatus, onLeagueLeft }: {
       queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/members`] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to update nickname", variant: "destructive" });
     },
   });
@@ -826,9 +828,11 @@ function LeagueProfile({ leagueId, memberStatus, onLeagueLeft }: {
     },
     onSuccess: () => {
       toast({ title: "Left league", description: "You have left the league." });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/leagues"] });
       onLeagueLeft?.();
+      setLocation("/join-league");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Cannot leave", description: error.message || "Failed to leave league", variant: "destructive" });
     },
   });

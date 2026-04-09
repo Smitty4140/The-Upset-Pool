@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -27,16 +27,18 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { UserPlus, Loader2 } from "lucide-react";
+import { League } from "@/lib/types";
+import { nicknameSchema } from "@/lib/nicknameSchema";
 
 const joinLeagueSchema = z.object({
   inviteCode: z.string().min(1, "Invite code is required").max(6, "Invite code must be 6 characters").toUpperCase(),
-  nickname: z.string().min(3, "Nickname must be at least 3 characters").max(25, "Nickname must be 25 characters or fewer"),
+  nickname: nicknameSchema,
 });
 
 type JoinLeagueFormData = z.infer<typeof joinLeagueSchema>;
 
 interface JoinLeagueProps {
-  onLeagueJoined?: (league: any) => void;
+  onLeagueJoined?: (league: League) => void;
 }
 
 export default function JoinLeague({ onLeagueJoined }: JoinLeagueProps) {
@@ -48,16 +50,23 @@ export default function JoinLeague({ onLeagueJoined }: JoinLeagueProps) {
     resolver: zodResolver(joinLeagueSchema),
     defaultValues: {
       inviteCode: "",
-      nickname: user?.username || "",
+      nickname: "",
     },
   });
+
+  // Prefill nickname with global username once user data is available
+  useEffect(() => {
+    if (user?.username && !form.getValues("nickname")) {
+      form.setValue("nickname", user.username, { shouldValidate: false });
+    }
+  }, [user?.username, form]);
 
   const joinLeagueMutation = useMutation({
     mutationFn: async (data: JoinLeagueFormData) => {
       const response = await apiRequest("POST", "/api/leagues/join", { inviteCode: data.inviteCode, nickname: data.nickname });
-      return await response.json();
+      return await response.json() as { message?: string; league?: League };
     },
-    onSuccess: (result: any) => {
+    onSuccess: (result) => {
       toast({
         title: "League Joined!",
         description: result.message || `Successfully joined ${result.league?.name || 'league'}`,
@@ -75,15 +84,11 @@ export default function JoinLeague({ onLeagueJoined }: JoinLeagueProps) {
         onLeagueJoined(result.league);
       }
     },
-    onError: (error: any) => {
-      console.error("Join league error:", error);
+    onError: (error: Error) => {
       let errorMessage = "Failed to join league";
       
-      // Try to extract error message from the response
       if (error?.message) {
-        // Check if it's a network error or a parsed error message
         if (error.message.includes(":")) {
-          // Format: "400: Invalid invite code"
           const parts = error.message.split(":");
           if (parts.length > 1) {
             errorMessage = parts.slice(1).join(":").trim();
