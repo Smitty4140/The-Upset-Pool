@@ -74,7 +74,6 @@ export const leagueMembers = pgTable("league_members", {
   userId: varchar("user_id").notNull().references(() => users.id),
   isAdmin: boolean("is_admin").default(false),
   isActive: boolean("is_active").default(true), // Whether the member can make picks
-  hasPaid: boolean("has_paid").default(false), // Whether the member has paid their league fee
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => {

@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share, Trash2, DollarSign, Archive } from "lucide-react";
+import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share, Trash2, Archive } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { formatWeeklyDate } from "@/lib/formatDate";
 import { NFLWeek, League, NFLGame, NFLTeam, User } from "@/lib/types";
@@ -1179,40 +1179,12 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
     }
   });
 
-  // Mutation for toggling payment status
-  const togglePaymentMutation = useMutation({
-    mutationFn: async ({ userId, hasPaid }: { userId: string; hasPaid: boolean }) => {
-      return apiRequest("POST", `/api/admin/league/${leagueId}/member/${userId}/toggle-payment`, {});
-    },
-    onSuccess: (data: any, variables) => {
-      toast({
-        title: "Success",
-        description: data.message || `Payment status updated successfully`,
-        variant: "default"
-      });
-      // Refetch league members to update the UI
-      refetch();
-      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}/members`] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update payment status",
-        variant: "destructive"
-      });
-    }
-  });
-
   const handleToggleActivation = (userId: string, currentStatus: boolean) => {
     toggleActivationMutation.mutate({ userId, isActive: currentStatus });
   };
 
   const handleToggleAdmin = (userId: string, currentStatus: boolean) => {
     toggleAdminMutation.mutate({ userId, isAdmin: currentStatus });
-  };
-
-  const handleTogglePayment = (userId: string, currentStatus: boolean) => {
-    togglePaymentMutation.mutate({ userId, hasPaid: currentStatus });
   };
 
   const handleRemoveMember = (userId: string, username: string) => {
@@ -1243,7 +1215,7 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
       <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 flex items-start">
         <UserCog className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
         <div className="text-sm text-blue-800">
-          Manage league member activation status, admin privileges, and payment tracking. Inactive users cannot submit picks. Admin users can manage game results and other admin functions. Track payment status for league fees.
+          Manage league member activation status and admin privileges. Inactive users cannot submit picks. Admin users can manage game results and other admin functions.
         </div>
       </div>
 
@@ -1255,7 +1227,6 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
               <TableHead>Email</TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-center">Role</TableHead>
-              <TableHead className="text-center">Payment</TableHead>
               <TableHead className="text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -1333,42 +1304,6 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
                         <div className="flex items-center">
                           <UserCog className="h-3 w-3 mr-2" />
                           Member
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell className="text-center">
-                  <Select 
-                    value={(member as any).hasPaid ? "paid" : "unpaid"}
-                    onValueChange={(value) => {
-                      if ((value === "paid") !== (member as any).hasPaid) {
-                        handleTogglePayment(member.userId, (member as any).hasPaid);
-                      }
-                    }}
-                    disabled={togglePaymentMutation.isPending || toggleActivationMutation.isPending || toggleAdminMutation.isPending}
-                  >
-                    <SelectTrigger className={`w-[100px] ${(member as any).hasPaid ? 'bg-green-50 border-green-200 text-green-800' : 'bg-orange-50 border-orange-200 text-orange-800'}`}>
-                      <div className="flex items-center">
-                        {(member as any).hasPaid ? (
-                          <DollarSign className="h-3 w-3 mr-1" />
-                        ) : (
-                          <Clock className="h-3 w-3 mr-1" />
-                        )}
-                        <SelectValue />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="paid" className="text-green-700">
-                        <div className="flex items-center">
-                          <DollarSign className="h-3 w-3 mr-2" />
-                          Paid
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="unpaid" className="text-orange-700">
-                        <div className="flex items-center">
-                          <Clock className="h-3 w-3 mr-2" />
-                          Not Paid
                         </div>
                       </SelectItem>
                     </SelectContent>

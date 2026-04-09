@@ -304,7 +304,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ 
         isActive: leagueMember.isActive,
         isAdmin: leagueMember.isAdmin,
-        hasPaid: leagueMember.hasPaid 
       });
     } catch (error) {
       console.error("Error fetching member status:", error);
@@ -433,44 +432,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Toggle payment status for a league member (Admin only)
-  app.post('/api/admin/league/:leagueId/member/:userId/toggle-payment', isAuthenticated, async (req: any, res) => {
-    try {
-      const adminUserId = req.user.id;
-      const leagueId = parseInt(req.params.leagueId);
-      const targetUserId = req.params.userId;
-      
-      if (isNaN(leagueId)) {
-        return res.status(400).json({ message: "Invalid league ID" });
-      }
-      
-      // Check if the requesting user is an admin of this league
-      const adminMember = await storage.getLeagueMember(leagueId, adminUserId);
-      if (!adminMember || !adminMember.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-      
-      // Get the target member
-      const targetMember = await storage.getLeagueMember(leagueId, targetUserId);
-      if (!targetMember) {
-        return res.status(404).json({ message: "Member not found" });
-      }
-      
-      // Toggle payment status
-      const updatedMember = await storage.updateLeagueMember(leagueId, targetUserId, {
-        hasPaid: !(targetMember as any).hasPaid
-      });
-      
-      res.json({ 
-        message: `Payment status updated: ${(updatedMember as any).hasPaid ? 'Paid' : 'Not Paid'}`,
-        hasPaid: (updatedMember as any).hasPaid 
-      });
-    } catch (error) {
-      console.error("Error toggling payment status:", error);
-      res.status(500).json({ message: "Failed to update payment status" });
-    }
-  });
-  
   // Toggle lock status for picks in a week (admin only)
   app.post('/api/admin/week/:id/toggle-lock', isAuthenticated, async (req: any, res) => {
     try {
