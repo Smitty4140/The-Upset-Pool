@@ -1112,7 +1112,7 @@ const UserManagement = ({ leagueId }: UserManagementProps) => {
     onSuccess: (data: any, variables) => {
       toast({
         title: "Success",
-        description: data.message || `User ${data.isActive ? 'activated' : 'deactivated'} successfully`,
+        description: `User ${!variables.isActive ? 'activated' : 'deactivated'} successfully`,
         variant: "default"
       });
       // Refetch league members to update the UI
