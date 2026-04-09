@@ -863,11 +863,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Already a member of this league" });
       }
 
-      // Add user to league
+      // Add user to league with username as default nickname
+      const userForNickname = await storage.getUser(userId);
       const leagueMember = await storage.addLeagueMember({
         leagueId,
         userId,
         isAdmin: false,
+        isActive: true,
+        nickname: userForNickname?.username || null,
       });
 
       res.status(201).json(leagueMember);
