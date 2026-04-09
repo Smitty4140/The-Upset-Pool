@@ -684,12 +684,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         season,
       });
       
-      // Add the creator as an admin member
+      // Add the creator as an admin member, using their username as the default nickname
+      const creator = await storage.getUser(userId);
       await storage.addLeagueMember({
         leagueId: newLeague.id,
         userId,
         isAdmin: true,
         isActive: true,
+        nickname: creator?.username || null,
       });
       
       res.status(201).json(newLeague);
