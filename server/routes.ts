@@ -825,10 +825,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "You are not a member of this league" });
       }
 
-      // Block if sole admin
+      // Block if sole active admin (consistent with member-status isSoleAdmin calculation)
       if (member.isAdmin) {
         const allMembers = await storage.getLeagueMembers(leagueId);
-        const adminCount = allMembers.filter(m => m.isAdmin).length;
+        const adminCount = allMembers.filter(m => m.isAdmin && m.isActive).length;
         if (adminCount <= 1) {
           return res.status(400).json({
             message: "You are the only admin. Transfer admin rights to another member before leaving."
