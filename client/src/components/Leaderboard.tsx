@@ -160,7 +160,7 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
               <th scope="col" className="px-1 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Score</th>
               <th scope="col" className="px-1 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Pooler</th>
               <th scope="col" className="px-1 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Pick</th>
-              <th scope="col" className="px-1 sm:px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Eligible</th>
+              <th scope="col" className="px-1 sm:px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Picked Every Week</th>
               <th scope="col" className="px-1 sm:px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-6 sm:w-12"></th>
             </tr>
           </thead>
