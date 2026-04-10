@@ -1,0 +1,21 @@
+Here are copy-paste-ready instructions for Replit:
+
+Instructions to improve the Golf League plan based on review:
+1. Fix the pick resubmission contradiction
+The "Out of scope" section says "Golf pick change / edit after submission — picks are final once submitted," but the picks UI task says picks can be re-submitted before the deadline. Remove the out-of-scope bullet or rewrite it to say: "Pick changes after the picks deadline are out of scope." The intended behavior is: users can overwrite their picks as many times as they want before the deadline. Once the deadline passes, picks are locked permanently.
+2. Clarify the leagues table migration safety
+In the database schema task, explicitly state: sport_type should default to 'nfl' and be NOT NULL. golf_tournament_id should be NULLABLE (since NFL leagues won't have one). Add a validation note: when sport_type is 'golf', golf_tournament_id is required; when sport_type is 'nfl', golf_tournament_id must be null. Existing league rows must not be affected by the migration.
+3. Add create-league validation rules
+In the golf API routes task, under POST /api/leagues, specify that the backend must validate: if sportType is 'golf', a valid golfTournamentId is required or reject with 400. If sportType is 'nfl', golfTournamentId must not be provided or should be ignored. If sportType is missing, default to 'nfl' for backward compatibility.
+4. Tighten the tiebreaker definition
+Replace the current tiebreaker description with: "Tiebreaker is determined by the highest OWGR number (i.e., worst-ranked golfer) among ALL 4 of a user's picks, not just the picks that scored. If two users are still tied after the tiebreaker, they share the same rank (standard competition ranking — e.g., two users tied for 1st, next user is 3rd)."
+5. Specify how amateur / no-OWGR 200-point value is handled in queries
+In the database schema task, clarify that owgr_at_lock is stored as NULL for amateurs. In the leaderboard storage method task, explicitly note that all point calculations must use COALESCE(owgr_at_lock, 200) when summing points so that amateurs resolve to 200 at query time. The admin UI should display "Amateur (200 pts)" when OWGR is left blank.
+6. Define how non-finishing golfers are handled in results entry
+In the super user golf admin UI task, specify that finishing positions are only required for golfers who made the cut and completed the tournament. The admin should be able to mark golfers as MC (missed cut), WD (withdrawn), or DQ (disqualified) — all of which count as not finishing top 10 and score zero points. The golf_results table should allow final_position to be nullable, with a status column (enum: 'finished', 'mc', 'wd', 'dq') to capture this.
+7. Clarify that pick ordering (1–4) has no functional significance
+In the database schema task, add a note that the four pick columns (pick1_player_id through pick4_player_id) are interchangeable — ordering does not affect scoring, tiebreaker, or display priority. They are simply four slots. This avoids anyone building logic that treats pick1 differently from pick4.
+8. Add defensive frontend handling for empty or unexpected golf league states
+In the GolfLeagueView task, specify the following states and what to display for each: (a) tournament exists but field is empty — show "Field not yet published" message, (b) field is published but deadline hasn't passed and user hasn't picked — show the pick selection UI, (c) deadline passed but no results entered — show submitted picks with a "Results Pending" banner, (d) results entered — show the full leaderboard. Also handle the edge case where a golf league references a tournament that doesn't exist (show an error state, not a crash).
+9. Ensure sportType flows through the full frontend data model
+In the frontend tasks, note that the league type/interface (in shared/schema.ts and client/src/lib/types.ts) must include sportType and golfTournamentId fields. Every component that reads league data should handle both types gracefully — audit Home.tsx, ContentTabs.tsx, sidebar, and any league list views to make sure none assume all leagues are NFL.
