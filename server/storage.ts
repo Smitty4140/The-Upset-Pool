@@ -19,6 +19,12 @@ import {
   nflWeeks,
   nflGames,
   userPicks,
+  golfTournaments,
+  golfPlayers,
+  golfTournamentField,
+  golfPicks,
+  golfPickSelections,
+  golfResults,
   type User,
   type UserWithEligibility,
   type LastPickInfo,
@@ -34,7 +40,12 @@ import {
   type NFLGame,
   type InsertNFLGame,
   type UserPick,
-  type InsertUserPick
+  type InsertUserPick,
+  type GolfTournament,
+  type InsertGolfTournament,
+  type GolfPlayer,
+  type GolfFieldEntry,
+  type GolfLeaderboardEntry,
 } from "@shared/schema";
 
 // Interface for storage operations
@@ -96,6 +107,29 @@ export interface IStorage {
   updateUserPick(id: number, pick: Partial<InsertUserPick>): Promise<UserPick | undefined>;
   getLeaderboard(leagueId: number): Promise<User[]>;
   processGameResults(gameId: number): Promise<void>;
+
+  // Golf Tournament operations
+  getGolfTournaments(): Promise<GolfTournament[]>;
+  getGolfTournament(id: number): Promise<GolfTournament | undefined>;
+  createGolfTournament(tournament: InsertGolfTournament): Promise<GolfTournament>;
+  updateGolfTournament(id: number, updates: Partial<InsertGolfTournament>): Promise<GolfTournament | undefined>;
+
+  // Golf Player & Field operations
+  getGolfPlayer(id: number): Promise<GolfPlayer | undefined>;
+  createGolfPlayer(player: { name: string; country?: string; isAmateur?: boolean }): Promise<GolfPlayer>;
+  getGolfTournamentField(tournamentId: number): Promise<GolfFieldEntry[]>;
+  upsertGolfFieldEntry(tournamentId: number, playerId: number, owgrAtLock: number | null): Promise<void>;
+
+  // Golf Pick operations (upsert — pre-deadline resubmission overwrites)
+  getGolfPick(userId: string, leagueId: number, tournamentId: number): Promise<{ pick: any; selections: any[] } | undefined>;
+  upsertGolfPicks(userId: string, leagueId: number, tournamentId: number, playerIds: number[]): Promise<void>;
+
+  // Golf Results operations
+  getGolfResults(tournamentId: number): Promise<(any & { player: GolfPlayer })[]>;
+  upsertGolfResults(tournamentId: number, results: { playerId: number; finalPosition: number | null; status: string }[]): Promise<void>;
+
+  // Golf Leaderboard
+  getGolfLeaderboard(leagueId: number, tournamentId: number): Promise<GolfLeaderboardEntry[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1208,6 +1242,264 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(userPicks.id, pick.id));
     }
+  }
+
+  // ─── Golf Tournament operations ──────────────────────────────────────────
+
+  async getGolfTournaments(): Promise<GolfTournament[]> {
+    return await db.select().from(golfTournaments).orderBy(desc(golfTournaments.startsAt));
+  }
+
+  async getGolfTournament(id: number): Promise<GolfTournament | undefined> {
+    const [t] = await db.select().from(golfTournaments).where(eq(golfTournaments.id, id));
+    return t;
+  }
+
+  async createGolfTournament(tournament: InsertGolfTournament): Promise<GolfTournament> {
+    const [t] = await db.insert(golfTournaments).values(tournament).returning();
+    return t;
+  }
+
+  async updateGolfTournament(id: number, updates: Partial<InsertGolfTournament>): Promise<GolfTournament | undefined> {
+    const [t] = await db.update(golfTournaments).set({ ...updates, updatedAt: new Date() })
+      .where(eq(golfTournaments.id, id)).returning();
+    return t;
+  }
+
+  // ─── Golf Player & Field operations ─────────────────────────────────────
+
+  async getGolfPlayer(id: number): Promise<GolfPlayer | undefined> {
+    const [p] = await db.select().from(golfPlayers).where(eq(golfPlayers.id, id));
+    return p;
+  }
+
+  async createGolfPlayer(player: { name: string; country?: string; isAmateur?: boolean }): Promise<GolfPlayer> {
+    const [p] = await db.insert(golfPlayers).values({
+      name: player.name,
+      country: player.country || null,
+      isAmateur: player.isAmateur || false,
+    }).returning();
+    return p;
+  }
+
+  async getGolfTournamentField(tournamentId: number): Promise<GolfFieldEntry[]> {
+    const rows = await db
+      .select({
+        id: golfTournamentField.id,
+        playerId: golfTournamentField.playerId,
+        name: golfPlayers.name,
+        country: golfPlayers.country,
+        isAmateur: golfPlayers.isAmateur,
+        owgrAtLock: golfTournamentField.owgrAtLock,
+      })
+      .from(golfTournamentField)
+      .innerJoin(golfPlayers, eq(golfTournamentField.playerId, golfPlayers.id))
+      .where(eq(golfTournamentField.tournamentId, tournamentId))
+      .orderBy(asc(golfTournamentField.owgrAtLock));
+
+    return rows.map(r => ({
+      ...r,
+      pointValue: r.owgrAtLock ?? 200,
+    }));
+  }
+
+  async upsertGolfFieldEntry(tournamentId: number, playerId: number, owgrAtLock: number | null): Promise<void> {
+    await db
+      .insert(golfTournamentField)
+      .values({ tournamentId, playerId, owgrAtLock })
+      .onConflictDoUpdate({
+        target: [golfTournamentField.tournamentId, golfTournamentField.playerId],
+        set: { owgrAtLock },
+      });
+  }
+
+  // ─── Golf Pick operations ────────────────────────────────────────────────
+
+  async getGolfPick(userId: string, leagueId: number, tournamentId: number): Promise<{ pick: any; selections: any[] } | undefined> {
+    const [pick] = await db
+      .select()
+      .from(golfPicks)
+      .where(and(
+        eq(golfPicks.userId, userId),
+        eq(golfPicks.leagueId, leagueId),
+        eq(golfPicks.tournamentId, tournamentId),
+      ));
+
+    if (!pick) return undefined;
+
+    const selections = await db
+      .select({
+        id: golfPickSelections.id,
+        pickId: golfPickSelections.pickId,
+        playerId: golfPickSelections.playerId,
+        playerName: golfPlayers.name,
+      })
+      .from(golfPickSelections)
+      .innerJoin(golfPlayers, eq(golfPickSelections.playerId, golfPlayers.id))
+      .where(eq(golfPickSelections.pickId, pick.id));
+
+    return { pick, selections };
+  }
+
+  async upsertGolfPicks(userId: string, leagueId: number, tournamentId: number, playerIds: number[]): Promise<void> {
+    // Upsert the pick header
+    const [pick] = await db
+      .insert(golfPicks)
+      .values({ userId, leagueId, tournamentId, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: [golfPicks.userId, golfPicks.leagueId, golfPicks.tournamentId],
+        set: { updatedAt: new Date() },
+      })
+      .returning();
+
+    // Delete old selections and re-insert fresh ones
+    await db.delete(golfPickSelections).where(eq(golfPickSelections.pickId, pick.id));
+    if (playerIds.length > 0) {
+      await db.insert(golfPickSelections).values(
+        playerIds.map(playerId => ({ pickId: pick.id, playerId }))
+      );
+    }
+  }
+
+  // ─── Golf Results operations ─────────────────────────────────────────────
+
+  async getGolfResults(tournamentId: number): Promise<(any & { player: GolfPlayer })[]> {
+    const rows = await db
+      .select({
+        id: golfResults.id,
+        tournamentId: golfResults.tournamentId,
+        playerId: golfResults.playerId,
+        finalPosition: golfResults.finalPosition,
+        status: golfResults.status,
+        topTen: golfResults.topTen,
+        player: golfPlayers,
+      })
+      .from(golfResults)
+      .innerJoin(golfPlayers, eq(golfResults.playerId, golfPlayers.id))
+      .where(eq(golfResults.tournamentId, tournamentId))
+      .orderBy(asc(golfResults.finalPosition));
+    return rows;
+  }
+
+  async upsertGolfResults(
+    tournamentId: number,
+    results: { playerId: number; finalPosition: number | null; status: string }[]
+  ): Promise<void> {
+    for (const r of results) {
+      const topTen = r.status === 'finished' && r.finalPosition !== null && r.finalPosition <= 10;
+      await db
+        .insert(golfResults)
+        .values({ tournamentId, playerId: r.playerId, finalPosition: r.finalPosition, status: r.status, topTen })
+        .onConflictDoUpdate({
+          target: [golfResults.tournamentId, golfResults.playerId],
+          set: { finalPosition: r.finalPosition, status: r.status, topTen },
+        });
+    }
+  }
+
+  // ─── Golf Leaderboard ────────────────────────────────────────────────────
+
+  async getGolfLeaderboard(leagueId: number, tournamentId: number): Promise<GolfLeaderboardEntry[]> {
+    // Get all members of the league
+    const members = await db
+      .select({
+        userId: leagueMembers.userId,
+        nickname: leagueMembers.nickname,
+        username: users.username,
+        profileImageUrl: users.profileImageUrl,
+      })
+      .from(leagueMembers)
+      .innerJoin(users, eq(leagueMembers.userId, users.id))
+      .where(and(eq(leagueMembers.leagueId, leagueId), eq(leagueMembers.isActive, true)));
+
+    // Get all picks for this tournament+league
+    const allPicks = await db
+      .select({
+        pickId: golfPicks.id,
+        userId: golfPicks.userId,
+        playerId: golfPickSelections.playerId,
+        playerName: golfPlayers.name,
+        owgrAtLock: golfTournamentField.owgrAtLock,
+      })
+      .from(golfPicks)
+      .innerJoin(golfPickSelections, eq(golfPickSelections.pickId, golfPicks.id))
+      .innerJoin(golfPlayers, eq(golfPickSelections.playerId, golfPlayers.id))
+      .leftJoin(golfTournamentField, and(
+        eq(golfTournamentField.playerId, golfPickSelections.playerId),
+        eq(golfTournamentField.tournamentId, tournamentId),
+      ))
+      .where(and(eq(golfPicks.leagueId, leagueId), eq(golfPicks.tournamentId, tournamentId)));
+
+    // Get all results for this tournament
+    const resultsMap = new Map<number, { topTen: boolean; status: string; finalPosition: number | null }>();
+    const results = await db
+      .select()
+      .from(golfResults)
+      .where(eq(golfResults.tournamentId, tournamentId));
+    for (const r of results) {
+      resultsMap.set(r.playerId, { topTen: r.topTen, status: r.status, finalPosition: r.finalPosition });
+    }
+
+    // Group picks by user
+    const picksByUser = new Map<string, typeof allPicks>();
+    for (const p of allPicks) {
+      if (!picksByUser.has(p.userId)) picksByUser.set(p.userId, []);
+      picksByUser.get(p.userId)!.push(p);
+    }
+
+    // Build leaderboard entries
+    const entries: Omit<GolfLeaderboardEntry, 'rank'>[] = members.map(member => {
+      const userPicks = picksByUser.get(member.userId) || [];
+      const picks = userPicks.map(p => {
+        const pointValue = p.owgrAtLock ?? 200;
+        const result = resultsMap.get(p.playerId);
+        const topTen = result?.topTen ?? false;
+        return {
+          playerId: p.playerId,
+          playerName: p.playerName,
+          owgrAtLock: p.owgrAtLock,
+          pointValue,
+          topTen,
+          pointsEarned: topTen ? pointValue : 0,
+          resultStatus: result?.status ?? null,
+          finalPosition: result?.finalPosition ?? null,
+        };
+      });
+
+      const totalPoints = picks.reduce((sum, p) => sum + p.pointsEarned, 0);
+      // Tiebreaker: highest OWGR number (worst rank) among ALL 4 picks
+      const tiebreakerOwgr = picks.length > 0
+        ? Math.max(...picks.map(p => p.pointValue))
+        : null;
+
+      return {
+        userId: member.userId,
+        username: member.username,
+        nickname: member.nickname,
+        profileImageUrl: member.profileImageUrl,
+        totalPoints,
+        picks,
+        tiebreakerOwgr,
+      };
+    });
+
+    // Sort: total points desc, then tiebreaker desc (worst OWGR = bigger number wins)
+    entries.sort((a, b) => {
+      if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+      return (b.tiebreakerOwgr ?? 0) - (a.tiebreakerOwgr ?? 0);
+    });
+
+    // Apply standard competition ranking (ties share the same rank)
+    let rank = 1;
+    return entries.map((entry, idx) => {
+      if (idx > 0) {
+        const prev = entries[idx - 1];
+        const samePoints = entry.totalPoints === prev.totalPoints;
+        const sameTiebreaker = entry.tiebreakerOwgr === prev.tiebreakerOwgr;
+        if (!samePoints || !sameTiebreaker) rank = idx + 1;
+      }
+      return { ...entry, rank };
+    });
   }
 }
 

@@ -30,10 +30,73 @@ export interface League {
   description: string | null;
   inviteCode: string;
   season: number | null;
+  sportType: string; // 'nfl' | 'golf'
+  golfTournamentId: number | null;
   isArchived: boolean;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface GolfTournament {
+  id: number;
+  name: string;
+  location: string | null;
+  season: number;
+  startsAt: string | null;
+  picksLockAt: string;
+  status: string; // 'upcoming' | 'active' | 'completed'
+  picksRequired: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GolfPlayer {
+  id: number;
+  name: string;
+  country: string | null;
+  isAmateur: boolean;
+  createdAt: string;
+}
+
+export interface GolfFieldEntry {
+  id: number;
+  playerId: number;
+  name: string;
+  country: string | null;
+  isAmateur: boolean;
+  owgrAtLock: number | null;
+  pointValue: number; // COALESCE(owgrAtLock, 200)
+}
+
+export interface GolfPickSession {
+  id: number;
+  userId: string;
+  leagueId: number;
+  tournamentId: number;
+  createdAt: string;
+  updatedAt: string;
+  selections: { playerId: number; playerName: string }[];
+}
+
+export interface GolfLeaderboardEntry {
+  userId: string;
+  username: string;
+  nickname: string | null;
+  profileImageUrl: string | null;
+  totalPoints: number;
+  picks: {
+    playerId: number;
+    playerName: string;
+    owgrAtLock: number | null;
+    pointValue: number;
+    topTen: boolean;
+    pointsEarned: number;
+    resultStatus: string | null;
+    finalPosition: number | null;
+  }[];
+  tiebreakerOwgr: number | null;
+  rank: number;
 }
 
 export interface LeagueMember {

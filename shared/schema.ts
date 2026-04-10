@@ -54,13 +54,29 @@ export const nflTeams = pgTable("nfl_teams", {
   secondaryColor: varchar("secondary_color"),
 });
 
-// NFL Leagues table
+// Golf Tournaments table (must be defined before leagues for FK reference)
+export const golfTournaments = pgTable("golf_tournaments", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  location: varchar("location"),
+  season: integer("season").notNull(),
+  startsAt: timestamp("starts_at"),
+  picksLockAt: timestamp("picks_lock_at").notNull(),
+  status: varchar("status").default("upcoming").notNull(), // 'upcoming' | 'active' | 'completed'
+  picksRequired: integer("picks_required").default(4).notNull(), // configurable per tournament
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Leagues table (supports both NFL and Golf)
 export const leagues = pgTable("leagues", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
   description: text("description"),
   inviteCode: varchar("invite_code", { length: 6 }).notNull().unique(),
-  season: integer("season").notNull().default(sql`EXTRACT(YEAR FROM NOW())::int`), // NFL season year
+  season: integer("season").notNull().default(sql`EXTRACT(YEAR FROM NOW())::int`),
+  sportType: varchar("sport_type").default("nfl").notNull(), // 'nfl' | 'golf'
+  golfTournamentId: integer("golf_tournament_id").references(() => golfTournaments.id), // null for NFL leagues
   isArchived: boolean("is_archived").default(false),
   archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -145,6 +161,59 @@ export const userPicks = pgTable("user_picks", {
     userLeagueIdx: index("idx_user_picks_user_league").on(table.userId, table.leagueId),
   };
 });
+
+// Golf Players table (individual golfers)
+export const golfPlayers = pgTable("golf_players", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  country: varchar("country"),
+  isAmateur: boolean("is_amateur").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Golf Tournament Field (which players are entered in which tournament, with OWGR at lock time)
+export const golfTournamentField = pgTable("golf_tournament_field", {
+  id: serial("id").primaryKey(),
+  tournamentId: integer("tournament_id").notNull().references(() => golfTournaments.id),
+  playerId: integer("player_id").notNull().references(() => golfPlayers.id),
+  owgrAtLock: integer("owgr_at_lock"), // NULL = amateur with no OWGR → 200 points via COALESCE
+}, (table) => ({
+  tournamentPlayerUnique: unique().on(table.tournamentId, table.playerId),
+}));
+
+// Golf Picks header (one row per user per league per tournament)
+export const golfPicks = pgTable("golf_picks", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  leagueId: integer("league_id").notNull().references(() => leagues.id),
+  tournamentId: integer("tournament_id").notNull().references(() => golfTournaments.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userLeagueTournamentUnique: unique().on(table.userId, table.leagueId, table.tournamentId),
+}));
+
+// Golf Pick Selections (individual golfer choices for a pick session)
+// pick ordering (1-4+) has NO functional significance — all slots are interchangeable
+export const golfPickSelections = pgTable("golf_pick_selections", {
+  id: serial("id").primaryKey(),
+  pickId: integer("pick_id").notNull().references(() => golfPicks.id),
+  playerId: integer("player_id").notNull().references(() => golfPlayers.id),
+}, (table) => ({
+  pickPlayerUnique: unique().on(table.pickId, table.playerId),
+}));
+
+// Golf Results (finishing positions per player per tournament)
+export const golfResults = pgTable("golf_results", {
+  id: serial("id").primaryKey(),
+  tournamentId: integer("tournament_id").notNull().references(() => golfTournaments.id),
+  playerId: integer("player_id").notNull().references(() => golfPlayers.id),
+  finalPosition: integer("final_position"), // nullable — MC/WD/DQ have no position
+  status: varchar("status").default("finished").notNull(), // 'finished' | 'mc' | 'wd' | 'dq'
+  topTen: boolean("top_ten").default(false).notNull(), // auto-set: status='finished' AND finalPosition <= 10
+}, (table) => ({
+  tournamentPlayerResultUnique: unique().on(table.tournamentId, table.playerId),
+}));
 
 // Relationships
 export const nflTeamsRelations = relations(nflTeams, ({ many }) => ({
@@ -298,3 +367,63 @@ export const userPickFormSchema = insertUserPickSchema.extend({
 });
 
 export type UserPickFormValues = z.infer<typeof userPickFormSchema>;
+
+// Golf Types
+export type GolfTournament = typeof golfTournaments.$inferSelect;
+export type InsertGolfTournament = typeof golfTournaments.$inferInsert;
+export const insertGolfTournamentSchema = createInsertSchema(golfTournaments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type GolfPlayer = typeof golfPlayers.$inferSelect;
+export type InsertGolfPlayer = typeof golfPlayers.$inferInsert;
+export const insertGolfPlayerSchema = createInsertSchema(golfPlayers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type GolfTournamentField = typeof golfTournamentField.$inferSelect;
+export type InsertGolfTournamentField = typeof golfTournamentField.$inferInsert;
+
+export type GolfPick = typeof golfPicks.$inferSelect;
+export type InsertGolfPick = typeof golfPicks.$inferInsert;
+
+export type GolfPickSelection = typeof golfPickSelections.$inferSelect;
+export type InsertGolfPickSelection = typeof golfPickSelections.$inferInsert;
+
+export type GolfResult = typeof golfResults.$inferSelect;
+export type InsertGolfResult = typeof golfResults.$inferInsert;
+
+// Golf leaderboard entry (computed for display)
+export type GolfLeaderboardEntry = {
+  userId: string;
+  username: string;
+  nickname: string | null;
+  profileImageUrl: string | null;
+  totalPoints: number;
+  picks: {
+    playerId: number;
+    playerName: string;
+    owgrAtLock: number | null;
+    pointValue: number; // COALESCE(owgr_at_lock, 200)
+    topTen: boolean;
+    pointsEarned: number; // pointValue if topTen, else 0
+    resultStatus: string | null; // 'finished' | 'mc' | 'wd' | 'dq' | null (no result yet)
+    finalPosition: number | null;
+  }[];
+  tiebreakerOwgr: number | null; // highest OWGR number among all 4 picks (worst rank = biggest number)
+  rank: number;
+};
+
+// Field entry with computed point value
+export type GolfFieldEntry = {
+  id: number;
+  playerId: number;
+  name: string;
+  country: string | null;
+  isAmateur: boolean;
+  owgrAtLock: number | null;
+  pointValue: number; // COALESCE(owgr_at_lock, 200)
+};
