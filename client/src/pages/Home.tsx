@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import LeagueHeader from "@/components/LeagueHeader";
 import AdminControls from "@/components/AdminControls";
 import ContentTabs from "@/components/ContentTabs";
+import GolfLeagueView from "@/components/GolfLeagueView";
 import NFLGameCard from "@/components/NFLGameCard";
 import WeekSelector from "@/components/WeekSelector";
 import Leaderboard from "@/components/Leaderboard";
@@ -107,13 +108,15 @@ export default function Home() {
     }
   }, [userLeagues]); // Remove selectedLeagueId dependency to prevent re-triggering
 
-  // Get current league info (including archive status and season)
+  // Get current league info (including archive status, season, and sport type)
   // Placed before week queries so season is available for filtering
   const { data: currentLeagueInfo } = useQuery<{
     id: number;
     name: string;
     isArchived?: boolean;
     season?: number;
+    sportType?: string;
+    golfTournamentId?: number | null;
   }>({
     queryKey: [`/api/leagues/${leagueId}`],
     enabled: !!leagueId,
@@ -516,6 +519,18 @@ export default function Home() {
         </div>
       )}
 
+      {/* Golf League View — replaces all NFL content for golf leagues */}
+      {currentLeagueInfo?.sportType === 'golf' && (
+        <GolfLeagueView
+          leagueId={leagueId}
+          league={currentLeagueInfo as any}
+          isSuperUser={Boolean(superUserStatus?.isSuperUser)}
+        />
+      )}
+
+      {/* ── NFL League Content ── */}
+      {(!currentLeagueInfo || currentLeagueInfo?.sportType !== 'golf') && (
+        <>
       {/* League Header with countdown and user's current pick */}
       <div className="mb-6">
         <LeagueHeader
@@ -782,6 +797,8 @@ export default function Home() {
           }} />
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

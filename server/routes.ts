@@ -692,7 +692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/leagues', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { name, description, season: seasonParam } = req.body;
+      const { name, description, season: seasonParam, sportType, golfTournamentId } = req.body;
       
       // Validate input
       if (!name || name.trim().length === 0) {
@@ -702,6 +702,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (name.trim().length > 100) {
         return res.status(400).json({ message: "League name must be 100 characters or less" });
       }
+
+      // Default sportType to 'nfl' for backward compatibility
+      const resolvedSportType = sportType === 'golf' ? 'golf' : 'nfl';
+
+      // Golf leagues require a valid tournament
+      if (resolvedSportType === 'golf') {
+        if (!golfTournamentId) {
+          return res.status(400).json({ message: "A golf tournament is required for golf leagues" });
+        }
+        const tournament = await storage.getGolfTournament(parseInt(golfTournamentId));
+        if (!tournament) {
+          return res.status(400).json({ message: "Invalid golf tournament" });
+        }
+      }
       
       const season = seasonParam ? parseInt(seasonParam) : new Date().getFullYear();
       
@@ -710,7 +724,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: name.trim(),
         description: description?.trim() || null,
         season,
-      });
+        sportType: resolvedSportType,
+        golfTournamentId: resolvedSportType === 'golf' ? parseInt(golfTournamentId) : null,
+      } as any);
       
       // Add the creator as an admin member, using their username as the default nickname
       const creator = await storage.getUser(userId);
@@ -2830,6 +2846,279 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error sending weekly email reminders:", error);
       res.status(500).json({ message: "Failed to send weekly email reminders" });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Golf API Routes
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // List all golf tournaments
+  app.get('/api/golf/tournaments', async (_req, res) => {
+    try {
+      const tournaments = await storage.getGolfTournaments();
+      res.json(tournaments);
+    } catch (error) {
+      console.error("Error fetching golf tournaments:", error);
+      res.status(500).json({ message: "Failed to fetch golf tournaments" });
+    }
+  });
+
+  // Get a specific golf tournament
+  app.get('/api/golf/tournaments/:id', async (req, res) => {
+    try {
+      const t = await storage.getGolfTournament(parseInt(req.params.id));
+      if (!t) return res.status(404).json({ message: "Tournament not found" });
+      res.json(t);
+    } catch (error) {
+      console.error("Error fetching golf tournament:", error);
+      res.status(500).json({ message: "Failed to fetch golf tournament" });
+    }
+  });
+
+  // Create a golf tournament (super user only)
+  app.post('/api/golf/tournaments', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const { name, location, season, startsAt, picksLockAt, picksRequired } = req.body;
+      if (!name || !season || !picksLockAt) {
+        return res.status(400).json({ message: "name, season, and picksLockAt are required" });
+      }
+      const tournament = await storage.createGolfTournament({
+        name: name.trim(),
+        location: location?.trim() || null,
+        season: parseInt(season),
+        startsAt: startsAt ? new Date(startsAt) : null,
+        picksLockAt: new Date(picksLockAt),
+        status: 'upcoming',
+        picksRequired: picksRequired ? parseInt(picksRequired) : 4,
+      });
+      res.status(201).json(tournament);
+    } catch (error) {
+      console.error("Error creating golf tournament:", error);
+      res.status(500).json({ message: "Failed to create golf tournament" });
+    }
+  });
+
+  // Update a golf tournament (super user only)
+  app.patch('/api/golf/tournaments/:id', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { name, location, season, startsAt, picksLockAt, status, picksRequired } = req.body;
+      const updates: any = {};
+      if (name !== undefined) updates.name = name.trim();
+      if (location !== undefined) updates.location = location?.trim() || null;
+      if (season !== undefined) updates.season = parseInt(season);
+      if (startsAt !== undefined) updates.startsAt = startsAt ? new Date(startsAt) : null;
+      if (picksLockAt !== undefined) updates.picksLockAt = new Date(picksLockAt);
+      if (status !== undefined) updates.status = status;
+      if (picksRequired !== undefined) updates.picksRequired = parseInt(picksRequired);
+      const updated = await storage.updateGolfTournament(id, updates);
+      if (!updated) return res.status(404).json({ message: "Tournament not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating golf tournament:", error);
+      res.status(500).json({ message: "Failed to update golf tournament" });
+    }
+  });
+
+  // Get tournament field (public once published)
+  app.get('/api/golf/tournaments/:id/field', async (req, res) => {
+    try {
+      const field = await storage.getGolfTournamentField(parseInt(req.params.id));
+      res.json(field);
+    } catch (error) {
+      console.error("Error fetching golf field:", error);
+      res.status(500).json({ message: "Failed to fetch golf field" });
+    }
+  });
+
+  // Bulk upsert tournament field entries (super user only)
+  // Body: { players: [{ name, country, isAmateur, owgrAtLock }] }
+  app.post('/api/golf/tournaments/:id/field', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const tournamentId = parseInt(req.params.id);
+      const { players } = req.body;
+
+      if (!Array.isArray(players) || players.length === 0) {
+        return res.status(400).json({ message: "players array is required" });
+      }
+
+      const tournament = await storage.getGolfTournament(tournamentId);
+      if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+
+      const added: any[] = [];
+      for (const p of players) {
+        if (!p.name) continue;
+        // Create or find the player
+        const player = await storage.createGolfPlayer({
+          name: p.name.trim(),
+          country: p.country?.trim() || null,
+          isAmateur: !!p.isAmateur,
+        });
+        // owgrAtLock: null means amateur with no OWGR (200 pts via COALESCE)
+        const owgr = p.owgrAtLock !== undefined && p.owgrAtLock !== null && p.owgrAtLock !== ''
+          ? parseInt(p.owgrAtLock)
+          : null;
+        await storage.upsertGolfFieldEntry(tournamentId, player.id, owgr);
+        added.push({ playerId: player.id, name: player.name, owgr });
+      }
+
+      res.json({ message: `Added ${added.length} players to field`, added });
+    } catch (error) {
+      console.error("Error updating golf field:", error);
+      res.status(500).json({ message: "Failed to update golf field" });
+    }
+  });
+
+  // Get current user's golf picks for a league
+  app.get('/api/golf/leagues/:leagueId/picks', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = parseInt(req.params.leagueId);
+      const userId = req.user.id;
+
+      const league = await storage.getLeague(leagueId);
+      if (!league || (league as any).sportType !== 'golf') {
+        return res.status(400).json({ message: "This is not a golf league" });
+      }
+
+      const tournamentId = (league as any).golfTournamentId;
+      if (!tournamentId) return res.status(400).json({ message: "League has no linked tournament" });
+
+      const pickData = await storage.getGolfPick(userId, leagueId, tournamentId);
+      if (!pickData) return res.json(null);
+      res.json({ ...pickData.pick, selections: pickData.selections });
+    } catch (error) {
+      console.error("Error fetching golf picks:", error);
+      res.status(500).json({ message: "Failed to fetch golf picks" });
+    }
+  });
+
+  // Submit/overwrite golf picks for a league
+  app.post('/api/golf/leagues/:leagueId/picks', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = parseInt(req.params.leagueId);
+      const userId = req.user.id;
+      const { playerIds } = req.body;
+
+      const league = await storage.getLeague(leagueId);
+      if (!league || (league as any).sportType !== 'golf') {
+        return res.status(400).json({ message: "This is not a golf league" });
+      }
+
+      const tournamentId = (league as any).golfTournamentId;
+      if (!tournamentId) return res.status(400).json({ message: "League has no linked tournament" });
+
+      const tournament = await storage.getGolfTournament(tournamentId);
+      if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+
+      // Enforce deadline
+      if (new Date() > new Date(tournament.picksLockAt)) {
+        return res.status(400).json({ message: "Picks are locked — the deadline has passed" });
+      }
+
+      if ((league as any).isArchived) {
+        return res.status(400).json({ message: "This league is archived" });
+      }
+
+      // Validate playerIds
+      const required = tournament.picksRequired;
+      if (!Array.isArray(playerIds) || playerIds.length !== required) {
+        return res.status(400).json({ message: `You must select exactly ${required} golfers` });
+      }
+
+      // Check for duplicates
+      const uniqueIds = new Set(playerIds.map(Number));
+      if (uniqueIds.size !== required) {
+        return res.status(400).json({ message: "All picks must be different golfers" });
+      }
+
+      // Validate all players are in the field
+      const field = await storage.getGolfTournamentField(tournamentId);
+      const fieldPlayerIds = new Set(field.map(f => f.playerId));
+      for (const pid of uniqueIds) {
+        if (!fieldPlayerIds.has(pid)) {
+          return res.status(400).json({ message: "One or more selected golfers are not in the tournament field" });
+        }
+      }
+
+      // Check membership
+      const member = await storage.getLeagueMember(leagueId, userId);
+      if (!member || !member.isActive) {
+        return res.status(403).json({ message: "You are not an active member of this league" });
+      }
+
+      await storage.upsertGolfPicks(userId, leagueId, tournamentId, Array.from(uniqueIds));
+      const savedPickData = await storage.getGolfPick(userId, leagueId, tournamentId);
+      const savedPick = savedPickData ? { ...savedPickData.pick, selections: savedPickData.selections } : null;
+      res.json({ message: "Picks saved", pick: savedPick });
+    } catch (error) {
+      console.error("Error submitting golf picks:", error);
+      res.status(500).json({ message: "Failed to submit golf picks" });
+    }
+  });
+
+  // Get golf leaderboard for a league
+  app.get('/api/golf/leagues/:leagueId/leaderboard', async (req, res) => {
+    try {
+      const leagueId = parseInt(req.params.leagueId);
+      const league = await storage.getLeague(leagueId);
+      if (!league || (league as any).sportType !== 'golf') {
+        return res.status(400).json({ message: "This is not a golf league" });
+      }
+      const tournamentId = (league as any).golfTournamentId;
+      if (!tournamentId) return res.status(400).json({ message: "League has no linked tournament" });
+
+      const leaderboard = await storage.getGolfLeaderboard(leagueId, tournamentId);
+      res.json(leaderboard);
+    } catch (error) {
+      console.error("Error fetching golf leaderboard:", error);
+      res.status(500).json({ message: "Failed to fetch golf leaderboard" });
+    }
+  });
+
+  // Get golf results for a tournament
+  app.get('/api/golf/tournaments/:id/results', async (req, res) => {
+    try {
+      const results = await storage.getGolfResults(parseInt(req.params.id));
+      res.json(results);
+    } catch (error) {
+      console.error("Error fetching golf results:", error);
+      res.status(500).json({ message: "Failed to fetch golf results" });
+    }
+  });
+
+  // Bulk upsert tournament results (super user only)
+  // Body: { results: [{ playerId, finalPosition, status }] }
+  app.post('/api/golf/tournaments/:id/results', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const tournamentId = parseInt(req.params.id);
+      const { results } = req.body;
+
+      if (!Array.isArray(results) || results.length === 0) {
+        return res.status(400).json({ message: "results array is required" });
+      }
+
+      const tournament = await storage.getGolfTournament(tournamentId);
+      if (!tournament) return res.status(404).json({ message: "Tournament not found" });
+
+      const validStatuses = ['finished', 'mc', 'wd', 'dq'];
+      const normalized = results.map((r: any) => ({
+        playerId: parseInt(r.playerId),
+        finalPosition: r.finalPosition ? parseInt(r.finalPosition) : null,
+        status: validStatuses.includes(r.status) ? r.status : 'finished',
+      }));
+
+      await storage.upsertGolfResults(tournamentId, normalized);
+
+      // Auto-update tournament status to 'completed' if not already
+      if (tournament.status !== 'completed') {
+        await storage.updateGolfTournament(tournamentId, { status: 'completed' });
+      }
+
+      res.json({ message: `Saved ${normalized.length} results` });
+    } catch (error) {
+      console.error("Error saving golf results:", error);
+      res.status(500).json({ message: "Failed to save golf results" });
     }
   });
 

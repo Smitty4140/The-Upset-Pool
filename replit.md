@@ -147,3 +147,16 @@ Preferred communication style: Simple, everyday language.
   - Production: Replit built-in PostgreSQL database (DATABASE_URL) for live app
   - server/db.ts automatically selects the correct database based on NODE_ENV
   - Schema must be pushed to both databases when changes are made
+- **Golf League Type**: Added multi-sport support with Golf as the second league type
+  - Golf leagues are linked to a Major Championship tournament (Masters, US Open, etc.)
+  - Users pick N golfers per tournament (configurable via `picks_required`, default 4)
+  - Scoring: OWGR ranking as points if golfer finishes T-10 or better; amateurs without OWGR get 200 points
+  - Each tournament is independent (no season-long tracking)
+  - New database tables: `golf_tournaments`, `golf_players`, `golf_tournament_field`, `golf_picks`, `golf_pick_selections`, `golf_results`
+  - `leagues` table extended with `sport_type` (default 'nfl') and `golf_tournament_id` columns
+  - Golf API routes: GET/POST/PATCH /api/golf/tournaments, GET/POST /api/golf/tournaments/:id/field, GET/POST /api/golf/leagues/:leagueId/picks, GET /api/golf/leagues/:leagueId/leaderboard, GET/POST /api/golf/tournaments/:id/results
+  - Frontend: `CreateLeague.tsx` now has sport type selector; `GolfLeagueView.tsx` renders for golf leagues
+  - Home.tsx conditionally renders GolfLeagueView (instead of NFL tabs) when selected league has sportType='golf'
+  - Tiebreaker: highest OWGR number (worst rank) across all N picks; standard competition ranking for remaining ties
+  - Admin panel in GolfLeagueView for super users: bulk-add field entries, enter results, adjust tournament settings
+  - Schema applied to both DEV and PROD databases via direct SQL (drizzle-kit push blocked by interactive prompts on users_google_id_unique constraint)
