@@ -2957,12 +2957,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           photoUrl: p.photoUrl?.trim() || null,
         });
         // owgrAtLock: null means amateur with no OWGR (200 pts via COALESCE)
-        const owgr = p.owgrAtLock !== undefined && p.owgrAtLock !== null && p.owgrAtLock !== ''
+        const owgrParsed = p.owgrAtLock !== undefined && p.owgrAtLock !== null && p.owgrAtLock !== ''
           ? parseInt(p.owgrAtLock)
           : null;
-        const odds = p.odds !== undefined && p.odds !== null && p.odds !== ''
-          ? parseInt(p.odds)
+        const owgr = owgrParsed !== null && !isNaN(owgrParsed) ? owgrParsed : null;
+        const oddsParsed = p.odds !== undefined && p.odds !== null && p.odds !== ''
+          ? parseInt(String(p.odds).replace(/\+/g, ''))
           : null;
+        const odds = oddsParsed !== null && !isNaN(oddsParsed) ? oddsParsed : null;
         await storage.upsertGolfFieldEntry(tournamentId, player.id, owgr, odds);
         added.push({ playerId: player.id, name: player.name, owgr, odds });
       }
