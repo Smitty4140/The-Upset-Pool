@@ -1273,11 +1273,12 @@ export class DatabaseStorage implements IStorage {
     return p;
   }
 
-  async createGolfPlayer(player: { name: string; country?: string; isAmateur?: boolean }): Promise<GolfPlayer> {
+  async createGolfPlayer(player: { name: string; country?: string; isAmateur?: boolean; photoUrl?: string }): Promise<GolfPlayer> {
     const [p] = await db.insert(golfPlayers).values({
       name: player.name,
       country: player.country || null,
       isAmateur: player.isAmateur || false,
+      photoUrl: player.photoUrl || null,
     }).returning();
     return p;
   }
@@ -1290,7 +1291,9 @@ export class DatabaseStorage implements IStorage {
         name: golfPlayers.name,
         country: golfPlayers.country,
         isAmateur: golfPlayers.isAmateur,
+        photoUrl: golfPlayers.photoUrl,
         owgrAtLock: golfTournamentField.owgrAtLock,
+        odds: golfTournamentField.odds,
       })
       .from(golfTournamentField)
       .innerJoin(golfPlayers, eq(golfTournamentField.playerId, golfPlayers.id))
@@ -1299,17 +1302,19 @@ export class DatabaseStorage implements IStorage {
 
     return rows.map(r => ({
       ...r,
+      photoUrl: r.photoUrl ?? null,
+      odds: r.odds ?? null,
       pointValue: r.owgrAtLock ?? 200,
     }));
   }
 
-  async upsertGolfFieldEntry(tournamentId: number, playerId: number, owgrAtLock: number | null): Promise<void> {
+  async upsertGolfFieldEntry(tournamentId: number, playerId: number, owgrAtLock: number | null, odds?: number | null): Promise<void> {
     await db
       .insert(golfTournamentField)
-      .values({ tournamentId, playerId, owgrAtLock })
+      .values({ tournamentId, playerId, owgrAtLock, odds: odds ?? null })
       .onConflictDoUpdate({
         target: [golfTournamentField.tournamentId, golfTournamentField.playerId],
-        set: { owgrAtLock },
+        set: { owgrAtLock, odds: odds ?? null },
       });
   }
 

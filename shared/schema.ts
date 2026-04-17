@@ -168,6 +168,7 @@ export const golfPlayers = pgTable("golf_players", {
   name: varchar("name").notNull(),
   country: varchar("country"),
   isAmateur: boolean("is_amateur").default(false).notNull(),
+  photoUrl: varchar("photo_url"), // Headshot image URL
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -177,6 +178,7 @@ export const golfTournamentField = pgTable("golf_tournament_field", {
   tournamentId: integer("tournament_id").notNull().references(() => golfTournaments.id),
   playerId: integer("player_id").notNull().references(() => golfPlayers.id),
   owgrAtLock: integer("owgr_at_lock"), // NULL = amateur with no OWGR → 200 points via COALESCE
+  odds: integer("odds"), // e.g. 2000 = +2000 (to-1 odds). NULL if not available.
 }, (table) => ({
   tournamentPlayerUnique: unique().on(table.tournamentId, table.playerId),
 }));
@@ -424,6 +426,8 @@ export type GolfFieldEntry = {
   name: string;
   country: string | null;
   isAmateur: boolean;
+  photoUrl: string | null;
   owgrAtLock: number | null;
+  odds: number | null; // e.g. 2000 = +2000 odds
   pointValue: number; // COALESCE(owgr_at_lock, 200)
 };
