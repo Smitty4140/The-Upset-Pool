@@ -65,7 +65,9 @@ export interface GolfFieldEntry {
   name: string;
   country: string | null;
   isAmateur: boolean;
+  photoUrl: string | null;
   owgrAtLock: number | null;
+  odds: number | null; // e.g. 2000 = +2000 odds
   pointValue: number; // COALESCE(owgrAtLock, 200)
 }
 

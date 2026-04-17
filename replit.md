@@ -158,5 +158,9 @@ Preferred communication style: Simple, everyday language.
   - Frontend: `CreateLeague.tsx` now has sport type selector; `GolfLeagueView.tsx` renders for golf leagues
   - Home.tsx conditionally renders GolfLeagueView (instead of NFL tabs) when selected league has sportType='golf'
   - Tiebreaker: highest OWGR number (worst rank) across all N picks; standard competition ranking for remaining ties
-  - Admin panel in GolfLeagueView for super users: bulk-add field entries, enter results, adjust tournament settings
-  - Schema applied to both DEV and PROD databases via direct SQL (drizzle-kit push blocked by interactive prompts on users_google_id_unique constraint)
+  - Admin panel in GolfLeagueView for league admins (not just super users): bulk-add field entries (Name, Country, OWGR, Odds, PhotoURL), enter results, adjust tournament settings
+  - Schema applied to DEV (Neon) and local Replit PostgreSQL via direct SQL (drizzle-kit push blocked by interactive prompts)
+  - `golf_players` has `photo_url` column; `golf_tournament_field` has `odds` column (integer, e.g. 600 = +600)
+  - **Golfer Card UI**: Pick panel uses a responsive card grid (2–5 cols) showing photo, OWGR badge, odds chip, points, and select toggle
+  - Sort options: by World Ranking (default), Odds (favorites first), or A–Z name
+  - 10 Masters 2026 golfers seeded in DEV DB (Scheffler #1/+600 through Fleetwood #10/+3500) with picsum.photos placeholder headshots

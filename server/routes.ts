@@ -2954,13 +2954,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: p.name.trim(),
           country: p.country?.trim() || null,
           isAmateur: !!p.isAmateur,
+          photoUrl: p.photoUrl?.trim() || null,
         });
         // owgrAtLock: null means amateur with no OWGR (200 pts via COALESCE)
         const owgr = p.owgrAtLock !== undefined && p.owgrAtLock !== null && p.owgrAtLock !== ''
           ? parseInt(p.owgrAtLock)
           : null;
-        await storage.upsertGolfFieldEntry(tournamentId, player.id, owgr);
-        added.push({ playerId: player.id, name: player.name, owgr });
+        const odds = p.odds !== undefined && p.odds !== null && p.odds !== ''
+          ? parseInt(p.odds)
+          : null;
+        await storage.upsertGolfFieldEntry(tournamentId, player.id, owgr, odds);
+        added.push({ playerId: player.id, name: player.name, owgr, odds });
       }
 
       res.json({ message: `Added ${added.length} players to field`, added });
