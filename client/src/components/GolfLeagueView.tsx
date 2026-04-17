@@ -390,7 +390,7 @@ function formatOdds(odds: number | null): string {
   return odds >= 0 ? `+${odds}` : `${odds}`;
 }
 
-function GolferCard({
+function GolferRow({
   player, isSelected, canSelect, isLocked, onToggle,
 }: {
   player: GolfFieldEntry;
@@ -403,104 +403,90 @@ function GolferCard({
 
   return (
     <div
-      onClick={() => clickable && onToggle(player.playerId)}
       className={`
-        relative rounded-xl border-2 overflow-hidden transition-all duration-200 flex flex-col
-        ${isSelected
-          ? "border-green-500 bg-green-50 shadow-lg shadow-green-100"
-          : canSelect
-            ? "border-gray-200 bg-white hover:border-green-300 hover:shadow-md cursor-pointer"
-            : "border-gray-100 bg-gray-50 opacity-60"
-        }
-        ${clickable ? "cursor-pointer" : "cursor-default"}
+        flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-0 transition-colors
+        ${isSelected ? "bg-green-50" : canSelect ? "hover:bg-gray-50" : "opacity-60"}
       `}
     >
-      {/* Selected overlay checkmark */}
-      {isSelected && (
-        <div className="absolute top-2 right-2 z-10 bg-green-500 rounded-full p-0.5 shadow">
-          <CheckCircle2 className="h-4 w-4 text-white" />
-        </div>
-      )}
-
-      {/* World Rank badge */}
-      {player.owgrAtLock !== null && (
-        <div className="absolute top-2 left-2 z-10">
-          <span className="text-xs font-bold bg-gray-900/80 text-white rounded-full px-2 py-0.5">
-            #{player.owgrAtLock}
-          </span>
-        </div>
-      )}
-      {player.isAmateur && (
-        <div className="absolute top-2 left-2 z-10">
-          <span className="text-xs font-bold bg-amber-500 text-white rounded-full px-2 py-0.5">
-            AM
-          </span>
-        </div>
-      )}
-
-      {/* Photo */}
-      <div className={`relative w-full aspect-square overflow-hidden ${isSelected ? "bg-green-100" : "bg-gray-100"}`}>
+      {/* Avatar */}
+      <div className={`relative flex-shrink-0 w-10 h-10 rounded-full overflow-hidden ${isSelected ? "bg-green-100" : "bg-gray-100"}`}>
         {player.photoUrl ? (
           <img
             src={player.photoUrl}
             alt={player.name}
             className="w-full h-full object-cover object-top"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <span className="text-4xl font-bold text-gray-300">
+            <span className="text-sm font-bold text-gray-400">
               {player.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
             </span>
           </div>
         )}
-        {/* Green tint overlay when selected */}
         {isSelected && (
-          <div className="absolute inset-0 bg-green-500/10" />
+          <div className="absolute inset-0 bg-green-500/15 flex items-center justify-center">
+            <CheckCircle2 className="h-4 w-4 text-green-600 drop-shadow" />
+          </div>
         )}
       </div>
 
-      {/* Info section */}
-      <div className="p-3 flex-1 flex flex-col gap-1">
-        <p className={`font-bold text-sm leading-tight ${isSelected ? "text-green-900" : "text-gray-900"}`}>
+      {/* Name + Country */}
+      <div className="flex-1 min-w-0">
+        <p className={`font-semibold text-sm truncate ${isSelected ? "text-green-900" : "text-gray-900"}`}>
           {player.name}
         </p>
-        <p className="text-xs text-gray-500">{player.country || "—"}</p>
-
-        {/* Stats row */}
-        <div className="flex items-center gap-2 mt-1">
-          {player.odds !== null && (
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-              isSelected
-                ? "bg-green-200 text-green-800"
-                : "bg-blue-50 text-blue-700 border border-blue-200"
-            }`}>
-              {formatOdds(player.odds)}
-            </span>
-          )}
-          <span className={`text-xs ml-auto font-semibold ${isSelected ? "text-green-700" : "text-gray-500"}`}>
-            {player.isAmateur ? "200 pts" : `${player.pointValue} pts`}
-          </span>
-        </div>
+        <p className="text-xs text-gray-500 truncate">
+          {player.country || "—"}
+          {player.isAmateur && <span className="ml-1 text-amber-600 font-medium">(Am)</span>}
+        </p>
       </div>
 
-      {/* Select / deselect button */}
-      {!isLocked && (
-        <div className="px-3 pb-3">
-          <div className={`
-            w-full text-center text-xs font-semibold py-1.5 rounded-lg transition-colors
+      {/* OWGR */}
+      <div className="flex-shrink-0 w-16 text-center">
+        {player.owgrAtLock !== null ? (
+          <span className={`text-sm font-bold ${isSelected ? "text-green-800" : "text-gray-700"}`}>
+            #{player.owgrAtLock}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">—</span>
+        )}
+      </div>
+
+      {/* Odds */}
+      <div className="flex-shrink-0 w-20 text-center">
+        {player.odds !== null ? (
+          <span className={`text-sm font-bold ${isSelected ? "text-green-700" : "text-blue-600"}`}>
+            {formatOdds(player.odds)}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">—</span>
+        )}
+      </div>
+
+      {/* Select button */}
+      {!isLocked ? (
+        <button
+          onClick={() => clickable && onToggle(player.playerId)}
+          disabled={!clickable}
+          className={`
+            flex-shrink-0 px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors
             ${isSelected
-              ? "bg-green-500 text-white"
+              ? "bg-green-500 text-white hover:bg-green-600"
               : canSelect
-                ? "bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-800"
-                : "bg-gray-50 text-gray-400"
+                ? "bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-800 cursor-pointer"
+                : "bg-gray-50 text-gray-300 cursor-not-allowed"
             }
-          `}>
-            {isSelected ? "✓ Selected" : canSelect ? "Select" : "Full"}
-          </div>
-        </div>
+          `}
+        >
+          {isSelected ? "✓ Remove" : "Select"}
+        </button>
+      ) : (
+        isSelected ? (
+          <span className="flex-shrink-0 px-4 py-1.5 rounded-lg text-xs font-semibold bg-green-100 text-green-700">
+            ✓ Picked
+          </span>
+        ) : null
       )}
     </div>
   );
@@ -516,9 +502,9 @@ function PicksPanel({
 
   if (isLoadingField) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="space-y-2">
         {Array.from({ length: 8 }).map((_, i) => (
-          <Skeleton key={i} className="aspect-[3/4] w-full rounded-xl" />
+          <Skeleton key={i} className="h-14 w-full rounded-lg" />
         ))}
       </div>
     );
@@ -601,27 +587,38 @@ function PicksPanel({
         </div>
       </div>
 
-      {/* Golfer cards grid */}
-      {field.length === 0 ? (
-        <p className="text-center text-gray-500 py-8 text-sm">No golfers match your search.</p>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-          {field.map(player => {
-            const isSelected = selectedPlayerIds.has(player.playerId);
-            const canSelect = !isLocked && isAuthenticated && (isSelected || selectedPlayerIds.size < picksRequired);
-            return (
-              <GolferCard
-                key={player.playerId}
-                player={player}
-                isSelected={isSelected}
-                canSelect={canSelect}
-                isLocked={isLocked}
-                onToggle={onToggle}
-              />
-            );
-          })}
+      {/* Golfer rows table */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Column headers */}
+        <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200">
+          <div className="flex-shrink-0 w-10" />
+          <div className="flex-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">Golfer</div>
+          <div className="flex-shrink-0 w-16 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">OWGR</div>
+          <div className="flex-shrink-0 w-20 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Odds</div>
+          <div className="flex-shrink-0 w-20 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Pick</div>
         </div>
-      )}
+
+        {field.length === 0 ? (
+          <p className="text-center text-gray-500 py-10 text-sm">No golfers match your search.</p>
+        ) : (
+          <div className="divide-y divide-gray-50 max-h-[520px] overflow-y-auto">
+            {field.map(player => {
+              const isSelected = selectedPlayerIds.has(player.playerId);
+              const canSelect = !isLocked && isAuthenticated && (isSelected || selectedPlayerIds.size < picksRequired);
+              return (
+                <GolferRow
+                  key={player.playerId}
+                  player={player}
+                  isSelected={isSelected}
+                  canSelect={canSelect}
+                  isLocked={isLocked}
+                  onToggle={onToggle}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Submit button */}
       {!isLocked && isAuthenticated && (
