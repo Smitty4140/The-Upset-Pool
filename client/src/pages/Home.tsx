@@ -525,6 +525,7 @@ export default function Home() {
           leagueId={leagueId}
           league={currentLeagueInfo as any}
           isSuperUser={Boolean(superUserStatus?.isSuperUser)}
+          isAdmin={Boolean(isAdmin)}
         />
       )}
 

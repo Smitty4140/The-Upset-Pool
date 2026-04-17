@@ -27,17 +27,22 @@ import {
   Calendar,
   Users,
   Star,
+  Copy,
+  UserCheck,
+  UserX,
+  ShieldCheck,
 } from "lucide-react";
 
 interface GolfLeagueViewProps {
   leagueId: number;
   league: League;
   isSuperUser: boolean;
+  isAdmin?: boolean;
 }
 
 type GolfTab = "picks" | "leaderboard" | "admin";
 
-export default function GolfLeagueView({ leagueId, league, isSuperUser }: GolfLeagueViewProps) {
+export default function GolfLeagueView({ leagueId, league, isSuperUser, isAdmin = false }: GolfLeagueViewProps) {
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<GolfTab>("picks");
@@ -178,10 +183,12 @@ export default function GolfLeagueView({ leagueId, league, isSuperUser }: GolfLe
     );
   }
 
+  const canSeeAdmin = isSuperUser || isAdmin;
+
   const tabs: { id: GolfTab; label: string; icon: React.ReactNode; hidden?: boolean }[] = [
     { id: "picks", label: isLocked ? "My Picks" : "Make Picks", icon: <Flag className="h-4 w-4" /> },
     { id: "leaderboard", label: "Leaderboard", icon: <Trophy className="h-4 w-4" />, hidden: !isLocked },
-    { id: "admin", label: "Golf Admin", icon: <Star className="h-4 w-4" />, hidden: !isSuperUser },
+    { id: "admin", label: "Admin", icon: <ShieldCheck className="h-4 w-4" />, hidden: !canSeeAdmin },
   ].filter(t => !t.hidden);
 
   return (
@@ -326,11 +333,14 @@ export default function GolfLeagueView({ leagueId, league, isSuperUser }: GolfLe
       )}
 
       {/* Golf Admin Tab */}
-      {activeTab === "admin" && isSuperUser && (
+      {activeTab === "admin" && canSeeAdmin && (
         <GolfAdminPanel
+          leagueId={leagueId}
+          league={league}
           tournamentId={tournamentId!}
           tournament={tournament}
           field={field}
+          isSuperUser={isSuperUser}
           onFieldUpdated={() => {
             queryClient.invalidateQueries({ queryKey: [`/api/golf/tournaments/${tournamentId}/field`] });
           }}
@@ -702,20 +712,156 @@ function LeaderboardPanel({ leaderboard, isLoading, hasResults, currentUserId }:
   );
 }
 
+// ─── League Admin Section ─────────────────────────────────────────────────────
+
+interface LeagueAdminSectionProps {
+  leagueId: number;
+  league: League;
+}
+
+function LeagueAdminSection({ leagueId, league }: LeagueAdminSectionProps) {
+  const { toast } = useToast();
+  const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
+
+  const { data: members = [], isLoading: isLoadingMembers, refetch: refetchMembers } = useQuery<any[]>({
+    queryKey: [`/api/leagues/${leagueId}/members`],
+  });
+
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(league.inviteCode);
+      toast({ title: "Copied!", description: "Invite code copied to clipboard." });
+    } catch {
+      toast({ title: "Copy failed", description: "Please copy the code manually.", variant: "destructive" });
+    }
+  };
+
+  const handleToggleActive = async (userId: string, currentlyActive: boolean) => {
+    setTogglingUserId(userId);
+    try {
+      const res = await fetch(`/api/admin/league/${leagueId}/member/${userId}/toggle-active`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update member");
+      }
+      const result = await res.json();
+      toast({ title: result.isActive ? "Member activated" : "Member deactivated", description: result.message });
+      refetchMembers();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setTogglingUserId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Invite Code */}
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">League Invite Code</p>
+        <p className="text-xs text-gray-500 mb-3">
+          Share this code with anyone you want to invite to your league.
+        </p>
+        <div className="flex items-center gap-3">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg px-5 py-3 flex-shrink-0">
+            <span className="font-mono text-2xl font-bold tracking-widest text-primary">
+              {league.inviteCode}
+            </span>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleCopyCode} className="gap-2">
+            <Copy className="h-4 w-4" />
+            Copy Code
+          </Button>
+        </div>
+      </div>
+
+      {/* Member Management */}
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">Members</p>
+        <p className="text-xs text-gray-500 mb-3">
+          Activate members to allow them to make picks. Deactivate to prevent them from participating.
+        </p>
+        {isLoadingMembers ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+          </div>
+        ) : members.length === 0 ? (
+          <p className="text-sm text-gray-500">No members yet.</p>
+        ) : (
+          <div className="border border-gray-200 rounded-lg divide-y divide-gray-100">
+            {members.map((member: any) => {
+              const displayName = member.nickname || member.user?.username || member.userId;
+              const isToggling = togglingUserId === member.userId;
+              return (
+                <div key={member.userId} className="flex items-center justify-between px-4 py-3 gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar className="h-8 w-8 flex-shrink-0">
+                      <AvatarImage src={member.user?.profileImageUrl || ""} />
+                      <AvatarFallback className="text-xs">
+                        {displayName.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
+                      <p className="text-xs text-gray-400 truncate">{member.user?.email || ""}</p>
+                    </div>
+                    {member.isAdmin && (
+                      <span className="flex-shrink-0 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full px-2 py-0.5 font-medium">
+                        Admin
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`text-xs font-medium ${member.isActive ? "text-green-600" : "text-gray-400"}`}>
+                      {member.isActive ? "Active" : "Inactive"}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant={member.isActive ? "outline" : "default"}
+                      className={`gap-1 h-8 ${!member.isActive ? "bg-green-600 hover:bg-green-700 text-white border-0" : ""}`}
+                      onClick={() => handleToggleActive(member.userId, member.isActive)}
+                      disabled={isToggling}
+                    >
+                      {isToggling ? (
+                        <span className="text-xs">...</span>
+                      ) : member.isActive ? (
+                        <><UserX className="h-3.5 w-3.5" /> Deactivate</>
+                      ) : (
+                        <><UserCheck className="h-3.5 w-3.5" /> Activate</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Golf Admin Panel ────────────────────────────────────────────────────────
 
 interface GolfAdminPanelProps {
+  leagueId: number;
+  league: League;
   tournamentId: number;
   tournament: GolfTournament;
   field: GolfFieldEntry[];
+  isSuperUser: boolean;
   onFieldUpdated: () => void;
   onResultsUpdated: () => void;
   onTournamentUpdated: () => void;
 }
 
-function GolfAdminPanel({ tournamentId, tournament, field, onFieldUpdated, onResultsUpdated, onTournamentUpdated }: GolfAdminPanelProps) {
+function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isSuperUser, onFieldUpdated, onResultsUpdated, onTournamentUpdated }: GolfAdminPanelProps) {
   const { toast } = useToast();
-  const [adminTab, setAdminTab] = useState<"field" | "results" | "settings">("field");
+  const [adminTab, setAdminTab] = useState<"league" | "field" | "results" | "settings">("league");
 
   // Field entry state
   const [bulkInput, setBulkInput] = useState("");
@@ -805,11 +951,18 @@ function GolfAdminPanel({ tournamentId, tournament, field, onFieldUpdated, onRes
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
-          <Star className="h-5 w-5 text-yellow-500" />
-          Golf Admin — {tournament.name}
+          <ShieldCheck className="h-5 w-5 text-blue-600" />
+          League Admin
         </CardTitle>
-        <div className="flex gap-2 mt-2">
-          {(["field", "results", "settings"] as const).map(t => (
+        <div className="flex gap-2 mt-2 flex-wrap">
+          <Button
+            variant={adminTab === "league" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setAdminTab("league")}
+          >
+            League
+          </Button>
+          {isSuperUser && (["field", "results", "settings"] as const).map(t => (
             <Button
               key={t}
               variant={adminTab === t ? "default" : "outline"}
@@ -822,6 +975,11 @@ function GolfAdminPanel({ tournamentId, tournament, field, onFieldUpdated, onRes
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+
+        {/* League management */}
+        {adminTab === "league" && (
+          <LeagueAdminSection leagueId={leagueId} league={league} />
+        )}
 
         {/* Field management */}
         {adminTab === "field" && (
