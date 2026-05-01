@@ -2853,6 +2853,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Golf API Routes
   // ═══════════════════════════════════════════════════════════════════════
 
+  // Search ESPN events by name
+  app.get('/api/golf/espn-search', async (req, res) => {
+    const q = (req.query.q as string || '').trim().toLowerCase();
+    if (!q) return res.json([]);
+    try {
+      const YEARS = [new Date().getFullYear(), new Date().getFullYear() + 1, new Date().getFullYear() - 1];
+      const results: { id: string; name: string; date: string }[] = [];
+      for (const year of YEARS) {
+        const url = `https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard?dates=${year}`;
+        const resp = await fetch(url);
+        if (!resp.ok) continue;
+        const data = await resp.json() as any;
+        // ESPN calendar: leagues[0].calendar is a flat array of {id, label, startDate, endDate}
+        const calEntries: any[] = data?.leagues?.[0]?.calendar || [];
+        for (const evt of calEntries) {
+          const name: string = evt?.label || '';
+          const id: string = evt?.id || '';
+          const startDate: string = evt?.startDate || '';
+          if (id && name.toLowerCase().includes(q)) {
+            if (!results.some(r => r.id === id)) {
+              results.push({ id, name, date: startDate });
+            }
+          }
+        }
+        // Also check top-level events array (scoreboard)
+        const sbEvents: any[] = data?.events || [];
+        for (const evt of sbEvents) {
+          const name: string = evt?.name || evt?.shortName || '';
+          const id: string = evt?.id || '';
+          const startDate: string = evt?.date || '';
+          if (id && name.toLowerCase().includes(q)) {
+            if (!results.some(r => r.id === id)) {
+              results.push({ id, name, date: startDate });
+            }
+          }
+        }
+        if (results.length > 0) break;
+      }
+      // Sort by date ascending
+      results.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      res.json(results.slice(0, 10));
+    } catch (error) {
+      console.error("Error searching ESPN events:", error);
+      res.status(500).json({ message: "Failed to search ESPN events" });
+    }
+  });
+
   // List all golf tournaments
   app.get('/api/golf/tournaments', async (_req, res) => {
     try {
