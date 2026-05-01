@@ -451,12 +451,20 @@ export default function Home() {
                         const leagueName = membership.league?.name || membership.name;
                         const isArchived = membership.league?.isArchived;
                         const season = membership.league?.season;
+                        const sportType = membership.league?.sportType ?? "nfl";
+                        const tournamentName = membership.tournamentName;
+                        const contextLabel = sportType === "golf" && tournamentName
+                          ? tournamentName
+                          : `NFL ${season ?? ""}`;
                         return (
                           <SelectItem key={leagueId} value={leagueId.toString()}>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
                               {isArchived && <Lock className="h-3 w-3 text-gray-400 flex-shrink-0" />}
                               <span className={`truncate ${isArchived ? "text-gray-500" : ""}`}>
-                                {leagueName}{isArchived && season ? ` — ${season}` : ""}
+                                {leagueName}
+                              </span>
+                              <span className="text-xs text-gray-400 flex-shrink-0">
+                                ({contextLabel})
                               </span>
                               {membership.isAdmin && !isArchived && (
                                 <Trophy className="h-3 w-3 text-yellow-600 flex-shrink-0" />
