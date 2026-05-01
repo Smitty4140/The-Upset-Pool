@@ -150,17 +150,20 @@ Preferred communication style: Simple, everyday language.
 - **Golf League Type**: Added multi-sport support with Golf as the second league type
   - Golf leagues are linked to a Major Championship tournament (Masters, US Open, etc.)
   - Users pick N golfers per tournament (configurable via `picks_required`, default 4)
-  - Scoring: OWGR ranking as points if golfer finishes T-10 or better; amateurs without OWGR get 200 points
+  - Scoring: golfer's American odds as points if they finish T-10 or better (e.g. +3500 = 3500 pts)
+  - Tiebreaker: highest odds (best point value) across picks; standard competition ranking for remaining ties
   - Each tournament is independent (no season-long tracking)
   - New database tables: `golf_tournaments`, `golf_players`, `golf_tournament_field`, `golf_picks`, `golf_pick_selections`, `golf_results`
   - `leagues` table extended with `sport_type` (default 'nfl') and `golf_tournament_id` columns
   - Golf API routes: GET/POST/PATCH /api/golf/tournaments, GET/POST /api/golf/tournaments/:id/field, GET/POST /api/golf/leagues/:leagueId/picks, GET /api/golf/leagues/:leagueId/leaderboard, GET/POST /api/golf/tournaments/:id/results
+  - New API pull routes: POST /api/golf/tournaments/:id/pull-field (Odds API), POST /api/golf/tournaments/:id/pull-results (ESPN)
   - Frontend: `CreateLeague.tsx` now has sport type selector; `GolfLeagueView.tsx` renders for golf leagues
   - Home.tsx conditionally renders GolfLeagueView (instead of NFL tabs) when selected league has sportType='golf'
-  - Tiebreaker: highest OWGR number (worst rank) across all N picks; standard competition ranking for remaining ties
-  - Admin panel in GolfLeagueView for league admins (not just super users): bulk-add field entries (Name, Country, OWGR, Odds, PhotoURL), enter results, adjust tournament settings
+  - Admin panel in GolfLeagueView for league admins: bulk-add field entries, pull field/odds via API, pull/enter results, adjust tournament settings
   - Schema applied to DEV (Neon) and local Replit PostgreSQL via direct SQL (drizzle-kit push blocked by interactive prompts)
   - `golf_players` has `photo_url` column; `golf_tournament_field` has `odds` column (integer, e.g. 600 = +600)
-  - **Golfer Card UI**: Pick panel uses a responsive card grid (2–5 cols) showing photo, OWGR badge, odds chip, points, and select toggle
-  - Sort options: by World Ranking (default), Odds (favorites first), or A–Z name
-  - 10 Masters 2026 golfers seeded in DEV DB (Scheffler #1/+600 through Fleetwood #10/+3500) with picsum.photos placeholder headshots
+  - `golf_tournaments` has `odds_api_sport_key`, `espn_event_id`, `last_poll_at` columns for API integration
+  - **Golfer pick panel**: row-based table layout (avatar, name, OWGR, odds, pick button); sort by odds/rank/A-Z
+  - **Automated API pulls**: `server/golfDataPuller.ts` pulls field+odds from The Odds API, scores from ESPN
+  - **Golf Scheduler** (`server/golfScheduler.ts`): hourly ESPN score polling for active tournaments; auto-completes when ESPN reports 'post' state
+  - Setting tournament status to 'active' starts hourly score polling; 'completed' stops it

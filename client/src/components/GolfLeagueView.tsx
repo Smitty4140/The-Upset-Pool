@@ -949,10 +949,12 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
   // Field entry state
   const [bulkInput, setBulkInput] = useState("");
   const [isAddingField, setIsAddingField] = useState(false);
+  const [isPullingField, setIsPullingField] = useState(false);
 
   // Results entry state
   const [resultInputs, setResultInputs] = useState<Record<number, { position: string; status: string }>>({});
   const [isSavingResults, setIsSavingResults] = useState(false);
+  const [isPullingResults, setIsPullingResults] = useState(false);
 
   // Settings state
   const [picksRequired, setPicksRequired] = useState(tournament.picksRequired.toString());
@@ -960,7 +962,37 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
   const [picksLockAt, setPicksLockAt] = useState(
     format(new Date(tournament.picksLockAt), "yyyy-MM-dd'T'HH:mm")
   );
+  const [oddsApiSportKey, setOddsApiSportKey] = useState(tournament.oddsApiSportKey ?? "");
+  const [espnEventId, setEspnEventId] = useState(tournament.espnEventId ?? "");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  const handlePullField = async () => {
+    setIsPullingField(true);
+    try {
+      const res = await apiRequest("POST", `/api/golf/tournaments/${tournamentId}/pull-field`, {});
+      const data = await res.json();
+      toast({ title: "Field pulled", description: data.message });
+      onFieldUpdated();
+    } catch (err: any) {
+      toast({ title: "Pull failed", description: err.message, variant: "destructive" });
+    }
+    setIsPullingField(false);
+  };
+
+  const handlePullResults = async () => {
+    setIsPullingResults(true);
+    try {
+      const res = await apiRequest("POST", `/api/golf/tournaments/${tournamentId}/pull-results`, {});
+      const data = await res.json();
+      const stateLabel = data.espnState === 'in' ? 'Live' : data.espnState === 'post' ? 'Final' : data.espnState;
+      toast({ title: `Results pulled (${stateLabel})`, description: data.message });
+      onResultsUpdated();
+      onTournamentUpdated();
+    } catch (err: any) {
+      toast({ title: "Pull failed", description: err.message, variant: "destructive" });
+    }
+    setIsPullingResults(false);
+  };
 
   const handleBulkAddField = async () => {
     const lines = bulkInput.trim().split("\n").filter(l => l.trim());
@@ -1025,6 +1057,8 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
         picksRequired: parseInt(picksRequired),
         status,
         picksLockAt: new Date(picksLockAt).toISOString(),
+        oddsApiSportKey: oddsApiSportKey.trim() || null,
+        espnEventId: espnEventId.trim() || null,
       });
       toast({ title: "Settings saved" });
       onTournamentUpdated();
@@ -1071,10 +1105,30 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
         {/* Field management */}
         {adminTab === "field" && (
           <div className="space-y-4">
+
+            {/* API pull */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+              <p className="text-sm font-medium text-blue-900">Pull Field &amp; Odds from API</p>
+              <p className="text-xs text-blue-700">
+                Fetches the full tournament field and betting odds from The Odds API. Set the <strong>Odds API Sport Key</strong> in Settings first (e.g. <code>golf_pga_championship_winner</code>).
+              </p>
+              <Button
+                size="sm"
+                onClick={handlePullField}
+                disabled={isPullingField || !tournament.oddsApiSportKey}
+                title={!tournament.oddsApiSportKey ? "Set Odds API Sport Key in Settings first" : ""}
+              >
+                {isPullingField ? "Pulling..." : "Pull Field & Odds"}
+              </Button>
+              {!tournament.oddsApiSportKey && (
+                <p className="text-xs text-amber-600">⚠ No Odds API sport key configured — go to Settings to add one.</p>
+              )}
+            </div>
+
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-1">Bulk add players</p>
+              <p className="text-sm font-medium text-gray-700 mb-1">Bulk add players manually</p>
               <p className="text-xs text-gray-500 mb-2">
-                One player per line: <code>Name, Country, OWGR, Odds, PhotoURL</code> — OWGR blank or "Amateur" = no rank (200 pts); Odds e.g. +1400; PhotoURL optional
+                One player per line: <code>Name, Country, OWGR, Odds, PhotoURL</code> — Odds e.g. +1400; PhotoURL optional
               </p>
               <textarea
                 className="w-full border border-gray-200 rounded-lg p-3 text-sm font-mono h-36 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
@@ -1109,8 +1163,31 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
         {/* Results entry */}
         {adminTab === "results" && (
           <div className="space-y-4">
+
+            {/* API pull */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+              <p className="text-sm font-medium text-blue-900">Pull Scores from ESPN</p>
+              <p className="text-xs text-blue-700">
+                Fetches live or final scores from ESPN. Works during and after the tournament. Set the <strong>ESPN Event ID</strong> in Settings first.
+                {tournament.lastPollAt && (
+                  <span className="ml-1 text-blue-600">Last updated: {new Date(tournament.lastPollAt).toLocaleString()}</span>
+                )}
+              </p>
+              <Button
+                size="sm"
+                onClick={handlePullResults}
+                disabled={isPullingResults || !tournament.espnEventId}
+                title={!tournament.espnEventId ? "Set ESPN Event ID in Settings first" : ""}
+              >
+                {isPullingResults ? "Pulling..." : "Pull Scores from ESPN"}
+              </Button>
+              {!tournament.espnEventId && (
+                <p className="text-xs text-amber-600">⚠ No ESPN Event ID configured — go to Settings to add one.</p>
+              )}
+            </div>
+
             <p className="text-sm text-gray-500">
-              Enter each golfer's finishing position, or mark as MC / WD / DQ. Players not entered default to no result.
+              Or enter each golfer's finishing position manually, or mark as MC / WD / DQ.
             </p>
             {field.length === 0 ? (
               <p className="text-gray-500 text-sm">No players in field yet.</p>
@@ -1190,10 +1267,38 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
               >
                 <option value="upcoming">Upcoming</option>
-                <option value="active">Active (In Progress)</option>
+                <option value="active">Active (In Progress — starts hourly score polling)</option>
                 <option value="completed">Completed</option>
               </select>
+              <p className="text-xs text-gray-400 mt-1">Setting to Active triggers automatic hourly score updates from ESPN</p>
             </div>
+
+            <div className="border-t pt-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">API Integration</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1">Odds API Sport Key</label>
+                  <Input
+                    placeholder="golf_pga_championship_winner"
+                    value={oddsApiSportKey}
+                    onChange={e => setOddsApiSportKey(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    From The Odds API — used to pull field &amp; odds. Active keys: <code>golf_pga_championship_winner</code>, <code>golf_us_open_winner</code>, <code>golf_the_open_championship_winner</code>
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1">ESPN Event ID</label>
+                  <Input
+                    placeholder="401811942"
+                    value={espnEventId}
+                    onChange={e => setEspnEventId(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">ESPN numeric event ID — used to pull live scores and final results</p>
+                </div>
+              </div>
+            </div>
+
             <Button onClick={handleSaveSettings} disabled={isSavingSettings}>
               {isSavingSettings ? "Saving..." : "Save Settings"}
             </Button>

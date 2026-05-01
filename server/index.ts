@@ -91,5 +91,15 @@ app.use((req, res, next) => {
     } catch (error) {
       console.error("Failed to start game scheduler:", error);
     }
+
+    // Start the golf score scheduler
+    try {
+      const { startGolfScheduler } = await import("./golfScheduler.js");
+      const { storage } = await import("./storage.js");
+      startGolfScheduler(storage);
+      log("Golf Score Scheduler started");
+    } catch (error) {
+      console.error("Failed to start golf scheduler:", error);
+    }
   });
 })();
