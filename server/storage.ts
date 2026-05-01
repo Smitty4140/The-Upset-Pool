@@ -1298,13 +1298,13 @@ export class DatabaseStorage implements IStorage {
       .from(golfTournamentField)
       .innerJoin(golfPlayers, eq(golfTournamentField.playerId, golfPlayers.id))
       .where(eq(golfTournamentField.tournamentId, tournamentId))
-      .orderBy(asc(golfTournamentField.owgrAtLock));
+      .orderBy(sql`${golfTournamentField.odds} DESC NULLS LAST`);
 
     return rows.map(r => ({
       ...r,
       photoUrl: r.photoUrl ?? null,
       odds: r.odds ?? null,
-      pointValue: r.owgrAtLock ?? 200,
+      pointValue: r.odds !== null && r.odds > 0 ? r.odds : 0,
     }));
   }
 
@@ -1425,6 +1425,7 @@ export class DatabaseStorage implements IStorage {
         playerId: golfPickSelections.playerId,
         playerName: golfPlayers.name,
         owgrAtLock: golfTournamentField.owgrAtLock,
+        odds: golfTournamentField.odds,
       })
       .from(golfPicks)
       .innerJoin(golfPickSelections, eq(golfPickSelections.pickId, golfPicks.id))
@@ -1456,7 +1457,7 @@ export class DatabaseStorage implements IStorage {
     const entries: Omit<GolfLeaderboardEntry, 'rank'>[] = members.map(member => {
       const userPicks = picksByUser.get(member.userId) || [];
       const picks = userPicks.map(p => {
-        const pointValue = p.owgrAtLock ?? 200;
+        const pointValue = p.odds !== null && p.odds > 0 ? p.odds : 0;
         const result = resultsMap.get(p.playerId);
         const topTen = result?.topTen ?? false;
         return {
@@ -1472,10 +1473,9 @@ export class DatabaseStorage implements IStorage {
       });
 
       const totalPoints = picks.reduce((sum, p) => sum + p.pointsEarned, 0);
-      // Tiebreaker: highest OWGR number (worst rank) among ALL 4 picks
-      const tiebreakerOwgr = picks.length > 0
-        ? Math.max(...picks.map(p => p.pointValue))
-        : null;
+      // Tiebreaker: highest odds value among top-10 picks (for display)
+      const topTenOdds = picks.filter(p => p.topTen).map(p => p.pointValue).sort((a, b) => b - a);
+      const tiebreakerOdds = topTenOdds.length > 0 ? topTenOdds[0] : null;
 
       return {
         userId: member.userId,
@@ -1484,14 +1484,30 @@ export class DatabaseStorage implements IStorage {
         profileImageUrl: member.profileImageUrl,
         totalPoints,
         picks,
-        tiebreakerOwgr,
+        tiebreakerOdds,
       };
     });
 
-    // Sort: total points desc, then tiebreaker desc (worst OWGR = bigger number wins)
+    // Helper: compare two entries' top-10 picks slot-by-slot (highest odds first)
+    // Returns negative if a wins tiebreak, positive if b wins, 0 if tied
+    const compareTopTenOdds = (
+      picksA: { topTen: boolean; pointValue: number }[],
+      picksB: { topTen: boolean; pointValue: number }[],
+    ): number => {
+      const aOdds = picksA.filter(p => p.topTen).map(p => p.pointValue).sort((x, y) => y - x);
+      const bOdds = picksB.filter(p => p.topTen).map(p => p.pointValue).sort((x, y) => y - x);
+      const len = Math.max(aOdds.length, bOdds.length);
+      for (let i = 0; i < len; i++) {
+        const diff = (bOdds[i] ?? 0) - (aOdds[i] ?? 0);
+        if (diff !== 0) return diff;
+      }
+      return 0;
+    };
+
+    // Sort: total points desc, then slot-by-slot top-10 odds descending (highest odds longshot wins tiebreak)
     entries.sort((a, b) => {
       if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
-      return (b.tiebreakerOwgr ?? 0) - (a.tiebreakerOwgr ?? 0);
+      return compareTopTenOdds(a.picks, b.picks);
     });
 
     // Apply standard competition ranking (ties share the same rank)
@@ -1500,7 +1516,7 @@ export class DatabaseStorage implements IStorage {
       if (idx > 0) {
         const prev = entries[idx - 1];
         const samePoints = entry.totalPoints === prev.totalPoints;
-        const sameTiebreaker = entry.tiebreakerOwgr === prev.tiebreakerOwgr;
+        const sameTiebreaker = compareTopTenOdds(entry.picks, prev.picks) === 0;
         if (!samePoints || !sameTiebreaker) rank = idx + 1;
       }
       return { ...entry, rank };
