@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import * as SelectPrimitive from "@radix-ui/react-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Shield,
@@ -456,21 +457,30 @@ export default function Home() {
                         const contextLabel = sportType === "golf" && tournamentName
                           ? tournamentName
                           : `NFL ${season ?? ""}`;
+                        // Use SelectPrimitive.Item directly so the context label sits
+                        // OUTSIDE SelectPrimitive.ItemText — keeping the trigger clean.
                         return (
-                          <SelectItem key={leagueId} value={leagueId.toString()}>
-                            <div className="flex items-center gap-2 min-w-0">
-                              {isArchived && <Lock className="h-3 w-3 text-gray-400 flex-shrink-0" />}
-                              <span className={`truncate ${isArchived ? "text-gray-500" : ""}`}>
-                                {leagueName}
+                          <SelectPrimitive.Item
+                            key={leagueId}
+                            value={leagueId.toString()}
+                            className="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                          >
+                            <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                              <SelectPrimitive.ItemIndicator>
+                                <Check className="h-4 w-4" />
+                              </SelectPrimitive.ItemIndicator>
+                            </span>
+                            <SelectPrimitive.ItemText>
+                              <span className={isArchived ? "text-gray-500" : ""}>
+                                {leagueName}{isArchived && season ? ` — ${season}` : ""}
                               </span>
-                              <span className="text-xs text-gray-400 flex-shrink-0">
-                                ({contextLabel})
-                              </span>
-                              {membership.isAdmin && !isArchived && (
-                                <Trophy className="h-3 w-3 text-yellow-600 flex-shrink-0" />
-                              )}
-                            </div>
-                          </SelectItem>
+                            </SelectPrimitive.ItemText>
+                            <span className="flex items-center gap-1.5 ml-1.5 flex-shrink-0">
+                              <span className="text-xs text-gray-400">({contextLabel})</span>
+                              {isArchived && <Lock className="h-3 w-3 text-gray-400" />}
+                              {membership.isAdmin && !isArchived && <Trophy className="h-3 w-3 text-yellow-600" />}
+                            </span>
+                          </SelectPrimitive.Item>
                         );
                       };
 
