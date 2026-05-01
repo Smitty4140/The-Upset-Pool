@@ -74,6 +74,21 @@ export interface GolfFieldEntry {
   pointValue: number; // positive odds value, or 0 if odds <= 0 or null
 }
 
+export interface GolfResult {
+  id: number;
+  tournamentId: number;
+  playerId: number;
+  finalPosition: number | null;
+  status: string; // 'finished' | 'mc' | 'wd' | 'dq'
+  topTen: boolean;
+  player: {
+    id: number;
+    name: string;
+    country: string | null;
+    isAmateur: boolean;
+  };
+}
+
 export interface GolfPickSession {
   id: number;
   userId: string;

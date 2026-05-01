@@ -4,8 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useCountdown } from "@/hooks/useCountdown";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { GolfTournament, GolfFieldEntry, GolfPickSession, GolfLeaderboardEntry, League } from "@/lib/types";
-import { format } from "date-fns";
+import { GolfTournament, GolfFieldEntry, GolfPickSession, GolfLeaderboardEntry, GolfResult, League } from "@/lib/types";
+import { format, formatDistanceToNow } from "date-fns";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,9 @@ import {
   UserCheck,
   UserX,
   ShieldCheck,
+  Radio,
+  RefreshCw,
+  Activity,
 } from "lucide-react";
 
 interface GolfLeagueViewProps {
@@ -53,10 +56,13 @@ export default function GolfLeagueView({ leagueId, league, isSuperUser, isAdmin 
 
   const tournamentId = league.golfTournamentId;
 
-  // Fetch tournament info
+  // Fetch tournament info — auto-refresh every 5 min when active so lastPollAt stays current
   const { data: tournament, isLoading: isLoadingTournament } = useQuery<GolfTournament>({
     queryKey: [`/api/golf/tournaments/${tournamentId}`],
     enabled: !!tournamentId,
+    refetchInterval: (query) =>
+      query.state.data?.status === "active" ? 5 * 60 * 1000 : false,
+    refetchIntervalInBackground: false,
   });
 
   // Fetch tournament field
@@ -79,15 +85,27 @@ export default function GolfLeagueView({ leagueId, league, isSuperUser, isAdmin 
     }
   }, [myPick, hasLoadedPicks]);
 
-  // Fetch leaderboard
+  // Countdown — must be declared before queries that depend on isLocked
+  const lockDate = useMemo(() => tournament?.picksLockAt ? new Date(tournament.picksLockAt) : null, [tournament?.picksLockAt]);
+  const { days, hours, minutes, isExpired: isLocked } = useCountdown(lockDate);
+
+  // Fetch leaderboard — auto-refresh every 2 min when the tournament is live
+  const isLiveTournament = tournament?.status === "active";
   const { data: leaderboard = [], isLoading: isLoadingLeaderboard } = useQuery<GolfLeaderboardEntry[]>({
     queryKey: [`/api/golf/leagues/${leagueId}/leaderboard`],
     enabled: activeTab === "leaderboard",
+    refetchInterval: isLiveTournament ? 2 * 60 * 1000 : false,
+    refetchIntervalInBackground: false,
   });
 
-  // Countdown
-  const lockDate = useMemo(() => tournament?.picksLockAt ? new Date(tournament.picksLockAt) : null, [tournament?.picksLockAt]);
-  const { days, hours, minutes, isExpired: isLocked } = useCountdown(lockDate);
+  // Fetch tournament results for the tournament leaderboard view on the picks tab
+  // Only fetch once picks are locked; auto-refresh every 2 min when live
+  const { data: tournamentResults = [], isLoading: isLoadingResults } = useQuery<GolfResult[]>({
+    queryKey: [`/api/golf/tournaments/${tournamentId}/results`],
+    enabled: !!tournamentId && isLocked,
+    refetchInterval: isLiveTournament ? 2 * 60 * 1000 : false,
+    refetchIntervalInBackground: false,
+  });
 
   const picksRequired = tournament?.picksRequired ?? 4;
 
@@ -327,6 +345,10 @@ export default function GolfLeagueView({ leagueId, league, isSuperUser, isAdmin 
           onToggle={togglePlayer}
           onSubmit={handleSubmit}
           isSubmitting={submitPicksMutation.isPending}
+          tournamentResults={tournamentResults}
+          isLoadingResults={isLoadingResults}
+          isLiveTournament={isLiveTournament}
+          tournament={tournament}
         />
       )}
 
@@ -337,6 +359,7 @@ export default function GolfLeagueView({ leagueId, league, isSuperUser, isAdmin 
           isLoading={isLoadingLeaderboard}
           hasResults={hasResults}
           currentUserId={user?.id}
+          tournament={tournament}
         />
       )}
 
@@ -383,6 +406,10 @@ interface PicksPanelProps {
   onToggle: (id: number) => void;
   onSubmit: () => void;
   isSubmitting: boolean;
+  tournamentResults: GolfResult[];
+  isLoadingResults: boolean;
+  isLiveTournament: boolean;
+  tournament?: GolfTournament;
 }
 
 function formatOdds(odds: number | null): string {
@@ -501,8 +528,26 @@ function PicksPanel({
   selectedPlayerIds, myPick, isLoadingField, isLoadingPick,
   search, setSearch, sortBy, setSortBy,
   onToggle, onSubmit, isSubmitting,
+  tournamentResults, isLoadingResults, isLiveTournament, tournament,
 }: PicksPanelProps) {
   const hasSubmitted = myPick && myPick.selections.length > 0;
+  const myPickIds = new Set((myPick?.selections ?? []).map(s => s.playerId));
+  const hasResults = tournamentResults.length > 0;
+
+  // When locked and there are results (or tournament is live), show the tournament leaderboard
+  if (isLocked && (hasResults || isLiveTournament)) {
+    return (
+      <TournamentLeaderboard
+        tournamentResults={tournamentResults}
+        isLoading={isLoadingResults}
+        isLiveTournament={isLiveTournament}
+        myPickIds={myPickIds}
+        field={allField}
+        tournament={tournament}
+        hasSubmittedPicks={!!hasSubmitted}
+      />
+    );
+  }
 
   if (isLoadingField) {
     return (
@@ -652,6 +697,275 @@ function PicksPanel({
   );
 }
 
+// ─── Tournament Leaderboard (picks tab, tournament in progress) ──────────────
+
+interface TournamentLeaderboardProps {
+  tournamentResults: GolfResult[];
+  isLoading: boolean;
+  isLiveTournament: boolean;
+  myPickIds: Set<number>;
+  field: GolfFieldEntry[];
+  tournament?: GolfTournament;
+  hasSubmittedPicks: boolean;
+}
+
+function TournamentLeaderboard({
+  tournamentResults,
+  isLoading,
+  isLiveTournament,
+  myPickIds,
+  field,
+  tournament,
+  hasSubmittedPicks,
+}: TournamentLeaderboardProps) {
+  // Build a photo / odds lookup from field entries
+  const fieldMap = useMemo(() => {
+    const m = new Map<number, GolfFieldEntry>();
+    for (const f of field) m.set(f.playerId, f);
+    return m;
+  }, [field]);
+
+  // Sort results: active players by position first, then DNF (mc/wd/dq)
+  const sorted = useMemo(() => {
+    const playing = tournamentResults
+      .filter(r => r.status === "finished" && r.finalPosition !== null)
+      .sort((a, b) => (a.finalPosition ?? 999) - (b.finalPosition ?? 999));
+    const dnf = tournamentResults
+      .filter(r => r.status !== "finished")
+      .sort((a, b) => a.player.name.localeCompare(b.player.name));
+    return [...playing, ...dnf];
+  }, [tournamentResults]);
+
+  const lastUpdatedText = tournament?.lastPollAt
+    ? `Updated ${formatDistanceToNow(new Date(tournament.lastPollAt), { addSuffix: true })}`
+    : null;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-14 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (tournamentResults.length === 0) {
+    return (
+      <div className="space-y-4">
+        {/* Live header */}
+        {isLiveTournament && (
+          <div className="bg-gradient-to-r from-red-600 to-rose-500 text-white rounded-lg px-4 py-3 flex items-center justify-between shadow">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white" />
+                </span>
+                <span className="font-bold text-sm tracking-wider uppercase">Live</span>
+              </div>
+              <div className="h-4 w-px bg-white/40" />
+              <span className="text-white/90 text-sm">Tournament in progress</span>
+            </div>
+            {lastUpdatedText && (
+              <div className="flex items-center gap-1.5 text-white/80 text-xs flex-shrink-0">
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span>{lastUpdatedText}</span>
+              </div>
+            )}
+          </div>
+        )}
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <Activity className="h-10 w-10 text-blue-400 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-gray-700">Scores not yet available</h3>
+            <p className="text-gray-500 mt-1 text-sm">
+              {isLiveTournament
+                ? "The tournament is underway. Scores will appear here once they are pulled from ESPN."
+                : "No results have been entered for this tournament yet."}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Live header */}
+      {isLiveTournament ? (
+        <div className="bg-gradient-to-r from-red-600 to-rose-500 text-white rounded-lg px-4 py-3 flex items-center justify-between shadow">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-white" />
+              </span>
+              <span className="font-bold text-sm tracking-wider uppercase">Live</span>
+            </div>
+            <div className="h-4 w-px bg-white/40" />
+            <div className="flex items-center gap-1.5 text-white/90 text-sm">
+              <Activity className="h-4 w-4" />
+              <span>Tournament leaderboard — scores update every 2 min</span>
+            </div>
+          </div>
+          {lastUpdatedText && (
+            <div className="flex items-center gap-1.5 text-white/80 text-xs flex-shrink-0 ml-4">
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span>{lastUpdatedText}</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex items-center gap-2">
+          <Trophy className="h-5 w-5 text-yellow-500 flex-shrink-0" />
+          <p className="text-gray-700 text-sm font-medium">Tournament results</p>
+        </div>
+      )}
+
+      {!hasSubmittedPicks && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+          <p className="text-amber-700 text-sm">You didn't submit picks — your golfers won't be highlighted below.</p>
+        </div>
+      )}
+
+      {/* Leaderboard table */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="max-h-[600px] overflow-y-auto">
+          <table className="w-full border-collapse">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="pl-4 pr-2 py-2 w-12 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Pos</th>
+                <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Golfer</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide w-24">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((result, idx) => {
+                const isMyPick = myPickIds.has(result.playerId);
+                const fieldEntry = fieldMap.get(result.playerId);
+                const isDnf = result.status !== "finished";
+                const pos = result.finalPosition;
+
+                // Check for tie (same position as adjacent)
+                const prevPos = idx > 0 ? sorted[idx - 1].finalPosition : null;
+                const nextPos = idx < sorted.length - 1 ? sorted[idx + 1].finalPosition : null;
+                const isTied = pos !== null && (pos === prevPos || pos === nextPos);
+                const posLabel = isDnf
+                  ? result.status.toUpperCase()
+                  : pos !== null
+                    ? isTied ? `T${pos}` : `${pos}`
+                    : "—";
+
+                return (
+                  <tr
+                    key={result.playerId}
+                    className={`border-b border-gray-100 last:border-0 transition-colors ${
+                      isMyPick
+                        ? isDnf
+                          ? "bg-red-50"
+                          : result.topTen
+                            ? "bg-green-50"
+                            : "bg-blue-50"
+                        : "hover:bg-gray-50"
+                    }`}
+                  >
+                    {/* Position */}
+                    <td className="pl-4 pr-2 py-3 w-14">
+                      <span className={`text-sm font-bold ${
+                        isDnf ? "text-gray-400" : pos === 1 ? "text-yellow-600" : "text-gray-700"
+                      }`}>
+                        {posLabel}
+                      </span>
+                    </td>
+
+                    {/* Golfer info */}
+                    <td className="px-2 py-3">
+                      <div className="flex items-center gap-2">
+                        {/* Photo */}
+                        <div className={`flex-shrink-0 w-9 h-9 rounded-full overflow-hidden ${
+                          isMyPick && !isDnf ? (result.topTen ? "bg-green-100 ring-2 ring-green-400" : "bg-blue-100 ring-2 ring-blue-400") : "bg-gray-100"
+                        }`}>
+                          {fieldEntry?.photoUrl ? (
+                            <img
+                              src={fieldEntry.photoUrl}
+                              alt={result.player.name}
+                              className="w-full h-full object-cover object-top"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <span className="text-xs font-bold text-gray-400">
+                                {result.player.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-sm font-semibold leading-tight ${
+                              isMyPick ? (result.topTen ? "text-green-900" : isDnf ? "text-red-800" : "text-blue-900") : "text-gray-900"
+                            }`}>
+                              {result.player.name}
+                            </span>
+                            {isMyPick && (
+                              <Badge
+                                variant="outline"
+                                className={`text-xs py-0 px-1.5 ${
+                                  result.topTen
+                                    ? "border-green-400 text-green-700 bg-green-50"
+                                    : isDnf
+                                      ? "border-red-300 text-red-600 bg-red-50"
+                                      : "border-blue-400 text-blue-700 bg-blue-50"
+                                }`}
+                              >
+                                ✓ Your Pick
+                              </Badge>
+                            )}
+                            {result.topTen && (
+                              <Badge className="text-xs py-0 px-1.5 bg-green-600 text-white">Top 10</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {result.player.country ?? "—"}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-3 py-3 text-right">
+                      {isDnf ? (
+                        <span className="text-xs font-semibold text-gray-400 uppercase">
+                          {result.status}
+                        </span>
+                      ) : isLiveTournament && pos !== null ? (
+                        <span className="flex items-center justify-end gap-1 text-xs text-blue-500">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500" />
+                          </span>
+                          <span>Live</span>
+                        </span>
+                      ) : pos !== null ? (
+                        <span className="text-xs text-green-600 font-medium">Final</span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Leaderboard Panel ───────────────────────────────────────────────────────
 
 interface LeaderboardPanelProps {
@@ -659,14 +973,46 @@ interface LeaderboardPanelProps {
   isLoading: boolean;
   hasResults: boolean;
   currentUserId?: string;
+  tournament?: GolfTournament;
 }
 
-function LeaderboardPanel({ leaderboard, isLoading, hasResults, currentUserId }: LeaderboardPanelProps) {
+function LeaderboardPanel({ leaderboard, isLoading, hasResults, currentUserId, tournament }: LeaderboardPanelProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const isLive = tournament?.status === "active";
+
+  const lastUpdatedText = tournament?.lastPollAt
+    ? `Updated ${formatDistanceToNow(new Date(tournament.lastPollAt), { addSuffix: true })}`
+    : null;
+
+  const liveBanner = isLive && (
+    <div className="bg-gradient-to-r from-red-600 to-rose-500 text-white rounded-lg px-4 py-3 flex items-center justify-between shadow">
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-white" />
+          </span>
+          <span className="font-bold text-sm tracking-wider uppercase">Live</span>
+        </div>
+        <div className="h-4 w-px bg-white/40" />
+        <div className="flex items-center gap-1.5 text-white/90 text-sm">
+          <Radio className="h-4 w-4" />
+          <span>Tournament in progress — scores update automatically</span>
+        </div>
+      </div>
+      {lastUpdatedText && (
+        <div className="flex items-center gap-1.5 text-white/80 text-xs flex-shrink-0 ml-4">
+          <RefreshCw className="h-3.5 w-3.5" />
+          <span>{lastUpdatedText}</span>
+        </div>
+      )}
+    </div>
+  );
 
   if (isLoading) {
     return (
       <div className="space-y-3">
+        {liveBanner}
         {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
       </div>
     );
@@ -674,22 +1020,36 @@ function LeaderboardPanel({ leaderboard, isLoading, hasResults, currentUserId }:
 
   if (leaderboard.length === 0) {
     return (
-      <Card>
-        <CardContent className="pt-6 text-center text-gray-500">
-          No picks have been submitted yet for this tournament.
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        {liveBanner}
+        <Card>
+          <CardContent className="pt-6 text-center text-gray-500">
+            No picks have been submitted yet for this tournament.
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {!hasResults && (
+      {liveBanner}
+
+      {!hasResults && !isLive && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-2">
           <Clock className="h-5 w-5 text-amber-600 flex-shrink-0" />
           <div>
             <p className="text-amber-800 font-medium text-sm">Results Pending</p>
             <p className="text-amber-700 text-xs mt-0.5">Picks are locked in. Scores will appear once the tournament results are entered.</p>
+          </div>
+        </div>
+      )}
+      {!hasResults && isLive && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center gap-2">
+          <Clock className="h-5 w-5 text-blue-500 flex-shrink-0" />
+          <div>
+            <p className="text-blue-800 font-medium text-sm">Scores Loading</p>
+            <p className="text-blue-700 text-xs mt-0.5">The tournament is underway. Live scores will appear here as they are pulled from ESPN.</p>
           </div>
         </div>
       )}
@@ -756,40 +1116,56 @@ function LeaderboardPanel({ leaderboard, isLoading, hasResults, currentUserId }:
                       {entry.picks.length === 0 ? (
                         <p className="text-sm text-gray-500 italic">No picks submitted</p>
                       ) : (
-                        entry.picks.map(pick => (
-                          <div key={pick.playerId}
-                            className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${
-                              pick.topTen ? "bg-green-100" : pick.resultStatus ? "bg-gray-50" : "bg-gray-50"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              {pick.topTen && <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />}
-                              <span className={pick.topTen ? "font-medium text-green-800" : "text-gray-700"}>
-                                {pick.playerName}
-                              </span>
-                              {pick.owgrAtLock === null && (
-                                <Badge variant="secondary" className="text-xs">Amateur</Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 text-right flex-shrink-0">
-                              {pick.resultStatus ? (
-                                <>
-                                  {pick.resultStatus === 'finished' && pick.finalPosition && (
-                                    <span className="text-gray-500 text-xs">T{pick.finalPosition}</span>
-                                  )}
-                                  {pick.resultStatus !== 'finished' && (
-                                    <span className="text-gray-400 text-xs uppercase">{pick.resultStatus}</span>
-                                  )}
-                                  <span className={`font-bold ${pick.topTen ? "text-green-700" : "text-gray-400"}`}>
-                                    {pick.pointsEarned > 0 ? `+${pick.pointsEarned}` : "0"} pts
+                        entry.picks.map(pick => {
+                          const hasLiveScore = isLive && pick.resultStatus !== null;
+                          const rowBg = pick.topTen
+                            ? "bg-green-100"
+                            : hasLiveScore
+                              ? "bg-blue-50"
+                              : "bg-gray-50";
+
+                          return (
+                            <div key={pick.playerId}
+                              className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${rowBg}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                {pick.topTen && <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />}
+                                {hasLiveScore && !pick.topTen && (
+                                  <span className="relative flex h-2 w-2 flex-shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
                                   </span>
-                                </>
-                              ) : (
-                                <span className="text-gray-400 text-xs">{pick.pointValue} pts possible</span>
-                              )}
+                                )}
+                                <span className={pick.topTen ? "font-medium text-green-800" : hasLiveScore ? "font-medium text-blue-900" : "text-gray-700"}>
+                                  {pick.playerName}
+                                </span>
+                                {pick.owgrAtLock === null && (
+                                  <Badge variant="secondary" className="text-xs">Amateur</Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-right flex-shrink-0">
+                                {pick.resultStatus ? (
+                                  <>
+                                    {pick.resultStatus === 'finished' && pick.finalPosition && (
+                                      <span className={`text-xs font-medium ${isLive ? "text-blue-600" : "text-gray-500"}`}>
+                                        {isLive ? "Pos " : "T"}{pick.finalPosition}
+                                        {isLive && <span className="ml-1 text-blue-400 italic text-xs">(live)</span>}
+                                      </span>
+                                    )}
+                                    {pick.resultStatus !== 'finished' && (
+                                      <span className="text-gray-400 text-xs uppercase">{pick.resultStatus}</span>
+                                    )}
+                                    <span className={`font-bold ${pick.topTen ? "text-green-700" : isLive ? "text-blue-600" : "text-gray-400"}`}>
+                                      {pick.pointsEarned > 0 ? `+${pick.pointsEarned}` : "0"} pts
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="text-gray-400 text-xs">{pick.pointValue} pts possible</span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>
