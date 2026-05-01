@@ -76,7 +76,7 @@ export interface IStorage {
 
   // League member operations
   getLeagueMembers(leagueId: number): Promise<(LeagueMember & { user: User })[]>;
-  getUserLeagues(userId: string): Promise<(LeagueMember & { league: League })[]>;
+  getUserLeagues(userId: string): Promise<(LeagueMember & { league: League; tournamentName?: string | null })[]>;
   getLeagueMember(leagueId: number, userId: string): Promise<LeagueMember | undefined>;
   addLeagueMember(member: InsertLeagueMember): Promise<LeagueMember>;
   addUserToLeague(leagueId: number, userId: string, isAdmin: boolean): Promise<LeagueMember>;
@@ -300,17 +300,19 @@ export class DatabaseStorage implements IStorage {
     })) as (LeagueMember & { user: User })[];
   }
 
-  async getUserLeagues(userId: string): Promise<(LeagueMember & { league: League })[]> {
+  async getUserLeagues(userId: string): Promise<(LeagueMember & { league: League; tournamentName?: string | null })[]> {
     const result = await db
       .select()
       .from(leagueMembers)
       .innerJoin(leagues, eq(leagueMembers.leagueId, leagues.id))
+      .leftJoin(golfTournaments, eq(leagues.golfTournamentId, golfTournaments.id))
       .where(eq(leagueMembers.userId, userId));
     
     return result.map(row => ({
       ...row.league_members,
-      league: row.leagues
-    })) as (LeagueMember & { league: League })[];
+      league: row.leagues,
+      tournamentName: row.golf_tournaments?.name ?? null,
+    }));
   }
 
   async getLeagueMember(leagueId: number, userId: string): Promise<LeagueMember | undefined> {
