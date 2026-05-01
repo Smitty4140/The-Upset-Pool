@@ -409,13 +409,13 @@ export type GolfLeaderboardEntry = {
     playerId: number;
     playerName: string;
     owgrAtLock: number | null;
-    pointValue: number; // COALESCE(owgr_at_lock, 200)
+    pointValue: number; // positive odds value, or 0 if odds <= 0 or null
     topTen: boolean;
     pointsEarned: number; // pointValue if topTen, else 0
     resultStatus: string | null; // 'finished' | 'mc' | 'wd' | 'dq' | null (no result yet)
     finalPosition: number | null;
   }[];
-  tiebreakerOwgr: number | null; // highest OWGR number among all 4 picks (worst rank = biggest number)
+  tiebreakerOdds: number | null; // highest odds value among top-10 picks (for display)
   rank: number;
 };
 
@@ -429,5 +429,5 @@ export type GolfFieldEntry = {
   photoUrl: string | null;
   owgrAtLock: number | null;
   odds: number | null; // e.g. 2000 = +2000 odds
-  pointValue: number; // COALESCE(owgr_at_lock, 200)
+  pointValue: number; // positive odds value, or 0 if odds <= 0 or null
 };

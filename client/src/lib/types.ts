@@ -68,7 +68,7 @@ export interface GolfFieldEntry {
   photoUrl: string | null;
   owgrAtLock: number | null;
   odds: number | null; // e.g. 2000 = +2000 odds
-  pointValue: number; // COALESCE(owgrAtLock, 200)
+  pointValue: number; // positive odds value, or 0 if odds <= 0 or null
 }
 
 export interface GolfPickSession {
@@ -97,7 +97,7 @@ export interface GolfLeaderboardEntry {
     resultStatus: string | null;
     finalPosition: number | null;
   }[];
-  tiebreakerOwgr: number | null;
+  tiebreakerOdds: number | null;
   rank: number;
 }
 

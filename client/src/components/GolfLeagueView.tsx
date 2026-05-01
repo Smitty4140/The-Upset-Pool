@@ -47,7 +47,7 @@ export default function GolfLeagueView({ leagueId, league, isSuperUser, isAdmin 
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<GolfTab>("picks");
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState<"owgr" | "name" | "odds">("owgr");
+  const [sortBy, setSortBy] = useState<"owgr" | "name" | "odds">("odds");
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<number>>(new Set());
   const [hasLoadedPicks, setHasLoadedPicks] = useState(false);
 
@@ -138,12 +138,12 @@ export default function GolfLeagueView({ leagueId, league, isSuperUser, isAdmin 
     if (sortBy === "name") {
       list.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortBy === "odds") {
-      // Sort by odds ascending (lowest odds = favorite = first)
+      // Sort by odds descending (highest point value = highest odds = first), nulls last
       list.sort((a, b) => {
         if (a.odds === null && b.odds === null) return a.name.localeCompare(b.name);
         if (a.odds === null) return 1;
         if (b.odds === null) return -1;
-        return a.odds - b.odds;
+        return b.odds - a.odds;
       });
     } else {
       // Sort by OWGR (ranked players first, then amateurs/no-OWGR)
@@ -728,8 +728,8 @@ function LeaderboardPanel({ leaderboard, isLoading, hasResults, currentUserId }:
                       </span>
                       {isCurrentUser && <Badge variant="secondary" className="text-xs">You</Badge>}
                     </div>
-                    {hasResults && entry.tiebreakerOwgr !== null && (
-                      <p className="text-xs text-gray-400">Tiebreaker: {entry.tiebreakerOwgr} OWGR</p>
+                    {hasResults && entry.tiebreakerOdds !== null && (
+                      <p className="text-xs text-gray-400">Tiebreaker: +{entry.tiebreakerOdds} odds</p>
                     )}
                   </div>
 
