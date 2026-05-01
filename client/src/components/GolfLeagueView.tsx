@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -1350,6 +1350,59 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
   const [espnEventId, setEspnEventId] = useState(tournament.espnEventId ?? "");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
+  // ESPN search state
+  const [espnSearchQuery, setEspnSearchQuery] = useState("");
+  const [espnSearchResults, setEspnSearchResults] = useState<{ id: string; name: string; date: string }[]>([]);
+  const [isEspnSearching, setIsEspnSearching] = useState(false);
+  const [showEspnDropdown, setShowEspnDropdown] = useState(false);
+  const espnSearchRef = useRef<HTMLDivElement>(null);
+  const espnDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced ESPN search
+  useEffect(() => {
+    if (espnDebounceRef.current) clearTimeout(espnDebounceRef.current);
+    const trimmed = espnSearchQuery.trim();
+    if (!trimmed) {
+      setEspnSearchResults([]);
+      setShowEspnDropdown(false);
+      return;
+    }
+    espnDebounceRef.current = setTimeout(async () => {
+      setIsEspnSearching(true);
+      try {
+        const res = await fetch(`/api/golf/espn-search?q=${encodeURIComponent(trimmed)}`);
+        if (!res.ok) {
+          setEspnSearchResults([]);
+          setShowEspnDropdown(true);
+          return;
+        }
+        const data: { id: string; name: string; date: string }[] = await res.json();
+        if (Array.isArray(data)) {
+          setEspnSearchResults(data);
+          setShowEspnDropdown(true);
+        } else {
+          setEspnSearchResults([]);
+        }
+      } catch {
+        setEspnSearchResults([]);
+      } finally {
+        setIsEspnSearching(false);
+      }
+    }, 400);
+    return () => { if (espnDebounceRef.current) clearTimeout(espnDebounceRef.current); };
+  }, [espnSearchQuery]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (espnSearchRef.current && !espnSearchRef.current.contains(e.target as Node)) {
+        setShowEspnDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handlePullField = async () => {
     setIsPullingField(true);
     try {
@@ -1679,6 +1732,52 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
                     onChange={e => setEspnEventId(e.target.value)}
                   />
                   <p className="text-xs text-gray-400 mt-1">ESPN numeric event ID — used to pull live scores and final results</p>
+                  {/* ESPN search */}
+                  <div className="relative mt-2" ref={espnSearchRef}>
+                    <label className="text-xs font-medium text-gray-500 block mb-1">Search ESPN by name to auto-fill ID</label>
+                    <div className="flex gap-2 items-center">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          className="pl-8 text-sm"
+                          placeholder="e.g. PGA Championship…"
+                          value={espnSearchQuery}
+                          onChange={e => setEspnSearchQuery(e.target.value)}
+                          onFocus={() => { if (espnSearchResults.length > 0) setShowEspnDropdown(true); }}
+                        />
+                      </div>
+                      {isEspnSearching && (
+                        <span className="text-xs text-gray-400 whitespace-nowrap">Searching…</span>
+                      )}
+                    </div>
+                    {showEspnDropdown && espnSearchResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                        {espnSearchResults.map(evt => (
+                          <button
+                            key={evt.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center justify-between gap-2 text-sm"
+                            onClick={() => {
+                              setEspnEventId(evt.id);
+                              setEspnSearchQuery("");
+                              setShowEspnDropdown(false);
+                              setEspnSearchResults([]);
+                            }}
+                          >
+                            <span className="font-medium truncate">{evt.name}</span>
+                            <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">
+                              {evt.date ? new Date(evt.date).toLocaleDateString() : ''} · ID: {evt.id}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {showEspnDropdown && espnSearchResults.length === 0 && !isEspnSearching && espnSearchQuery.trim() && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg px-3 py-2 text-sm text-gray-500">
+                        No matching ESPN events found
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
