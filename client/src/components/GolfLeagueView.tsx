@@ -461,6 +461,13 @@ function GolferRow({
         )}
       </td>
 
+      {/* Pts */}
+      <td className="px-2 py-3 text-center w-20">
+        <span className={`text-sm font-bold ${player.pointValue > 0 ? (isSelected ? "text-green-800" : "text-gray-700") : "text-gray-400"}`}>
+          {player.pointValue > 0 ? player.pointValue : "0"}
+        </span>
+      </td>
+
       {/* Select / deselect */}
       <td className="pl-2 pr-4 py-3 text-center w-24">
         {!isLocked ? (
@@ -597,6 +604,7 @@ function PicksPanel({
                   <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Golfer</th>
                   <th className="px-2 py-2 w-20 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">OWGR</th>
                   <th className="px-2 py-2 w-24 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Odds</th>
+                  <th className="px-2 py-2 w-20 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Pts</th>
                   <th className="pl-2 pr-4 py-2 w-24 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Pick</th>
                 </tr>
               </thead>
