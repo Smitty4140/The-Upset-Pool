@@ -2903,7 +2903,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/golf/tournaments/:id', isAuthenticated, isSuperUser, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { name, location, season, startsAt, picksLockAt, status, picksRequired } = req.body;
+      const { name, location, season, startsAt, picksLockAt, status, picksRequired, oddsApiSportKey, espnEventId } = req.body;
       const updates: any = {};
       if (name !== undefined) updates.name = name.trim();
       if (location !== undefined) updates.location = location?.trim() || null;
@@ -2912,12 +2912,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (picksLockAt !== undefined) updates.picksLockAt = new Date(picksLockAt);
       if (status !== undefined) updates.status = status;
       if (picksRequired !== undefined) updates.picksRequired = parseInt(picksRequired);
+      if (oddsApiSportKey !== undefined) updates.oddsApiSportKey = oddsApiSportKey?.trim() || null;
+      if (espnEventId !== undefined) updates.espnEventId = espnEventId?.trim() || null;
       const updated = await storage.updateGolfTournament(id, updates);
       if (!updated) return res.status(404).json({ message: "Tournament not found" });
+
+      // If status was set to 'active', trigger golf scheduler to start polling
+      if (status === 'active' && updated.espnEventId) {
+        try {
+          const { golfScheduler } = await import('./golfScheduler.js');
+          golfScheduler.scheduleHourlyPoll(id, updated.name);
+        } catch (err) {
+          console.error('Could not start golf scheduler poll:', err);
+        }
+      }
+
       res.json(updated);
     } catch (error) {
       console.error("Error updating golf tournament:", error);
       res.status(500).json({ message: "Failed to update golf tournament" });
+    }
+  });
+
+  // Pull tournament field + odds from The Odds API (super user only)
+  app.post('/api/golf/tournaments/:id/pull-field', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const tournamentId = parseInt(req.params.id);
+      const { pullGolfFieldFromOddsAPI } = await import('./golfDataPuller.js');
+      const result = await pullGolfFieldFromOddsAPI(tournamentId, storage);
+      res.json({ message: `Pulled ${result.results.playersUpserted} players`, ...result });
+    } catch (error: any) {
+      console.error('Error pulling golf field:', error);
+      res.status(500).json({ message: error.message || 'Failed to pull field from Odds API' });
+    }
+  });
+
+  // Pull live / final scores from ESPN (super user only)
+  app.post('/api/golf/tournaments/:id/pull-results', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const tournamentId = parseInt(req.params.id);
+      const { pullGolfScoresFromESPN } = await import('./golfDataPuller.js');
+      const result = await pullGolfScoresFromESPN(tournamentId, storage);
+
+      // If ESPN says the event is over, mark tournament completed and stop polling
+      if (result.espnState === 'post') {
+        await storage.updateGolfTournament(tournamentId, { status: 'completed' });
+        try {
+          const { golfScheduler } = await import('./golfScheduler.js');
+          golfScheduler.cancelPoll(tournamentId);
+        } catch (_) {}
+      }
+
+      res.json({
+        message: `Matched ${result.matched} / ${result.total} players (${result.skipped} skipped)`,
+        espnState: result.espnState,
+        matched: result.matched,
+        skipped: result.skipped,
+        total: result.total,
+      });
+    } catch (error: any) {
+      console.error('Error pulling golf results:', error);
+      res.status(500).json({ message: error.message || 'Failed to pull results from ESPN' });
     }
   });
 

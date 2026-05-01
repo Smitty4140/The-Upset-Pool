@@ -64,6 +64,9 @@ export const golfTournaments = pgTable("golf_tournaments", {
   picksLockAt: timestamp("picks_lock_at").notNull(),
   status: varchar("status").default("upcoming").notNull(), // 'upcoming' | 'active' | 'completed'
   picksRequired: integer("picks_required").default(4).notNull(), // configurable per tournament
+  oddsApiSportKey: varchar("odds_api_sport_key"), // e.g. 'golf_pga_championship_winner'
+  espnEventId: varchar("espn_event_id"), // ESPN event ID for live score / results pulls
+  lastPollAt: timestamp("last_poll_at"), // when scores were last polled from ESPN
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

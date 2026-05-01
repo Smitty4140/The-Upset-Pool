@@ -47,6 +47,9 @@ export interface GolfTournament {
   picksLockAt: string;
   status: string; // 'upcoming' | 'active' | 'completed'
   picksRequired: number;
+  oddsApiSportKey: string | null;
+  espnEventId: string | null;
+  lastPollAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
