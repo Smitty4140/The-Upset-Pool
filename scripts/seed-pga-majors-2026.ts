@@ -1,11 +1,8 @@
 /**
  * Seed the 2026 PGA Majors into golf_tournaments.
- * Safe to re-run — skips any tournament that already exists by name+season.
+ * Upsert-safe: inserts if missing, updates key fields if row already exists.
  *
  * Run with: NODE_ENV=development npx tsx scripts/seed-pga-majors-2026.ts
- *
- * The Open Championship 2026 is the only major still upcoming as of May 2026.
- * (Masters Apr 9-12, PGA Championship May 21-24, US Open Jun 18-21 already seeded/passed)
  */
 
 async function main() {
@@ -25,19 +22,20 @@ async function main() {
       name: "The Open Championship 2026",
       location: "Royal Portrush Golf Club",
       season: 2026,
-      // Starts Thursday July 16 — first tee time ~6:35am BST = 5:35am UTC
+      // Starts Thursday July 16 — first tee ~6:35am BST = 5:35am UTC
       // picksLockAt = Thursday July 16 at 8:00am ET = 12:00 UTC
       startsAt: new Date("2026-07-16T05:35:00.000Z"),
       picksLockAt: new Date("2026-07-16T12:00:00.000Z"),
       status: "upcoming" as const,
       picksRequired: 4,
       oddsApiSportKey: "golf_the_open_championship_winner",
-      espnEventId: null as string | null,
+      // ESPN event ID confirmed via site.api.espn.com 2026 PGA calendar
+      espnEventId: "401811957",
     },
   ];
 
   let inserted = 0;
-  let skipped = 0;
+  let updated = 0;
 
   for (const m of MAJORS) {
     const existing = await db.query.golfTournaments.findFirst({
@@ -48,25 +46,37 @@ async function main() {
     });
 
     if (existing) {
-      console.log(`  ✓ Already exists: ${m.name} (id=${existing.id}) — skipped`);
-      skipped++;
-      continue;
+      await db
+        .update(golfTournaments)
+        .set({
+          location: m.location,
+          startsAt: m.startsAt,
+          picksLockAt: m.picksLockAt,
+          picksRequired: m.picksRequired,
+          oddsApiSportKey: m.oddsApiSportKey,
+          espnEventId: m.espnEventId,
+        })
+        .where(eq(golfTournaments.id, existing.id));
+      console.log(`  ✓ Updated: ${m.name} (id=${existing.id})`);
+      updated++;
+    } else {
+      const [created] = await db
+        .insert(golfTournaments)
+        .values(m)
+        .returning();
+      console.log(`  ✓ Inserted: ${m.name} (id=${created.id})`);
+      inserted++;
     }
 
-    const [created] = await db
-      .insert(golfTournaments)
-      .values(m)
-      .returning();
-
-    console.log(`  ✓ Inserted: ${m.name} (id=${created.id})`);
-    console.log(`      location:       ${m.location}`);
-    console.log(`      startsAt:       ${m.startsAt.toISOString()}`);
-    console.log(`      picksLockAt:    ${m.picksLockAt.toISOString()} (Thu 8am ET)`);
+    const t = existing || { id: "?" };
+    console.log(`      location:        ${m.location}`);
+    console.log(`      startsAt:        ${m.startsAt.toISOString()}`);
+    console.log(`      picksLockAt:     ${m.picksLockAt.toISOString()} (Thu 8am ET)`);
     console.log(`      oddsApiSportKey: ${m.oddsApiSportKey}`);
-    inserted++;
+    console.log(`      espnEventId:     ${m.espnEventId}`);
   }
 
-  console.log(`\n=== Done: ${inserted} inserted, ${skipped} skipped ===`);
+  console.log(`\n=== Done: ${inserted} inserted, ${updated} updated ===`);
   process.exit(0);
 }
 
