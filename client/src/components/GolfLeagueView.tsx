@@ -517,29 +517,46 @@ function SelectedPicksTray({
   selectedPlayerIds,
   allField,
   onToggle,
+  onSubmit,
+  isSubmitting,
+  hasSubmitted,
 }: {
   picksRequired: number;
   selectedPlayerIds: Set<number>;
   allField: GolfFieldEntry[];
   onToggle: (id: number) => void;
+  onSubmit: () => void;
+  isSubmitting: boolean;
+  hasSubmitted: boolean;
 }) {
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 640);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
   const selectedPlayers = Array.from(selectedPlayerIds)
     .map(id => allField.find(p => p.playerId === id))
     .filter(Boolean) as GolfFieldEntry[];
 
   const slots = Array.from({ length: picksRequired }, (_, i) => selectedPlayers[i] ?? null);
+  const allPicked = selectedPlayerIds.size === picksRequired;
 
   return (
     <div className="mb-1">
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
         My Picks ({selectedPlayerIds.size}/{picksRequired})
       </p>
-      <div className="flex sm:grid gap-2 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0" style={{ gridTemplateColumns: `repeat(${picksRequired}, minmax(0, 1fr))` }}>
+      <div
+        className="grid gap-2 grid-cols-2"
+        style={isMobile ? undefined : { gridTemplateColumns: `repeat(${picksRequired}, minmax(0, 1fr))` }}
+      >
         {slots.map((player, i) =>
           player ? (
             <div
               key={player.playerId}
-              className="relative bg-white border border-green-300 rounded-xl p-2 flex flex-col items-center gap-1 shadow-sm flex-shrink-0 w-28 sm:w-auto"
+              className="relative bg-white border border-green-300 rounded-xl p-2 flex flex-col items-center gap-1 shadow-sm"
             >
               {/* × button */}
               <button
@@ -583,7 +600,7 @@ function SelectedPicksTray({
           ) : (
             <div
               key={`empty-${i}`}
-              className="border-2 border-dashed border-gray-200 rounded-xl p-2 flex flex-col items-center justify-center gap-1 min-h-[100px] flex-shrink-0 w-28 sm:w-auto"
+              className="border-2 border-dashed border-gray-200 rounded-xl p-2 flex flex-col items-center justify-center gap-1 min-h-[100px]"
             >
               <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-bold text-gray-300">{i + 1}</span>
@@ -592,6 +609,23 @@ function SelectedPicksTray({
             </div>
           )
         )}
+      </div>
+
+      {/* Submit button in tray */}
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="text-sm text-gray-500">
+          {allPicked
+            ? "Ready to save your picks"
+            : `${picksRequired - selectedPlayerIds.size} more pick${picksRequired - selectedPlayerIds.size === 1 ? "" : "s"} needed`}
+        </p>
+        <Button
+          onClick={onSubmit}
+          disabled={!allPicked || isSubmitting}
+          size="sm"
+          className="flex-shrink-0"
+        >
+          {isSubmitting ? "Saving…" : hasSubmitted ? "Update Picks" : `Submit Picks`}
+        </Button>
       </div>
     </div>
   );
@@ -681,6 +715,9 @@ function PicksPanel({
           selectedPlayerIds={selectedPlayerIds}
           allField={allField}
           onToggle={onToggle}
+          onSubmit={onSubmit}
+          isSubmitting={isSubmitting}
+          hasSubmitted={!!hasSubmitted}
         />
       )}
 
