@@ -2916,7 +2916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/golf/tournaments/available', async (_req, res) => {
     try {
       const { golfTournaments } = await import("@shared/schema");
-      const { gt, asc, isNotNull } = await import("drizzle-orm");
+      const { gt, asc } = await import("drizzle-orm");
       const now = new Date();
       const available = await db
         .select()
