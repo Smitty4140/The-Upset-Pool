@@ -3042,6 +3042,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manually trigger the Sunday odds-pull for upcoming tournaments (super user only)
+  app.post('/api/golf/scheduler/pull-upcoming', isAuthenticated, isSuperUser, async (_req, res) => {
+    try {
+      const { golfScheduler } = await import('./golfScheduler.js');
+      const result = await golfScheduler.pullUpcomingTournamentFields();
+      const message = result.skipped
+        ? 'No upcoming tournaments found within the next 7 days'
+        : `Pulled ${result.pulled.length} tournament(s), ${result.failed.length} failed`;
+      res.json({ message, ...result });
+    } catch (error: any) {
+      console.error('Error triggering Sunday field pull:', error);
+      res.status(500).json({ message: error.message || 'Failed to trigger upcoming field pull' });
+    }
+  });
+
   // Get tournament field (public once published)
   app.get('/api/golf/tournaments/:id/field', async (req, res) => {
     try {
