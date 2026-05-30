@@ -518,6 +518,7 @@ function SelectedPicksTray({
   onSubmit,
   isSubmitting,
   hasSubmitted,
+  readOnly = false,
 }: {
   picksRequired: number;
   selectedPlayerIds: Set<number>;
@@ -526,6 +527,7 @@ function SelectedPicksTray({
   onSubmit: () => void;
   isSubmitting: boolean;
   hasSubmitted: boolean;
+  readOnly?: boolean;
 }) {
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 640);
   useEffect(() => {
@@ -556,14 +558,16 @@ function SelectedPicksTray({
               key={player.playerId}
               className="relative bg-white border border-green-300 rounded-xl p-2 flex flex-col items-center gap-1 shadow-sm"
             >
-              {/* × button */}
-              <button
-                onClick={() => onToggle(player.playerId)}
-                className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-600 transition-colors text-xs font-bold leading-none"
-                aria-label={`Remove ${player.name}`}
-              >
-                ×
-              </button>
+              {/* × button — hidden in read-only mode */}
+              {!readOnly && (
+                <button
+                  onClick={() => onToggle(player.playerId)}
+                  className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-600 transition-colors text-xs font-bold leading-none"
+                  aria-label={`Remove ${player.name}`}
+                >
+                  ×
+                </button>
+              )}
 
               {/* Photo */}
               <div className="w-10 h-10 rounded-full overflow-hidden bg-green-100 flex-shrink-0">
@@ -609,22 +613,24 @@ function SelectedPicksTray({
         )}
       </div>
 
-      {/* Submit button in tray */}
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <p className="text-sm text-gray-500">
-          {allPicked
-            ? "Ready to save your picks"
-            : `${picksRequired - selectedPlayerIds.size} more pick${picksRequired - selectedPlayerIds.size === 1 ? "" : "s"} needed`}
-        </p>
-        <Button
-          onClick={onSubmit}
-          disabled={!allPicked || isSubmitting}
-          size="sm"
-          className="flex-shrink-0"
-        >
-          {isSubmitting ? "Saving…" : hasSubmitted ? "Update Picks" : `Submit Picks`}
-        </Button>
-      </div>
+      {/* Submit button in tray — hidden in read-only mode */}
+      {!readOnly && (
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-gray-500">
+            {allPicked
+              ? "Ready to save your picks"
+              : `${picksRequired - selectedPlayerIds.size} more pick${picksRequired - selectedPlayerIds.size === 1 ? "" : "s"} needed`}
+          </p>
+          <Button
+            onClick={onSubmit}
+            disabled={!allPicked || isSubmitting}
+            size="sm"
+            className="flex-shrink-0"
+          >
+            {isSubmitting ? "Saving…" : hasSubmitted ? "Update Picks" : `Submit Picks`}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -643,15 +649,36 @@ function PicksPanel({
   // When locked and there are results (or tournament is live), show the tournament leaderboard
   if (isLocked && (hasResults || isLiveTournament)) {
     return (
-      <TournamentLeaderboard
-        tournamentResults={tournamentResults}
-        isLoading={isLoadingResults}
-        isLiveTournament={isLiveTournament}
-        myPickIds={myPickIds}
-        field={allField}
-        tournament={tournament}
-        hasSubmittedPicks={!!hasSubmitted}
-      />
+      <div className="space-y-4">
+        {/* My Picks tray — always visible once locked */}
+        {isAuthenticated && hasSubmitted && (
+          <SelectedPicksTray
+            picksRequired={picksRequired}
+            selectedPlayerIds={myPickIds}
+            allField={allField}
+            onToggle={() => {}}
+            onSubmit={() => {}}
+            isSubmitting={false}
+            hasSubmitted={true}
+            readOnly
+          />
+        )}
+        {isAuthenticated && !hasSubmitted && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
+            <p className="text-red-700 text-sm">You did not submit picks before the deadline.</p>
+          </div>
+        )}
+        <TournamentLeaderboard
+          tournamentResults={tournamentResults}
+          isLoading={isLoadingResults}
+          isLiveTournament={isLiveTournament}
+          myPickIds={myPickIds}
+          field={allField}
+          tournament={tournament}
+          hasSubmittedPicks={!!hasSubmitted}
+        />
+      </div>
     );
   }
 
