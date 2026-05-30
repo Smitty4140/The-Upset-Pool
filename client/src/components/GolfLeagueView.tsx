@@ -724,12 +724,19 @@ function PicksPanel({
   }
 
   if (allField.length === 0) {
+    const isUpcoming = tournament?.status === "upcoming";
     return (
-      <Card className="border-amber-200 bg-amber-50">
+      <Card className={isUpcoming ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}>
         <CardContent className="pt-6 text-center">
-          <Flag className="h-10 w-10 text-amber-400 mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-amber-800">Field not yet published</h3>
-          <p className="text-amber-700 mt-1">The tournament field and player rankings haven't been published yet. Check back soon.</p>
+          <Flag className={`h-10 w-10 mx-auto mb-3 ${isUpcoming ? "text-green-500" : "text-amber-400"}`} />
+          <h3 className={`text-lg font-semibold ${isUpcoming ? "text-green-800" : "text-amber-800"}`}>
+            {isUpcoming ? "Picks opening soon" : "Field not yet published"}
+          </h3>
+          <p className={`mt-1 ${isUpcoming ? "text-green-700" : "text-amber-700"}`}>
+            {isUpcoming
+              ? "Field and odds are pulled on the Sunday before the tournament begins. Check back then to make your picks."
+              : "The tournament field and player rankings haven't been published yet. Check back soon."}
+          </p>
         </CardContent>
       </Card>
     );
