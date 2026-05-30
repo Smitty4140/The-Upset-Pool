@@ -1,8 +1,8 @@
 import * as cron from 'node-cron';
 import { db } from './db.js';
 import { golfTournaments } from '../shared/schema.js';
-import { eq, and } from 'drizzle-orm';
-import { pullGolfScoresFromESPN } from './golfDataPuller.js';
+import { eq, and, gt, lte, isNotNull } from 'drizzle-orm';
+import { pullGolfScoresFromESPN, pullGolfFieldFromOddsAPI } from './golfDataPuller.js';
 import type { IStorage } from './storage.js';
 
 class GolfScheduler {
@@ -27,8 +27,57 @@ class GolfScheduler {
       await this.checkAndScheduleActiveTournaments();
     });
 
+    // Every Sunday at 8:00 AM ET: auto-pull field + odds for any tournament
+    // starting within the next 7 days (the week ahead).
+    cron.schedule('0 8 * * 0', async () => {
+      await this.pullUpcomingTournamentFields();
+    }, { timezone: 'America/New_York' });
+
     // Run immediately on startup
     this.checkAndScheduleActiveTournaments();
+  }
+
+  /**
+   * Find tournaments starting within the next 7 days and pull their field + odds.
+   * After a successful pull, status is set to 'active' so picks become available.
+   */
+  async pullUpcomingTournamentFields() {
+    try {
+      const now = new Date();
+      const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      const upcoming = await db
+        .select()
+        .from(golfTournaments)
+        .where(
+          and(
+            eq(golfTournaments.status, 'upcoming'),
+            gt(golfTournaments.startsAt, now),
+            lte(golfTournaments.startsAt, sevenDaysFromNow),
+            isNotNull(golfTournaments.oddsApiSportKey)
+          )
+        );
+
+      if (upcoming.length === 0) {
+        console.log('[GolfScheduler] Sunday check: no upcoming tournaments in next 7 days');
+        return;
+      }
+
+      for (const t of upcoming) {
+        console.log(`[GolfScheduler] ⏰ Sunday auto-pull: pulling field + odds for "${t.name}" (id=${t.id})`);
+        try {
+          await pullGolfFieldFromOddsAPI(t.id, this.storage);
+          await db.update(golfTournaments)
+            .set({ status: 'active', updatedAt: new Date() })
+            .where(eq(golfTournaments.id, t.id));
+          console.log(`[GolfScheduler] ✅ Field pulled + status → active for "${t.name}"`);
+        } catch (err) {
+          console.error(`[GolfScheduler] ❌ Failed to pull field for "${t.name}":`, err);
+        }
+      }
+    } catch (err) {
+      console.error('[GolfScheduler] Error in Sunday field pull:', err);
+    }
   }
 
   /**

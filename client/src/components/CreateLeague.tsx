@@ -61,9 +61,9 @@ export default function CreateLeague({ onLeagueCreated }: CreateLeagueProps) {
 
   const sportType = form.watch("sportType");
 
-  // Fetch golf tournaments when Golf is selected
+  // Fetch only upcoming tournaments (startsAt in the future) for league creation
   const { data: golfTournaments } = useQuery<GolfTournament[]>({
-    queryKey: ["/api/golf/tournaments"],
+    queryKey: ["/api/golf/tournaments/available"],
     enabled: sportType === "golf",
   });
 
