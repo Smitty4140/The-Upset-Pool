@@ -3042,10 +3042,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enrich field with ESPN photos + DataGolf OWGR rankings (super user only)
-  app.post('/api/golf/tournaments/:id/pull-enrichment', isAuthenticated, isSuperUser, async (req: any, res) => {
+  // Enrich field with ESPN photos + DataGolf OWGR rankings (super user OR league admin)
+  app.post('/api/golf/tournaments/:id/pull-enrichment', isAuthenticated, async (req: any, res) => {
     try {
       const tournamentId = parseInt(req.params.id);
+      const userId = req.user?.id || req.session?.userId;
+
+      // Allow super users; also allow admins of any league linked to this tournament
+      const userIsSuperUser = req.user?.isSuperUser || req.session?.isSuperUser;
+      if (!userIsSuperUser) {
+        // Find leagues tied to this tournament and check admin status
+        const { leagues: leaguesTable, leagueMembers } = await import('../shared/schema.js');
+        const linkedLeagues = await db
+          .select({ id: leaguesTable.id })
+          .from(leaguesTable)
+          .where(eq(leaguesTable.golfTournamentId, tournamentId));
+
+        let isLeagueAdmin = false;
+        for (const league of linkedLeagues) {
+          const member = await storage.getLeagueMember(league.id, userId);
+          if (member?.isAdmin && member?.isActive) {
+            isLeagueAdmin = true;
+            break;
+          }
+        }
+
+        if (!isLeagueAdmin) {
+          return res.status(403).json({ message: 'Only super users or league admins can refresh photos and rankings' });
+        }
+      }
+
       const { enrichGolfFieldWithESPNPhotos, enrichGolfFieldWithDataGolfOWGR } = await import('./golfDataPuller.js');
 
       const photoResult = await enrichGolfFieldWithESPNPhotos(tournamentId, storage).catch((err: any) => {

@@ -1839,7 +1839,7 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
           >
             League
           </Button>
-          {isSuperUser && (["field", "results", "settings"] as const).map(t => (
+          {(["field", "results", "settings"] as const).map(t => (
             <Button
               key={t}
               variant={adminTab === t ? "default" : "outline"}
@@ -1862,26 +1862,28 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
         {adminTab === "field" && (
           <div className="space-y-4">
 
-            {/* API pull */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
-              <p className="text-sm font-medium text-blue-900">Pull Field &amp; Odds from API</p>
-              <p className="text-xs text-blue-700">
-                Fetches the full tournament field and betting odds from The Odds API. Set the <strong>Odds API Sport Key</strong> in Settings first (e.g. <code>golf_pga_championship_winner</code>).
-              </p>
-              <Button
-                size="sm"
-                onClick={handlePullField}
-                disabled={isPullingField || !tournament.oddsApiSportKey}
-                title={!tournament.oddsApiSportKey ? "Set Odds API Sport Key in Settings first" : ""}
-              >
-                {isPullingField ? "Pulling..." : "Pull Field & Odds"}
-              </Button>
-              {!tournament.oddsApiSportKey && (
-                <p className="text-xs text-amber-600">⚠ No Odds API sport key configured — go to Settings to add one.</p>
-              )}
-            </div>
+            {/* API pull — super user only */}
+            {isSuperUser && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                <p className="text-sm font-medium text-blue-900">Pull Field &amp; Odds from API</p>
+                <p className="text-xs text-blue-700">
+                  Fetches the full tournament field and betting odds from The Odds API. Set the <strong>Odds API Sport Key</strong> in Settings first (e.g. <code>golf_pga_championship_winner</code>).
+                </p>
+                <Button
+                  size="sm"
+                  onClick={handlePullField}
+                  disabled={isPullingField || !tournament.oddsApiSportKey}
+                  title={!tournament.oddsApiSportKey ? "Set Odds API Sport Key in Settings first" : ""}
+                >
+                  {isPullingField ? "Pulling..." : "Pull Field & Odds"}
+                </Button>
+                {!tournament.oddsApiSportKey && (
+                  <p className="text-xs text-amber-600">⚠ No Odds API sport key configured — go to Settings to add one.</p>
+                )}
+              </div>
+            )}
 
-            {/* Photo + OWGR enrichment */}
+            {/* Photo + OWGR enrichment — all admins */}
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
               <p className="text-sm font-medium text-purple-900">Refresh Photos &amp; Rankings</p>
               <p className="text-xs text-purple-700">
@@ -1903,21 +1905,24 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
               )}
             </div>
 
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-1">Bulk add players manually</p>
-              <p className="text-xs text-gray-500 mb-2">
-                One player per line: <code>Name, Country, OWGR, Odds, PhotoURL</code> — Odds e.g. +1400; PhotoURL optional
-              </p>
-              <textarea
-                className="w-full border border-gray-200 rounded-lg p-3 text-sm font-mono h-36 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder={"Scottie Scheffler, USA, 1\nRory McIlroy, IRL, 2\nLocal Amateur, USA, Amateur"}
-                value={bulkInput}
-                onChange={e => setBulkInput(e.target.value)}
-              />
-              <Button onClick={handleBulkAddField} disabled={isAddingField || !bulkInput.trim()} className="mt-2">
-                {isAddingField ? "Adding..." : "Add to Field"}
-              </Button>
-            </div>
+            {/* Bulk add — super user only */}
+            {isSuperUser && (
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">Bulk add players manually</p>
+                <p className="text-xs text-gray-500 mb-2">
+                  One player per line: <code>Name, Country, OWGR, Odds, PhotoURL</code> — Odds e.g. +1400; PhotoURL optional
+                </p>
+                <textarea
+                  className="w-full border border-gray-200 rounded-lg p-3 text-sm font-mono h-36 resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder={"Scottie Scheffler, USA, 1\nRory McIlroy, IRL, 2\nLocal Amateur, USA, Amateur"}
+                  value={bulkInput}
+                  onChange={e => setBulkInput(e.target.value)}
+                />
+                <Button onClick={handleBulkAddField} disabled={isAddingField || !bulkInput.trim()} className="mt-2">
+                  {isAddingField ? "Adding..." : "Add to Field"}
+                </Button>
+              </div>
+            )}
 
             {field.length > 0 && (
               <div>
