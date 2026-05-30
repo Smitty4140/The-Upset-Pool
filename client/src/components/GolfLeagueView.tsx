@@ -1084,65 +1084,72 @@ interface GolferPickCardProps {
 
 function GolferPickCard({ pick, isLive }: GolferPickCardProps) {
   const hasResult = pick.resultStatus !== null;
-  const hasLiveScore = isLive && hasResult;
   const initials = pick.playerName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
+  // Card border / background
   let borderColor = "border-gray-200";
   let bgColor = "bg-white";
   if (pick.topTen) {
     borderColor = "border-green-400";
     bgColor = "bg-green-50";
-  } else if (hasLiveScore) {
+  } else if (isLive && hasResult) {
     borderColor = "border-blue-300";
     bgColor = "bg-blue-50";
   }
 
-  let positionBadge: JSX.Element | null = null;
+  // Position label for upper-right corner badge
+  let posLabel: string | null = null;
+  let posBadgeColor = "bg-gray-200 text-gray-600";
   if (hasResult) {
     if (pick.resultStatus === "finished" && pick.finalPosition !== null) {
-      const label = `T${pick.finalPosition}`;
-      positionBadge = (
-        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${pick.topTen ? "bg-green-200 text-green-800" : isLive ? "bg-blue-200 text-blue-800" : "bg-gray-200 text-gray-600"}`}>
-          {label}
-        </span>
-      );
+      posLabel = `T${pick.finalPosition}`;
+      posBadgeColor = pick.topTen
+        ? "bg-green-200 text-green-800"
+        : isLive
+          ? "bg-blue-200 text-blue-800"
+          : "bg-gray-200 text-gray-600";
     } else if (pick.resultStatus === "mc") {
-      positionBadge = <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700">CUT</span>;
+      posLabel = "CUT";
+      posBadgeColor = "bg-red-100 text-red-700";
     } else if (pick.resultStatus === "wd") {
-      positionBadge = <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">WD</span>;
+      posLabel = "WD";
     } else if (pick.resultStatus === "dq") {
-      positionBadge = <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">DQ</span>;
-    } else {
-      positionBadge = (
-        <span className="flex items-center gap-1 text-xs text-blue-600">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
-          </span>
-          Active
-        </span>
-      );
+      posLabel = "DQ";
     }
   }
 
+  // Points chip — green+bold if scoring, grey if not
+  const chipBg   = pick.topTen ? "bg-green-200"  : "bg-gray-200";
+  const chipText = pick.topTen ? "text-green-800 font-bold" : "text-gray-600 font-medium";
+  const chipValue = pick.topTen
+    ? pick.pointsEarned.toLocaleString()
+    : pick.pointValue.toLocaleString();
+
   return (
-    <div className={`flex flex-col items-center rounded-lg border p-1.5 w-full h-24 flex-shrink-0 ${bgColor} ${borderColor}`}>
+    <div className={`relative flex flex-col items-center rounded-lg border p-1.5 w-full h-24 flex-shrink-0 ${bgColor} ${borderColor}`}>
+      {/* Position badge — upper-right corner */}
+      {posLabel && (
+        <span className={`absolute top-1 right-1 text-[9px] font-bold px-1 py-0.5 rounded leading-none ${posBadgeColor}`}>
+          {posLabel}
+        </span>
+      )}
+
       <Avatar className="h-6 w-6 flex-shrink-0">
         {pick.photoUrl ? <AvatarImage src={pick.photoUrl} alt={pick.playerName} /> : null}
         <AvatarFallback className="text-[9px] font-semibold">{initials}</AvatarFallback>
       </Avatar>
-      {/* Name always reserves exactly 2 lines of height */}
+
+      {/* Name — always 2-line height */}
       <div className="h-7 w-full flex items-center justify-center mt-0.5">
-        <p className="text-[10px] font-medium text-gray-800 text-center leading-tight line-clamp-2 w-full">{pick.playerName}</p>
+        <p className="text-[10px] font-medium text-gray-800 text-center leading-tight line-clamp-2 w-full">
+          {pick.playerName}
+        </p>
       </div>
-      <p className="text-[10px] text-gray-400">{pick.pointValue.toLocaleString()}</p>
-      <div className="flex-1 flex items-center justify-center">
-        {positionBadge}
-        {!positionBadge && <span className="h-4" />}
-      </div>
-      {pick.topTen && (
-        <span className="text-[10px] font-bold text-green-700">{pick.pointsEarned.toLocaleString()} pts</span>
-      )}
+
+      {/* Points chip */}
+      <span className={`text-[10px] ${chipText} ${chipBg} px-1.5 py-0.5 rounded-full leading-none`}>
+        {chipValue}
+      </span>
     </div>
   );
 }
