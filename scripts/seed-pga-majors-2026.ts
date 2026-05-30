@@ -21,6 +21,20 @@ async function main() {
 
   const MAJORS = [
     {
+      name: "US Open 2026",
+      location: "Oakmont Country Club",
+      season: 2026,
+      // Starts Thursday June 18 — first tee ~7:00am UTC per ESPN
+      // picksLockAt = Thursday June 18 at 8:00am ET = 12:00 UTC
+      startsAt: new Date("2026-06-18T07:00:00.000Z"),
+      picksLockAt: new Date("2026-06-18T12:00:00.000Z"),
+      status: "upcoming" as const,
+      picksRequired: 4,
+      oddsApiSportKey: "golf_us_open_winner",
+      // ESPN event ID confirmed via site.api.espn.com 2026 PGA calendar
+      espnEventId: "401811952",
+    },
+    {
       name: "The Open Championship 2026",
       location: "Royal Portrush Golf Club",
       season: 2026,
