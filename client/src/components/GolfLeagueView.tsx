@@ -466,8 +466,8 @@ function GolferRow({
         </p>
       </td>
 
-      {/* OWGR */}
-      <td className="px-2 py-3 text-center w-20">
+      {/* OWGR — hidden on mobile to prevent horizontal scroll */}
+      <td className="hidden sm:table-cell px-2 py-3 text-center w-20">
         {player.owgrAtLock !== null ? (
           <span className={`text-sm font-bold ${isSelected ? "text-green-800" : "text-gray-700"}`}>
             #{player.owgrAtLock}
@@ -759,7 +759,7 @@ function PicksPanel({
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="pl-4 pr-2 py-2 w-12 text-left" />
                   <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Golfer</th>
-                  <th className="px-2 py-2 w-20 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">OWGR</th>
+                  <th className="hidden sm:table-cell px-2 py-2 w-20 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">OWGR</th>
                   <th className="px-2 py-2 w-20 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Pts</th>
                   <th className="pl-2 pr-4 py-2 w-24 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Pick</th>
                 </tr>
