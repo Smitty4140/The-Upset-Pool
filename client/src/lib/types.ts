@@ -108,6 +108,7 @@ export interface GolfLeaderboardEntry {
   picks: {
     playerId: number;
     playerName: string;
+    photoUrl: string | null;
     owgrAtLock: number | null;
     pointValue: number;
     topTen: boolean;
