@@ -41,7 +41,10 @@ class GolfScheduler {
    * Find tournaments starting within the next 7 days and pull their field + odds.
    * After a successful pull, status is set to 'active' so picks become available.
    */
-  async pullUpcomingTournamentFields() {
+  async pullUpcomingTournamentFields(): Promise<{ pulled: { id: number; name: string }[]; failed: { id: number; name: string; error: string }[]; skipped: boolean }> {
+    const pulled: { id: number; name: string }[] = [];
+    const failed: { id: number; name: string; error: string }[] = [];
+
     try {
       const now = new Date();
       const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -60,7 +63,7 @@ class GolfScheduler {
 
       if (upcoming.length === 0) {
         console.log('[GolfScheduler] Sunday check: no upcoming tournaments in next 7 days');
-        return;
+        return { pulled, failed, skipped: true };
       }
 
       for (const t of upcoming) {
@@ -71,13 +74,17 @@ class GolfScheduler {
             .set({ status: 'active', updatedAt: new Date() })
             .where(eq(golfTournaments.id, t.id));
           console.log(`[GolfScheduler] ✅ Field pulled + status → active for "${t.name}"`);
-        } catch (err) {
+          pulled.push({ id: t.id, name: t.name });
+        } catch (err: any) {
           console.error(`[GolfScheduler] ❌ Failed to pull field for "${t.name}":`, err);
+          failed.push({ id: t.id, name: t.name, error: err?.message || 'Unknown error' });
         }
       }
     } catch (err) {
       console.error('[GolfScheduler] Error in Sunday field pull:', err);
     }
+
+    return { pulled, failed, skipped: false };
   }
 
   /**
