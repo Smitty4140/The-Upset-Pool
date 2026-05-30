@@ -126,7 +126,7 @@ export interface IStorage {
 
   // Golf Results operations
   getGolfResults(tournamentId: number): Promise<(any & { player: GolfPlayer })[]>;
-  upsertGolfResults(tournamentId: number, results: { playerId: number; finalPosition: number | null; status: string }[]): Promise<void>;
+  upsertGolfResults(tournamentId: number, results: { playerId: number; finalPosition: number | null; status: string; scoreToPar?: number | null }[]): Promise<void>;
 
   // Golf Leaderboard
   getGolfLeaderboard(leagueId: number, tournamentId: number): Promise<GolfLeaderboardEntry[]>;
@@ -1379,6 +1379,7 @@ export class DatabaseStorage implements IStorage {
         finalPosition: golfResults.finalPosition,
         status: golfResults.status,
         topTen: golfResults.topTen,
+        scoreToPar: golfResults.scoreToPar,
         player: golfPlayers,
       })
       .from(golfResults)
@@ -1390,16 +1391,18 @@ export class DatabaseStorage implements IStorage {
 
   async upsertGolfResults(
     tournamentId: number,
-    results: { playerId: number; finalPosition: number | null; status: string }[]
+    results: { playerId: number; finalPosition: number | null; status: string; scoreToPar?: number | null }[]
   ): Promise<void> {
     for (const r of results) {
-      const topTen = r.status === 'finished' && r.finalPosition !== null && r.finalPosition <= 10;
+      // topTen is true whenever the player has a position <= 10 (live or final)
+      const topTen = r.finalPosition !== null && r.finalPosition <= 10;
+      const scoreToPar = r.scoreToPar ?? null;
       await db
         .insert(golfResults)
-        .values({ tournamentId, playerId: r.playerId, finalPosition: r.finalPosition, status: r.status, topTen })
+        .values({ tournamentId, playerId: r.playerId, finalPosition: r.finalPosition, status: r.status, topTen, scoreToPar })
         .onConflictDoUpdate({
           target: [golfResults.tournamentId, golfResults.playerId],
-          set: { finalPosition: r.finalPosition, status: r.status, topTen },
+          set: { finalPosition: r.finalPosition, status: r.status, topTen, scoreToPar },
         });
     }
   }
@@ -1440,13 +1443,13 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(golfPicks.leagueId, leagueId), eq(golfPicks.tournamentId, tournamentId)));
 
     // Get all results for this tournament
-    const resultsMap = new Map<number, { topTen: boolean; status: string; finalPosition: number | null }>();
+    const resultsMap = new Map<number, { topTen: boolean; status: string; finalPosition: number | null; scoreToPar: number | null }>();
     const results = await db
       .select()
       .from(golfResults)
       .where(eq(golfResults.tournamentId, tournamentId));
     for (const r of results) {
-      resultsMap.set(r.playerId, { topTen: r.topTen, status: r.status, finalPosition: r.finalPosition });
+      resultsMap.set(r.playerId, { topTen: r.topTen, status: r.status, finalPosition: r.finalPosition, scoreToPar: r.scoreToPar ?? null });
     }
 
     // Group picks by user
@@ -1473,6 +1476,7 @@ export class DatabaseStorage implements IStorage {
           pointsEarned: topTen ? pointValue : 0,
           resultStatus: result?.status ?? null,
           finalPosition: result?.finalPosition ?? null,
+          scoreToPar: result?.scoreToPar ?? null,
         };
       });
 
