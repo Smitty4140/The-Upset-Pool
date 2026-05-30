@@ -156,12 +156,12 @@ export default function GolfLeagueView({ leagueId, league, isSuperUser, isAdmin 
     if (sortBy === "name") {
       list.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortBy === "odds") {
-      // Sort by odds descending (highest point value = highest odds = first), nulls last
+      // Sort by odds ascending (lowest point value = favorites = first), nulls last
       list.sort((a, b) => {
         if (a.odds === null && b.odds === null) return a.name.localeCompare(b.name);
         if (a.odds === null) return 1;
         if (b.odds === null) return -1;
-        return b.odds - a.odds;
+        return a.odds - b.odds;
       });
     } else {
       // Sort by OWGR (ranked players first, then amateurs/no-OWGR)
@@ -477,17 +477,6 @@ function GolferRow({
         )}
       </td>
 
-      {/* Odds */}
-      <td className="px-2 py-3 text-center w-24">
-        {player.odds !== null ? (
-          <span className={`text-sm font-bold ${isSelected ? "text-green-700" : "text-blue-600"}`}>
-            {formatOdds(player.odds)}
-          </span>
-        ) : (
-          <span className="text-xs text-gray-400">—</span>
-        )}
-      </td>
-
       {/* Pts */}
       <td className="px-2 py-3 text-center w-20">
         <span className={`text-sm font-bold ${player.pointValue > 0 ? (isSelected ? "text-green-800" : "text-gray-700") : "text-gray-400"}`}>
@@ -648,7 +637,6 @@ function PicksPanel({
                   <th className="pl-4 pr-2 py-2 w-12 text-left" />
                   <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Golfer</th>
                   <th className="px-2 py-2 w-20 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">OWGR</th>
-                  <th className="px-2 py-2 w-24 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Odds</th>
                   <th className="px-2 py-2 w-20 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Pts</th>
                   <th className="pl-2 pr-4 py-2 w-24 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Pick</th>
                 </tr>
