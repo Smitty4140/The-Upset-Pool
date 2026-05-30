@@ -1426,6 +1426,7 @@ export class DatabaseStorage implements IStorage {
         userId: golfPicks.userId,
         playerId: golfPickSelections.playerId,
         playerName: golfPlayers.name,
+        photoUrl: golfPlayers.photoUrl,
         owgrAtLock: golfTournamentField.owgrAtLock,
         odds: golfTournamentField.odds,
       })
@@ -1465,6 +1466,7 @@ export class DatabaseStorage implements IStorage {
         return {
           playerId: p.playerId,
           playerName: p.playerName,
+          photoUrl: p.photoUrl ?? null,
           owgrAtLock: p.owgrAtLock,
           pointValue,
           topTen,

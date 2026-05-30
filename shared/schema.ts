@@ -411,6 +411,7 @@ export type GolfLeaderboardEntry = {
   picks: {
     playerId: number;
     playerName: string;
+    photoUrl: string | null;
     owgrAtLock: number | null;
     pointValue: number; // positive odds value, or 0 if odds <= 0 or null
     topTen: boolean;

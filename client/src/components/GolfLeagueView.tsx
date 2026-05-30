@@ -21,8 +21,6 @@ import {
   CheckCircle2,
   Trophy,
   Lock,
-  ChevronUp,
-  ChevronDown,
   MapPin,
   Calendar,
   Users,
@@ -1077,6 +1075,78 @@ function TournamentLeaderboard({
   );
 }
 
+// ─── Inline Golfer Pick Card ─────────────────────────────────────────────────
+
+interface GolferPickCardProps {
+  pick: GolfLeaderboardEntry["picks"][number];
+  isLive: boolean;
+}
+
+function GolferPickCard({ pick, isLive }: GolferPickCardProps) {
+  const hasResult = pick.resultStatus !== null;
+  const hasLiveScore = isLive && hasResult;
+  const initials = pick.playerName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+  let borderColor = "border-gray-200";
+  let bgColor = "bg-white";
+  if (pick.topTen) {
+    borderColor = "border-green-400";
+    bgColor = "bg-green-50";
+  } else if (hasLiveScore) {
+    borderColor = "border-blue-300";
+    bgColor = "bg-blue-50";
+  }
+
+  let positionBadge: JSX.Element | null = null;
+  if (hasResult) {
+    if (pick.resultStatus === "finished" && pick.finalPosition !== null) {
+      const label = `T${pick.finalPosition}`;
+      positionBadge = (
+        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${pick.topTen ? "bg-green-200 text-green-800" : isLive ? "bg-blue-200 text-blue-800" : "bg-gray-200 text-gray-600"}`}>
+          {label}
+        </span>
+      );
+    } else if (pick.resultStatus === "mc") {
+      positionBadge = <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700">CUT</span>;
+    } else if (pick.resultStatus === "wd") {
+      positionBadge = <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">WD</span>;
+    } else if (pick.resultStatus === "dq") {
+      positionBadge = <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">DQ</span>;
+    } else {
+      positionBadge = (
+        <span className="flex items-center gap-1 text-xs text-blue-600">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+          </span>
+          Active
+        </span>
+      );
+    }
+  }
+
+  return (
+    <div className={`flex flex-col items-center rounded-lg border p-1.5 w-full h-24 flex-shrink-0 ${bgColor} ${borderColor}`}>
+      <Avatar className="h-6 w-6 flex-shrink-0">
+        {pick.photoUrl ? <AvatarImage src={pick.photoUrl} alt={pick.playerName} /> : null}
+        <AvatarFallback className="text-[9px] font-semibold">{initials}</AvatarFallback>
+      </Avatar>
+      {/* Name always reserves exactly 2 lines of height */}
+      <div className="h-7 w-full flex items-center justify-center mt-0.5">
+        <p className="text-[10px] font-medium text-gray-800 text-center leading-tight line-clamp-2 w-full">{pick.playerName}</p>
+      </div>
+      <p className="text-[10px] text-gray-400">{pick.pointValue.toLocaleString()}</p>
+      <div className="flex-1 flex items-center justify-center">
+        {positionBadge}
+        {!positionBadge && <span className="h-4" />}
+      </div>
+      {pick.topTen && (
+        <span className="text-[10px] font-bold text-green-700">{pick.pointsEarned.toLocaleString()} pts</span>
+      )}
+    </div>
+  );
+}
+
 // ─── Leaderboard Panel ───────────────────────────────────────────────────────
 
 interface LeaderboardPanelProps {
@@ -1088,7 +1158,6 @@ interface LeaderboardPanelProps {
 }
 
 function LeaderboardPanel({ leaderboard, isLoading, hasResults, currentUserId, tournament }: LeaderboardPanelProps) {
-  const [expanded, setExpanded] = useState<string | null>(null);
   const isLive = tournament?.status === "active";
 
   const lastUpdatedText = tournament?.lastPollAt
@@ -1124,7 +1193,7 @@ function LeaderboardPanel({ leaderboard, isLoading, hasResults, currentUserId, t
     return (
       <div className="space-y-3">
         {liveBanner}
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}
       </div>
     );
   }
@@ -1173,117 +1242,143 @@ function LeaderboardPanel({ leaderboard, isLoading, hasResults, currentUserId, t
           </h3>
         </div>
 
-        <div className="divide-y divide-gray-100">
+        {/* ── Mobile: stacked cards with 2×2 pick grid ── */}
+        <div className="md:hidden divide-y divide-gray-100">
           {leaderboard.map(entry => {
             const isCurrentUser = entry.userId === currentUserId;
-            const isExpanded = expanded === entry.userId;
+            const sortedPicks = [...entry.picks].sort((a, b) => a.pointValue - b.pointValue);
+            const possiblePoints = entry.picks.reduce((sum, p) => sum + p.pointValue, 0);
 
             return (
-              <div key={entry.userId} className={isCurrentUser ? "bg-blue-50/50" : ""}>
-                <button
-                  onClick={() => setExpanded(isExpanded ? null : entry.userId)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
-                >
-                  {/* Rank */}
-                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+              <div key={entry.userId} className={`p-4 ${isCurrentUser ? "bg-blue-50/60" : ""}`}>
+                {/* Header row: rank + avatar + name + points */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0
                     ${entry.rank === 1 ? "bg-yellow-400 text-yellow-900"
                       : entry.rank === 2 ? "bg-gray-300 text-gray-700"
                         : entry.rank === 3 ? "bg-amber-600 text-white"
                           : "bg-gray-100 text-gray-600"}`}>
                     {entry.rank}
                   </div>
-
-                  {/* Avatar + name */}
-                  <Avatar className="h-8 w-8 flex-shrink-0">
-                    <AvatarImage src={entry.profileImageUrl || ""} />
-                    <AvatarFallback className="text-xs">
-                      {(entry.nickname || entry.username || "?").slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900 truncate">
-                        {entry.nickname || entry.username}
-                      </span>
-                      {isCurrentUser && <Badge variant="secondary" className="text-xs">You</Badge>}
-                    </div>
-                    {hasResults && entry.tiebreakerOdds !== null && (
-                      <p className="text-xs text-gray-400">Tiebreaker: +{entry.tiebreakerOdds} odds</p>
-                    )}
-                  </div>
-
-                  {/* Points */}
-                  <div className="flex-shrink-0 flex items-center gap-2">
-                    <span className="text-lg font-bold text-gray-900">{entry.totalPoints}</span>
-                    <span className="text-xs text-gray-500">pts</span>
-                    {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
-                  </div>
-                </button>
-
-                {/* Expanded picks breakdown */}
-                {isExpanded && (
-                  <div className="px-4 pb-4">
-                    <div className="ml-11 space-y-2">
-                      {entry.picks.length === 0 ? (
-                        <p className="text-sm text-gray-500 italic">No picks submitted</p>
-                      ) : (
-                        entry.picks.map(pick => {
-                          const hasLiveScore = isLive && pick.resultStatus !== null;
-                          const rowBg = pick.topTen
-                            ? "bg-green-100"
-                            : hasLiveScore
-                              ? "bg-blue-50"
-                              : "bg-gray-50";
-
-                          return (
-                            <div key={pick.playerId}
-                              className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm ${rowBg}`}
-                            >
-                              <div className="flex items-center gap-2">
-                                {pick.topTen && <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />}
-                                {hasLiveScore && !pick.topTen && (
-                                  <span className="relative flex h-2 w-2 flex-shrink-0">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
-                                  </span>
-                                )}
-                                <span className={pick.topTen ? "font-medium text-green-800" : hasLiveScore ? "font-medium text-blue-900" : "text-gray-700"}>
-                                  {pick.playerName}
-                                </span>
-                                {pick.owgrAtLock === null && (
-                                  <Badge variant="secondary" className="text-xs">Amateur</Badge>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 text-right flex-shrink-0">
-                                {pick.resultStatus ? (
-                                  <>
-                                    {pick.resultStatus === 'finished' && pick.finalPosition && (
-                                      <span className={`text-xs font-medium ${isLive ? "text-blue-600" : "text-gray-500"}`}>
-                                        {isLive ? "Pos " : "T"}{pick.finalPosition}
-                                        {isLive && <span className="ml-1 text-blue-400 italic text-xs">(live)</span>}
-                                      </span>
-                                    )}
-                                    {pick.resultStatus !== 'finished' && (
-                                      <span className="text-gray-400 text-xs uppercase">{pick.resultStatus}</span>
-                                    )}
-                                    <span className={`font-bold ${pick.topTen ? "text-green-700" : isLive ? "text-blue-600" : "text-gray-400"}`}>
-                                      {pick.pointsEarned > 0 ? `+${pick.pointsEarned}` : "0"} pts
-                                    </span>
-                                  </>
-                                ) : (
-                                  <span className="text-gray-400 text-xs">{pick.pointValue} pts possible</span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium text-gray-900 text-sm truncate">{entry.nickname || entry.username}</span>
+                      {isCurrentUser && <Badge variant="secondary" className="text-xs py-0">You</Badge>}
                     </div>
                   </div>
-                )}
+                  <div className="flex-shrink-0 text-right">
+                    <p className={`text-xl font-bold leading-none ${entry.totalPoints > 0 ? "text-green-700" : "text-gray-400"}`}>
+                      {entry.totalPoints.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">{possiblePoints.toLocaleString()} possible</p>
+                  </div>
+                </div>
+
+                {/* 2×2 pick grid */}
+                <div className="grid grid-cols-2 gap-2">
+                  {Array.from({ length: 4 }).map((_, i) => {
+                    const pick = sortedPicks[i];
+                    return pick ? (
+                      <GolferPickCard key={i} pick={pick} isLive={isLive} />
+                    ) : (
+                      <div key={i} className="h-24 rounded-lg border border-dashed border-gray-200 flex items-center justify-center">
+                        <span className="text-xs text-gray-300">—</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
+        </div>
+
+        {/* ── Desktop: horizontally scrollable table ── */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full min-w-max border-collapse">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-100 bg-gray-50/60">
+                <th className="text-left px-4 py-2 font-medium w-10">Place</th>
+                <th className="text-left px-3 py-2 font-medium w-36">Pooler</th>
+                <th className="text-center px-2 py-2 font-medium" colSpan={4}>Picks (favorites → longshots)</th>
+                <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Possible</th>
+                <th className="text-right px-4 py-2 font-medium whitespace-nowrap">Points</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {leaderboard.map(entry => {
+                const isCurrentUser = entry.userId === currentUserId;
+                const sortedPicks = [...entry.picks].sort((a, b) => a.pointValue - b.pointValue);
+                const possiblePoints = entry.picks.reduce((sum, p) => sum + p.pointValue, 0);
+
+                return (
+                  <tr
+                    key={entry.userId}
+                    className={`align-middle ${isCurrentUser ? "bg-blue-50/60" : "hover:bg-gray-50/50"} transition-colors`}
+                  >
+                    {/* Rank */}
+                    <td className="px-4 py-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0
+                        ${entry.rank === 1 ? "bg-yellow-400 text-yellow-900"
+                          : entry.rank === 2 ? "bg-gray-300 text-gray-700"
+                            : entry.rank === 3 ? "bg-amber-600 text-white"
+                              : "bg-gray-100 text-gray-600"}`}>
+                        {entry.rank}
+                      </div>
+                    </td>
+
+                    {/* User */}
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Avatar className="h-8 w-8 flex-shrink-0">
+                          <AvatarImage src={entry.profileImageUrl || ""} />
+                          <AvatarFallback className="text-xs">
+                            {(entry.nickname || entry.username || "?").slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-medium text-gray-900 text-sm truncate max-w-24">
+                              {entry.nickname || entry.username}
+                            </span>
+                            {isCurrentUser && <Badge variant="secondary" className="text-xs py-0">You</Badge>}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* 4 Pick cards (sorted lowest → highest point value) */}
+                    {Array.from({ length: 4 }).map((_, i) => {
+                      const pick = sortedPicks[i];
+                      return (
+                        <td key={i} className="px-1.5 py-3 w-28">
+                          {pick ? (
+                            <GolferPickCard pick={pick} isLive={isLive} />
+                          ) : (
+                            <div className="w-full h-24 rounded-lg border border-dashed border-gray-200 flex items-center justify-center">
+                              <span className="text-xs text-gray-300">—</span>
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+
+                    {/* Possible Points */}
+                    <td className="px-3 py-3 text-right">
+                      <p className="text-sm font-semibold text-gray-700">{possiblePoints.toLocaleString()}</p>
+                      <p className="text-xs text-gray-400">possible</p>
+                    </td>
+
+                    {/* Current Points */}
+                    <td className="px-4 py-3 text-right">
+                      <span className={`text-xl font-bold ${entry.totalPoints > 0 ? "text-green-700" : "text-gray-400"}`}>
+                        {entry.totalPoints.toLocaleString()}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
