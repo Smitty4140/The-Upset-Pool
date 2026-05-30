@@ -1639,6 +1639,7 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
   const [bulkInput, setBulkInput] = useState("");
   const [isAddingField, setIsAddingField] = useState(false);
   const [isPullingField, setIsPullingField] = useState(false);
+  const [isPullingEnrichment, setIsPullingEnrichment] = useState(false);
 
   // Results entry state
   const [resultInputs, setResultInputs] = useState<Record<number, { position: string; status: string }>>({});
@@ -1719,6 +1720,19 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
       toast({ title: "Pull failed", description: err.message, variant: "destructive" });
     }
     setIsPullingField(false);
+  };
+
+  const handlePullEnrichment = async () => {
+    setIsPullingEnrichment(true);
+    try {
+      const res = await apiRequest("POST", `/api/golf/tournaments/${tournamentId}/pull-enrichment`, {});
+      const data = await res.json();
+      toast({ title: "Photos & rankings refreshed", description: data.message });
+      onFieldUpdated();
+    } catch (err: any) {
+      toast({ title: "Enrichment failed", description: err.message, variant: "destructive" });
+    }
+    setIsPullingEnrichment(false);
   };
 
   const handlePullResults = async () => {
@@ -1864,6 +1878,28 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
               </Button>
               {!tournament.oddsApiSportKey && (
                 <p className="text-xs text-amber-600">⚠ No Odds API sport key configured — go to Settings to add one.</p>
+              )}
+            </div>
+
+            {/* Photo + OWGR enrichment */}
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
+              <p className="text-sm font-medium text-purple-900">Refresh Photos &amp; Rankings</p>
+              <p className="text-xs text-purple-700">
+                Pulls player headshots from ESPN and world rankings (OWGR) from DataGolf. Run this after pulling the field. Requires the ESPN Event ID in Settings. OWGR also requires a <code>DATAGOLF_API_KEY</code> server secret (free at datagolf.com) — photos will still be pulled without it.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-purple-300 text-purple-800 hover:bg-purple-100"
+                onClick={handlePullEnrichment}
+                disabled={isPullingEnrichment || !tournament.espnEventId}
+                title={!tournament.espnEventId ? "Set ESPN Event ID in Settings first" : ""}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isPullingEnrichment ? "animate-spin" : ""}`} />
+                {isPullingEnrichment ? "Refreshing..." : "Refresh Photos & Rankings"}
+              </Button>
+              {!tournament.espnEventId && (
+                <p className="text-xs text-amber-600">⚠ No ESPN Event ID configured — go to Settings to add one.</p>
               )}
             </div>
 

@@ -99,6 +99,116 @@ export async function pullGolfFieldFromOddsAPI(tournamentId: number, storage: IS
 }
 
 /**
+ * Enrich the tournament field with ESPN headshot photos.
+ * Queries the ESPN scoreboard for the event, matches players by normalised name,
+ * and updates golf_players.photo_url with the ESPN headshot CDN URL.
+ */
+export async function enrichGolfFieldWithESPNPhotos(tournamentId: number, storage: IStorage): Promise<{ updated: number; skipped: number }> {
+  console.log(`[GolfDataPuller] Starting ESPN photo enrichment for tournament ${tournamentId}...`);
+
+  const tournament = await storage.getGolfTournament(tournamentId);
+  if (!tournament) throw new Error(`Tournament ${tournamentId} not found`);
+  if (!tournament.espnEventId) throw new Error('Tournament has no espnEventId configured — cannot enrich photos');
+
+  const url = `https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard?event=${tournament.espnEventId}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`ESPN API error: ${res.status} ${res.statusText}`);
+
+  const data: any = await res.json();
+  const espnEvent = data.events?.[0];
+  if (!espnEvent) throw new Error('No events returned from ESPN scoreboard');
+
+  const competition = espnEvent.competitions?.[0];
+  const competitors: any[] = competition?.competitors ?? [];
+  console.log(`[GolfDataPuller] ESPN returned ${competitors.length} competitors for photo enrichment`);
+
+  // Build normalised name → competitor.id from ESPN response
+  const espnIdMap = new Map<string, string>();
+  for (const competitor of competitors) {
+    const displayName: string = competitor.athlete?.displayName ?? '';
+    const competitorId: string = competitor.id ?? '';
+    if (displayName && competitorId) {
+      espnIdMap.set(normaliseName(displayName), competitorId);
+    }
+  }
+
+  const field = await storage.getGolfTournamentField(tournamentId);
+  let updated = 0;
+  let skipped = 0;
+
+  for (const entry of field) {
+    const espnId = espnIdMap.get(normaliseName(entry.name));
+    if (!espnId) {
+      skipped++;
+      continue;
+    }
+    const photoUrl = `https://a.espncdn.com/i/headshots/golf/players/full/${espnId}.png`;
+    await db.update(golfPlayers)
+      .set({ photoUrl })
+      .where(eq(golfPlayers.id, entry.playerId));
+    updated++;
+  }
+
+  console.log(`[GolfDataPuller] ✅ ESPN photo enrichment complete — updated: ${updated}, skipped: ${skipped}`);
+  return { updated, skipped };
+}
+
+/**
+ * Enrich the tournament field with OWGR rankings from DataGolf's free API.
+ * Requires DATAGOLF_API_KEY env var — skips gracefully if not set.
+ * Updates golf_tournament_field.owgr_at_lock for matched players.
+ */
+export async function enrichGolfFieldWithDataGolfOWGR(tournamentId: number, storage: IStorage): Promise<{ updated: number; skipped: number }> {
+  console.log(`[GolfDataPuller] Starting DataGolf OWGR enrichment for tournament ${tournamentId}...`);
+
+  const apiKey = process.env.DATAGOLF_API_KEY;
+  if (!apiKey) {
+    console.warn('[GolfDataPuller] DATAGOLF_API_KEY not set — skipping OWGR enrichment');
+    return { updated: 0, skipped: 0 };
+  }
+
+  const url = `https://feeds.datagolf.com/field-updates?tour=pga&file_format=json&key=${apiKey}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`DataGolf API error: ${res.status} ${res.statusText}`);
+
+  const data: any = await res.json();
+  const dgPlayers: any[] = data.field ?? [];
+  console.log(`[GolfDataPuller] DataGolf returned ${dgPlayers.length} players for OWGR enrichment`);
+
+  // Build normalised name → OWGR rank from DataGolf
+  const owgrMap = new Map<string, number>();
+  for (const p of dgPlayers) {
+    const name: string = p.player_name ?? '';
+    const owgr: number | null = p.owgr ?? null;
+    if (name && owgr !== null) {
+      owgrMap.set(normaliseName(name), owgr);
+    }
+  }
+
+  const field = await storage.getGolfTournamentField(tournamentId);
+  let updated = 0;
+  let skipped = 0;
+
+  for (const entry of field) {
+    const owgr = owgrMap.get(normaliseName(entry.name));
+    if (owgr === undefined) {
+      skipped++;
+      continue;
+    }
+    await db.update(golfTournamentField)
+      .set({ owgrAtLock: owgr })
+      .where(and(
+        eq(golfTournamentField.tournamentId, tournamentId),
+        eq(golfTournamentField.playerId, entry.playerId)
+      ));
+    updated++;
+  }
+
+  console.log(`[GolfDataPuller] ✅ DataGolf OWGR enrichment complete — updated: ${updated}, skipped: ${skipped}`);
+  return { updated, skipped };
+}
+
+/**
  * Pull live / final scores from ESPN's unofficial scoreboard API.
  * Upserts golf_results for matched players.
  * Returns { espnState, matched, skipped, total }.
