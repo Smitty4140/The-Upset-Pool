@@ -144,7 +144,7 @@ export async function pullGolfScoresFromESPN(tournamentId: number, storage: ISto
     playersByNormName.set(normaliseName(entry.name), entry.playerId);
   }
 
-  const resultsToUpsert: { playerId: number; finalPosition: number | null; status: string }[] = [];
+  const resultsToUpsert: { playerId: number; finalPosition: number | null; status: string; scoreToPar: number | null }[] = [];
   let matched = 0;
   let skipped = 0;
 
@@ -171,7 +171,31 @@ export async function pullGolfScoresFromESPN(tournamentId: number, storage: ISto
       status = 'finished';
     }
 
-    resultsToUpsert.push({ playerId, finalPosition, status });
+    // Extract score-to-par: ESPN provides this as competitor.score or competitor.statistics
+    // Try competitor.score.value first (cumulative score), then linescores sum
+    let scoreToPar: number | null = null;
+    const scoreValue = competitor.score?.value;
+    if (scoreValue !== undefined && scoreValue !== null && scoreValue !== '') {
+      const parsed = parseInt(String(scoreValue), 10);
+      if (!isNaN(parsed)) {
+        scoreToPar = parsed;
+      }
+    }
+    // Fallback: sum up linescore values
+    if (scoreToPar === null && competitor.linescores && competitor.linescores.length > 0) {
+      let total = 0;
+      let hasScore = false;
+      for (const ls of competitor.linescores) {
+        const v = ls.value;
+        if (v !== undefined && v !== null && v !== '' && !isNaN(Number(v))) {
+          total += Number(v);
+          hasScore = true;
+        }
+      }
+      if (hasScore) scoreToPar = total;
+    }
+
+    resultsToUpsert.push({ playerId, finalPosition, status, scoreToPar });
     matched++;
   }
 

@@ -214,8 +214,9 @@ export const golfResults = pgTable("golf_results", {
   tournamentId: integer("tournament_id").notNull().references(() => golfTournaments.id),
   playerId: integer("player_id").notNull().references(() => golfPlayers.id),
   finalPosition: integer("final_position"), // nullable — MC/WD/DQ have no position
-  status: varchar("status").default("finished").notNull(), // 'finished' | 'mc' | 'wd' | 'dq'
-  topTen: boolean("top_ten").default(false).notNull(), // auto-set: status='finished' AND finalPosition <= 10
+  status: varchar("status").default("finished").notNull(), // 'finished' | 'mc' | 'wd' | 'dq' | 'in_progress'
+  topTen: boolean("top_ten").default(false).notNull(), // auto-set: finalPosition <= 10 (live or final)
+  scoreToPar: integer("score_to_par"), // e.g. -3, 0, +2; null = not yet available
 }, (table) => ({
   tournamentPlayerResultUnique: unique().on(table.tournamentId, table.playerId),
 }));
@@ -416,8 +417,9 @@ export type GolfLeaderboardEntry = {
     pointValue: number; // positive odds value, or 0 if odds <= 0 or null
     topTen: boolean;
     pointsEarned: number; // pointValue if topTen, else 0
-    resultStatus: string | null; // 'finished' | 'mc' | 'wd' | 'dq' | null (no result yet)
+    resultStatus: string | null; // 'finished' | 'mc' | 'wd' | 'dq' | 'in_progress' | null (no result yet)
     finalPosition: number | null;
+    scoreToPar: number | null; // e.g. -3, 0, +2; null = not yet available
   }[];
   tiebreakerOdds: number | null; // highest odds value among top-10 picks (for display)
   rank: number;

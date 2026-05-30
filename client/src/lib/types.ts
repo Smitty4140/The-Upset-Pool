@@ -79,8 +79,9 @@ export interface GolfResult {
   tournamentId: number;
   playerId: number;
   finalPosition: number | null;
-  status: string; // 'finished' | 'mc' | 'wd' | 'dq'
+  status: string; // 'finished' | 'mc' | 'wd' | 'dq' | 'in_progress'
   topTen: boolean;
+  scoreToPar: number | null;
   player: {
     id: number;
     name: string;
@@ -115,6 +116,7 @@ export interface GolfLeaderboardEntry {
     pointsEarned: number;
     resultStatus: string | null;
     finalPosition: number | null;
+    scoreToPar: number | null;
   }[];
   tiebreakerOdds: number | null;
   rank: number;

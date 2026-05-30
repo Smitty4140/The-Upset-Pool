@@ -519,6 +519,8 @@ function SelectedPicksTray({
   isSubmitting,
   hasSubmitted,
   readOnly = false,
+  leaderboardPicks,
+  isLive = false,
 }: {
   picksRequired: number;
   selectedPlayerIds: Set<number>;
@@ -528,6 +530,8 @@ function SelectedPicksTray({
   isSubmitting: boolean;
   hasSubmitted: boolean;
   readOnly?: boolean;
+  leaderboardPicks?: GolfLeaderboardEntry["picks"];
+  isLive?: boolean;
 }) {
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 640);
   useEffect(() => {
@@ -552,7 +556,12 @@ function SelectedPicksTray({
         className="grid gap-2 grid-cols-2"
         style={isMobile ? undefined : { gridTemplateColumns: `repeat(${picksRequired}, minmax(0, 1fr))` }}
       >
-        {slots.map((player, i) =>
+        {/* When locked with results, use the same card design as the leaderboard */}
+        {readOnly && leaderboardPicks && leaderboardPicks.length > 0
+          ? leaderboardPicks.map(pick => (
+              <GolferPickCard key={pick.playerId} pick={pick} isLive={isLive} />
+            ))
+          : slots.map((player, i) =>
           player ? (
             <div
               key={player.playerId}
@@ -661,6 +670,28 @@ function PicksPanel({
             isSubmitting={false}
             hasSubmitted={true}
             readOnly
+            isLive={isLiveTournament}
+            leaderboardPicks={(() => {
+              if (!tournamentResults.length) return undefined;
+              return Array.from(myPickIds).map(playerId => {
+                const fieldEntry = allField.find(f => f.playerId === playerId);
+                const result = tournamentResults.find(r => r.playerId === playerId);
+                const pointValue = fieldEntry?.pointValue ?? 0;
+                const topTen = result?.topTen ?? false;
+                return {
+                  playerId,
+                  playerName: fieldEntry?.name ?? "",
+                  photoUrl: fieldEntry?.photoUrl ?? null,
+                  owgrAtLock: fieldEntry?.owgrAtLock ?? null,
+                  pointValue,
+                  topTen,
+                  pointsEarned: topTen ? pointValue : 0,
+                  resultStatus: result?.status ?? null,
+                  finalPosition: result?.finalPosition ?? null,
+                  scoreToPar: result?.scoreToPar ?? null,
+                };
+              });
+            })()}
           />
         )}
         {isAuthenticated && !hasSubmitted && (
@@ -981,7 +1012,7 @@ function TournamentLeaderboard({
               {sorted.map((result, idx) => {
                 const isMyPick = myPickIds.has(result.playerId);
                 const fieldEntry = fieldMap.get(result.playerId);
-                const isDnf = result.status !== "finished";
+                const isDnf = result.status === "mc" || result.status === "wd" || result.status === "dq";
                 const pos = result.finalPosition;
 
                 // Check for tie (same position as adjacent)
@@ -1060,9 +1091,6 @@ function TournamentLeaderboard({
                                 ✓ Your Pick
                               </Badge>
                             )}
-                            {result.topTen && (
-                              <Badge className="text-xs py-0 px-1.5 bg-green-600 text-white">Top 10</Badge>
-                            )}
                           </div>
                           <p className="text-xs text-gray-500 mt-0.5">
                             {result.player.country ?? "—"}
@@ -1071,22 +1099,26 @@ function TournamentLeaderboard({
                       </div>
                     </td>
 
-                    {/* Status */}
+                    {/* Status / Score */}
                     <td className="px-3 py-3 text-right">
                       {isDnf ? (
                         <span className="text-xs font-semibold text-gray-400 uppercase">
                           {result.status}
                         </span>
-                      ) : isLiveTournament && pos !== null ? (
-                        <span className="flex items-center justify-end gap-1 text-xs text-blue-500">
-                          <span className="relative flex h-1.5 w-1.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500" />
-                          </span>
-                          <span>Live</span>
+                      ) : result.scoreToPar !== null && result.scoreToPar !== undefined ? (
+                        <span className={`text-sm font-semibold ${
+                          result.scoreToPar < 0
+                            ? "text-green-600"
+                            : result.scoreToPar === 0
+                              ? "text-gray-500"
+                              : "text-red-500"
+                        }`}>
+                          {result.scoreToPar < 0
+                            ? String(result.scoreToPar)
+                            : result.scoreToPar === 0
+                              ? "E"
+                              : `+${result.scoreToPar}`}
                         </span>
-                      ) : pos !== null ? (
-                        <span className="text-xs text-green-600 font-medium">Final</span>
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
                       )}
@@ -1128,11 +1160,11 @@ function GolferPickCard({ pick, isLive }: GolferPickCardProps) {
   let posLabel: string | null = null;
   let posBadgeColor = "bg-gray-200 text-gray-600";
   if (hasResult) {
-    if (pick.resultStatus === "finished" && pick.finalPosition !== null) {
+    if ((pick.resultStatus === "finished" || pick.resultStatus === "in_progress") && pick.finalPosition !== null) {
       posLabel = `T${pick.finalPosition}`;
       posBadgeColor = pick.topTen
         ? "bg-green-200 text-green-800"
-        : isLive
+        : pick.resultStatus === "in_progress"
           ? "bg-blue-200 text-blue-800"
           : "bg-gray-200 text-gray-600";
     } else if (pick.resultStatus === "mc") {
@@ -1152,8 +1184,24 @@ function GolferPickCard({ pick, isLive }: GolferPickCardProps) {
     ? pick.pointsEarned.toLocaleString()
     : pick.pointValue.toLocaleString();
 
+  // Score-to-par display
+  let scoreLabel: string | null = null;
+  let scoreColor = "text-gray-500";
+  if (hasResult && pick.scoreToPar !== null && pick.scoreToPar !== undefined) {
+    if (pick.scoreToPar < 0) {
+      scoreLabel = String(pick.scoreToPar);
+      scoreColor = "text-green-600 font-semibold";
+    } else if (pick.scoreToPar === 0) {
+      scoreLabel = "E";
+      scoreColor = "text-gray-500";
+    } else {
+      scoreLabel = `+${pick.scoreToPar}`;
+      scoreColor = "text-red-500 font-semibold";
+    }
+  }
+
   return (
-    <div className={`relative flex flex-col items-center rounded-lg border p-1.5 w-full h-24 flex-shrink-0 ${bgColor} ${borderColor}`}>
+    <div className={`relative flex flex-col items-center rounded-lg border p-1.5 w-full h-28 flex-shrink-0 ${bgColor} ${borderColor}`}>
       {/* Position badge — upper-right corner */}
       {posLabel && (
         <span className={`absolute top-1 right-1 text-[9px] font-bold px-1 py-0.5 rounded leading-none ${posBadgeColor}`}>
@@ -1173,10 +1221,20 @@ function GolferPickCard({ pick, isLive }: GolferPickCardProps) {
         </p>
       </div>
 
+      {/* Score-to-par chip */}
+      {scoreLabel !== null ? (
+        <span className={`text-[10px] ${scoreColor} leading-none mb-0.5`}>
+          {scoreLabel}
+        </span>
+      ) : (
+        <span className="h-[14px] mb-0.5" />
+      )}
+
       {/* Points chip */}
       <span className={`text-[10px] ${chipText} ${chipBg} px-1.5 py-0.5 rounded-full leading-none`}>
         {chipValue}
       </span>
+
     </div>
   );
 }
@@ -1211,7 +1269,7 @@ function LeaderboardPanel({ leaderboard, isLoading, hasResults, currentUserId, t
         <div className="h-4 w-px bg-white/40" />
         <div className="flex items-center gap-1.5 text-white/90 text-sm">
           <Radio className="h-4 w-4" />
-          <span>Tournament in progress — scores update automatically</span>
+          <span>Tournament in progress — scores update every 2 min</span>
         </div>
       </div>
       {lastUpdatedText && (
