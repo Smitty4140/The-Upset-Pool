@@ -534,12 +534,12 @@ function SelectedPicksTray({
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
         My Picks ({selectedPlayerIds.size}/{picksRequired})
       </p>
-      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${picksRequired}, minmax(0, 1fr))` }}>
+      <div className="flex sm:grid gap-2 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0" style={{ gridTemplateColumns: `repeat(${picksRequired}, minmax(0, 1fr))` }}>
         {slots.map((player, i) =>
           player ? (
             <div
               key={player.playerId}
-              className="relative bg-white border border-green-300 rounded-xl p-2 flex flex-col items-center gap-1 shadow-sm"
+              className="relative bg-white border border-green-300 rounded-xl p-2 flex flex-col items-center gap-1 shadow-sm flex-shrink-0 w-28 sm:w-auto"
             >
               {/* × button */}
               <button
@@ -583,7 +583,7 @@ function SelectedPicksTray({
           ) : (
             <div
               key={`empty-${i}`}
-              className="border-2 border-dashed border-gray-200 rounded-xl p-2 flex flex-col items-center justify-center gap-1 min-h-[100px]"
+              className="border-2 border-dashed border-gray-200 rounded-xl p-2 flex flex-col items-center justify-center gap-1 min-h-[100px] flex-shrink-0 w-28 sm:w-auto"
             >
               <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-bold text-gray-300">{i + 1}</span>
