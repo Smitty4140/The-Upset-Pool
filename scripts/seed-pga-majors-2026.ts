@@ -6,10 +6,12 @@
  */
 
 async function main() {
-  if (process.env.NODE_ENV !== "development") {
-    console.error("This script must be run with NODE_ENV=development");
+  if (process.env.NODE_ENV !== "development" && process.env.SEED_TARGET !== "production") {
+    console.error("Set NODE_ENV=development (dev DB) or SEED_TARGET=production (prod DB)");
     process.exit(1);
   }
+  const env = process.env.NODE_ENV || "development";
+  console.log(`Target environment: ${env}`);
 
   const { db } = await import("../server/db.js");
   const { eq, and } = await import("drizzle-orm");
