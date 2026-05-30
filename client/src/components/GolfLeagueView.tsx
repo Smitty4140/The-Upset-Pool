@@ -576,7 +576,7 @@ function SelectedPicksTray({
               {/* Points */}
               {player.pointValue > 0 && (
                 <span className="text-xs font-bold text-green-700 bg-green-50 rounded px-1.5 py-0.5">
-                  {player.pointValue} pts
+                  {player.pointValue}
                 </span>
               )}
             </div>
