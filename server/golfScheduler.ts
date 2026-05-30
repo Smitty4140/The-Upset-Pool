@@ -2,7 +2,7 @@ import * as cron from 'node-cron';
 import { db } from './db.js';
 import { golfTournaments } from '../shared/schema.js';
 import { eq, and, gt, lte, isNotNull } from 'drizzle-orm';
-import { pullGolfScoresFromESPN, pullGolfFieldFromOddsAPI } from './golfDataPuller.js';
+import { pullGolfScoresFromESPN, pullGolfFieldFromOddsAPI, enrichGolfFieldWithESPNPhotos, enrichGolfFieldWithDataGolfOWGR } from './golfDataPuller.js';
 import type { IStorage } from './storage.js';
 
 class GolfScheduler {
@@ -74,6 +74,21 @@ class GolfScheduler {
             .set({ status: 'active', updatedAt: new Date() })
             .where(eq(golfTournaments.id, t.id));
           console.log(`[GolfScheduler] ✅ Field pulled + status → active for "${t.name}"`);
+
+          // Enrich with ESPN photos — non-blocking
+          enrichGolfFieldWithESPNPhotos(t.id, this.storage).then(r => {
+            console.log(`[GolfScheduler] ✅ ESPN photos enriched for "${t.name}" — updated: ${r.updated}, skipped: ${r.skipped}`);
+          }).catch(err => {
+            console.error(`[GolfScheduler] ⚠ ESPN photo enrichment failed for "${t.name}":`, err?.message);
+          });
+
+          // Enrich with DataGolf OWGR — non-blocking
+          enrichGolfFieldWithDataGolfOWGR(t.id, this.storage).then(r => {
+            console.log(`[GolfScheduler] ✅ DataGolf OWGR enriched for "${t.name}" — updated: ${r.updated}, skipped: ${r.skipped}`);
+          }).catch(err => {
+            console.error(`[GolfScheduler] ⚠ DataGolf OWGR enrichment failed for "${t.name}":`, err?.message);
+          });
+
           pulled.push({ id: t.id, name: t.name });
         } catch (err: any) {
           console.error(`[GolfScheduler] ❌ Failed to pull field for "${t.name}":`, err);

@@ -3042,6 +3042,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Enrich field with ESPN photos + DataGolf OWGR rankings (super user only)
+  app.post('/api/golf/tournaments/:id/pull-enrichment', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const tournamentId = parseInt(req.params.id);
+      const { enrichGolfFieldWithESPNPhotos, enrichGolfFieldWithDataGolfOWGR } = await import('./golfDataPuller.js');
+
+      const photoResult = await enrichGolfFieldWithESPNPhotos(tournamentId, storage).catch((err: any) => {
+        console.error('[Routes] ESPN photo enrichment failed:', err);
+        return { updated: 0, skipped: 0, error: err?.message || 'ESPN photo pull failed' };
+      });
+
+      const owgrResult = await enrichGolfFieldWithDataGolfOWGR(tournamentId, storage).catch((err: any) => {
+        console.error('[Routes] DataGolf OWGR enrichment failed:', err);
+        return { updated: 0, skipped: 0, error: err?.message || 'DataGolf OWGR pull failed' };
+      });
+
+      res.json({
+        message: `Photos: ${photoResult.updated} updated, ${photoResult.skipped} skipped. Rankings: ${owgrResult.updated} updated, ${owgrResult.skipped} skipped.`,
+        photos: photoResult,
+        owgr: owgrResult,
+      });
+    } catch (error: any) {
+      console.error('Error running field enrichment:', error);
+      res.status(500).json({ message: error.message || 'Failed to run field enrichment' });
+    }
+  });
+
   // Manually trigger the Sunday odds-pull for upcoming tournaments (super user only)
   app.post('/api/golf/scheduler/pull-upcoming', isAuthenticated, isSuperUser, async (_req, res) => {
     try {
