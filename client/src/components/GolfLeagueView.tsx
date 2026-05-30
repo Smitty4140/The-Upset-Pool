@@ -512,6 +512,91 @@ function GolferRow({
   );
 }
 
+function SelectedPicksTray({
+  picksRequired,
+  selectedPlayerIds,
+  allField,
+  onToggle,
+}: {
+  picksRequired: number;
+  selectedPlayerIds: Set<number>;
+  allField: GolfFieldEntry[];
+  onToggle: (id: number) => void;
+}) {
+  const selectedPlayers = Array.from(selectedPlayerIds)
+    .map(id => allField.find(p => p.playerId === id))
+    .filter(Boolean) as GolfFieldEntry[];
+
+  const slots = Array.from({ length: picksRequired }, (_, i) => selectedPlayers[i] ?? null);
+
+  return (
+    <div className="mb-1">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+        My Picks ({selectedPlayerIds.size}/{picksRequired})
+      </p>
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${picksRequired}, minmax(0, 1fr))` }}>
+        {slots.map((player, i) =>
+          player ? (
+            <div
+              key={player.playerId}
+              className="relative bg-white border border-green-300 rounded-xl p-2 flex flex-col items-center gap-1 shadow-sm"
+            >
+              {/* × button */}
+              <button
+                onClick={() => onToggle(player.playerId)}
+                className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-600 transition-colors text-xs font-bold leading-none"
+                aria-label={`Remove ${player.name}`}
+              >
+                ×
+              </button>
+
+              {/* Photo */}
+              <div className="w-10 h-10 rounded-full overflow-hidden bg-green-100 flex-shrink-0">
+                {player.photoUrl ? (
+                  <img
+                    src={player.photoUrl}
+                    alt={player.name}
+                    className="w-full h-full object-cover object-top"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="text-xs font-bold text-green-600">
+                      {player.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Name */}
+              <p className="text-xs font-semibold text-gray-800 text-center leading-tight line-clamp-2 w-full px-0.5">
+                {player.name}
+              </p>
+
+              {/* Points */}
+              {player.pointValue > 0 && (
+                <span className="text-xs font-bold text-green-700 bg-green-50 rounded px-1.5 py-0.5">
+                  {player.pointValue} pts
+                </span>
+              )}
+            </div>
+          ) : (
+            <div
+              key={`empty-${i}`}
+              className="border-2 border-dashed border-gray-200 rounded-xl p-2 flex flex-col items-center justify-center gap-1 min-h-[100px]"
+            >
+              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-sm font-bold text-gray-300">{i + 1}</span>
+              </div>
+              <p className="text-xs text-gray-300 font-medium">Empty</p>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PicksPanel({
   field, allField, isLocked, isAuthenticated, picksRequired,
   selectedPlayerIds, myPick, isLoadingField, isLoadingPick,
@@ -589,6 +674,16 @@ function PicksPanel({
         </div>
       ) : null}
 
+      {/* Selected picks tray */}
+      {!isLocked && isAuthenticated && (
+        <SelectedPicksTray
+          picksRequired={picksRequired}
+          selectedPlayerIds={selectedPlayerIds}
+          allField={allField}
+          onToggle={onToggle}
+        />
+      )}
+
       {/* Controls row */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
         <div className="relative flex-1 w-full sm:w-auto">
@@ -613,15 +708,6 @@ function PicksPanel({
               {opt === "owgr" ? "Ranking" : opt === "odds" ? "Odds" : "A–Z"}
             </Button>
           ))}
-        </div>
-
-        {/* Pick progress */}
-        <div className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-semibold ${
-          selectedPlayerIds.size === picksRequired
-            ? "bg-green-100 text-green-800"
-            : "bg-gray-100 text-gray-600"
-        }`}>
-          {selectedPlayerIds.size}/{picksRequired} picks
         </div>
       </div>
 
