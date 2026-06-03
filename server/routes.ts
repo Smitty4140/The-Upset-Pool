@@ -2900,6 +2900,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Field counts per tournament (super user only — used by Manage Tournaments page)
+  app.get('/api/golf/tournaments/field-counts', isAuthenticated, isSuperUser, async (_req, res) => {
+    try {
+      const { golfTournamentField } = await import("@shared/schema");
+      const { count, eq } = await import("drizzle-orm");
+      const rows = await db
+        .select({ tournamentId: golfTournamentField.tournamentId, cnt: count() })
+        .from(golfTournamentField)
+        .groupBy(golfTournamentField.tournamentId);
+      const result: Record<number, number> = {};
+      for (const r of rows) result[r.tournamentId] = Number(r.cnt);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error fetching field counts:', error);
+      res.status(500).json({ message: 'Failed to fetch field counts' });
+    }
+  });
+
   // List available golf sport keys from The Odds API (super user only)
   app.get('/api/golf/odds-sports', isAuthenticated, isSuperUser, async (_req, res) => {
     try {
