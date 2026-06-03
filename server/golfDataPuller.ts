@@ -54,14 +54,8 @@ export async function pullGolfFieldFromOddsAPI(tournamentId: number, storage: IS
 
   console.log(`[GolfDataPuller] ${outcomes.length} players from Odds API for "${tournament.name}"`);
 
-  // Load all known players once (avoid N+1 queries in the loop)
-  const allKnownPlayers = await db.select().from(golfPlayers);
-  const playerByNormName = new Map<string, typeof allKnownPlayers[0]>();
-  for (const p of allKnownPlayers) {
-    playerByNormName.set(normaliseName(p.name), p);
-  }
-
-  // Pre-fetch ESPN competitor IDs so new players get photos immediately
+  // Pre-fetch ESPN competitor IDs so new players get photos immediately,
+  // and so we can filter the Odds API list to only confirmed starters.
   const espnIdMap = new Map<string, string>();
   if (tournament.espnEventId) {
     try {
@@ -77,17 +71,36 @@ export async function pullGolfFieldFromOddsAPI(tournamentId: number, storage: IS
             espnIdMap.set(normaliseName(displayName), competitorId);
           }
         }
-        console.log(`[GolfDataPuller] ESPN pre-fetch: ${espnIdMap.size} competitor IDs loaded`);
+        console.log(`[GolfDataPuller] ESPN pre-fetch: ${espnIdMap.size} confirmed starters`);
       }
     } catch (err) {
-      console.warn('[GolfDataPuller] ESPN pre-fetch failed (photos will be skipped for new players):', (err as any)?.message);
+      console.warn('[GolfDataPuller] ESPN pre-fetch failed:', (err as any)?.message);
     }
+  }
+
+  // If ESPN returned a confirmed field, restrict to only those players.
+  // This filters out withdrawals, alternates, and speculative entries that
+  // bookmakers list but who aren't actually teeing it up.
+  const filteredOutcomes = espnIdMap.size > 0
+    ? outcomes.filter(o => espnIdMap.has(normaliseName(o.name)))
+    : outcomes;
+
+  if (espnIdMap.size > 0) {
+    const dropped = outcomes.length - filteredOutcomes.length;
+    console.log(`[GolfDataPuller] ESPN filter: keeping ${filteredOutcomes.length} / ${outcomes.length} players (${dropped} not in ESPN field)`);
+  }
+
+  // Load all known players once (avoid N+1 queries in the loop)
+  const allKnownPlayers = await db.select().from(golfPlayers);
+  const playerByNormName = new Map<string, typeof allKnownPlayers[0]>();
+  for (const p of allKnownPlayers) {
+    playerByNormName.set(normaliseName(p.name), p);
   }
 
   const results = { playersUpserted: 0, playersRemoved: 0, photosSet: 0, errors: 0 };
   const upsertedPlayerIds: number[] = [];
 
-  for (const outcome of outcomes) {
+  for (const outcome of filteredOutcomes) {
     try {
       const normName = normaliseName(outcome.name);
       const americanOdds = decimalToAmerican(outcome.price);
