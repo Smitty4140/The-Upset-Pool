@@ -1,6 +1,6 @@
 import { db } from './db.js';
 import { golfTournaments, golfPlayers, golfTournamentField, golfResults } from '../shared/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, notInArray } from 'drizzle-orm';
 import type { IStorage } from './storage.js';
 
 /**
@@ -22,8 +22,11 @@ function normaliseName(name: string): string {
 
 /**
  * Pull tournament field + odds from The Odds API.
- * Upserts golf_players (by normalised name) and golf_tournament_field (odds column).
- * Does NOT overwrite owgrAtLock.
+ *
+ * - Players in the new field are upserted (odds updated, owgrAtLock preserved).
+ * - Players NO LONGER in the new field are removed from golf_tournament_field.
+ * - Brand-new players (first time seen) have their ESPN photo set immediately
+ *   if the tournament has an espnEventId configured.
  */
 export async function pullGolfFieldFromOddsAPI(tournamentId: number, storage: IStorage) {
   console.log(`[GolfDataPuller] Starting field pull for tournament ${tournamentId}...`);
@@ -42,7 +45,6 @@ export async function pullGolfFieldFromOddsAPI(tournamentId: number, storage: IS
   const data: any[] = await res.json();
   if (!data.length) throw new Error('No events returned from Odds API');
 
-  // Use the first event (the tournament outright market)
   const event = data[0];
   const bookmaker = event.bookmakers?.[0];
   if (!bookmaker) throw new Error('No bookmaker data in Odds API response');
@@ -52,29 +54,69 @@ export async function pullGolfFieldFromOddsAPI(tournamentId: number, storage: IS
 
   console.log(`[GolfDataPuller] ${outcomes.length} players from Odds API for "${tournament.name}"`);
 
-  const results = { playersUpserted: 0, errors: 0 };
+  // Load all known players once (avoid N+1 queries in the loop)
+  const allKnownPlayers = await db.select().from(golfPlayers);
+  const playerByNormName = new Map<string, typeof allKnownPlayers[0]>();
+  for (const p of allKnownPlayers) {
+    playerByNormName.set(normaliseName(p.name), p);
+  }
+
+  // Pre-fetch ESPN competitor IDs so new players get photos immediately
+  const espnIdMap = new Map<string, string>();
+  if (tournament.espnEventId) {
+    try {
+      const espnUrl = `https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard?event=${tournament.espnEventId}`;
+      const espnRes = await fetch(espnUrl);
+      if (espnRes.ok) {
+        const espnData: any = await espnRes.json();
+        const competitors: any[] = espnData.events?.[0]?.competitions?.[0]?.competitors ?? [];
+        for (const c of competitors) {
+          const displayName: string = c.athlete?.displayName ?? '';
+          const competitorId: string = c.id ?? '';
+          if (displayName && competitorId) {
+            espnIdMap.set(normaliseName(displayName), competitorId);
+          }
+        }
+        console.log(`[GolfDataPuller] ESPN pre-fetch: ${espnIdMap.size} competitor IDs loaded`);
+      }
+    } catch (err) {
+      console.warn('[GolfDataPuller] ESPN pre-fetch failed (photos will be skipped for new players):', (err as any)?.message);
+    }
+  }
+
+  const results = { playersUpserted: 0, playersRemoved: 0, photosSet: 0, errors: 0 };
+  const upsertedPlayerIds: number[] = [];
 
   for (const outcome of outcomes) {
     try {
       const normName = normaliseName(outcome.name);
       const americanOdds = decimalToAmerican(outcome.price);
 
-      // Find existing player by normalised name
-      const allPlayers = await db.select().from(golfPlayers);
-      const existing = allPlayers.find(p => normaliseName(p.name) === normName);
-
+      const existing = playerByNormName.get(normName);
       let playerId: number;
+
       if (existing) {
         playerId = existing.id;
       } else {
+        // Brand-new player — create them and assign ESPN photo immediately if available
+        const espnId = espnIdMap.get(normName);
+        const photoUrl = espnId
+          ? `https://a.espncdn.com/i/headshots/golf/players/full/${espnId}.png`
+          : null;
+
         const [newPlayer] = await db.insert(golfPlayers)
-          .values({ name: outcome.name })
+          .values({ name: outcome.name, photoUrl })
           .returning();
         playerId = newPlayer.id;
-        console.log(`[GolfDataPuller] Created player: ${outcome.name}`);
+
+        // Add to local map so duplicate names in the same pull don't re-insert
+        playerByNormName.set(normName, newPlayer);
+
+        if (photoUrl) results.photosSet++;
+        console.log(`[GolfDataPuller] Created player: ${outcome.name}${photoUrl ? ' (with photo)' : ''}`);
       }
 
-      // Upsert field entry — only update odds, preserve owgrAtLock
+      // Upsert field entry — update odds, preserve owgrAtLock
       await db.insert(golfTournamentField)
         .values({ tournamentId, playerId, odds: americanOdds, owgrAtLock: null })
         .onConflictDoUpdate({
@@ -82,10 +124,25 @@ export async function pullGolfFieldFromOddsAPI(tournamentId: number, storage: IS
           set: { odds: americanOdds },
         });
 
+      upsertedPlayerIds.push(playerId);
       results.playersUpserted++;
     } catch (err) {
       console.error(`[GolfDataPuller] Error processing player ${outcome.name}:`, err);
       results.errors++;
+    }
+  }
+
+  // Remove players no longer in the field (dropped from the Odds API response)
+  if (upsertedPlayerIds.length > 0) {
+    const removed = await db.delete(golfTournamentField)
+      .where(and(
+        eq(golfTournamentField.tournamentId, tournamentId),
+        notInArray(golfTournamentField.playerId, upsertedPlayerIds)
+      ))
+      .returning();
+    results.playersRemoved = removed.length;
+    if (removed.length > 0) {
+      console.log(`[GolfDataPuller] Removed ${removed.length} players no longer in field`);
     }
   }
 

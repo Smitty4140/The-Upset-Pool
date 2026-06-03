@@ -3006,7 +3006,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tournamentId = parseInt(req.params.id);
       const { pullGolfFieldFromOddsAPI } = await import('./golfDataPuller.js');
       const result = await pullGolfFieldFromOddsAPI(tournamentId, storage);
-      res.json({ message: `Pulled ${result.results.playersUpserted} players`, ...result });
+      const { playersUpserted, playersRemoved, photosSet, errors } = result.results;
+      const parts = [`${playersUpserted} player${playersUpserted !== 1 ? 's' : ''} added/updated`];
+      if (playersRemoved > 0) parts.push(`${playersRemoved} removed`);
+      if (photosSet > 0) parts.push(`${photosSet} photo${photosSet !== 1 ? 's' : ''} set`);
+      if (errors > 0) parts.push(`${errors} error${errors !== 1 ? 's' : ''}`);
+      res.json({ message: parts.join(', '), ...result });
     } catch (error: any) {
       console.error('Error pulling golf field:', error);
       res.status(500).json({ message: error.message || 'Failed to pull field from Odds API' });
