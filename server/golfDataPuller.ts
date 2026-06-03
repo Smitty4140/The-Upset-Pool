@@ -97,11 +97,11 @@ export async function pullGolfFieldFromOddsAPI(tournamentId: number, storage: IS
 
       if (existing) {
         playerId = existing.id;
-        // Update photo for existing players too — set if missing, refresh if ESPN has it
-        const espnId = espnIdMap.get(normName);
-        if (espnId) {
-          const photoUrl = `https://a.espncdn.com/i/headshots/golf/players/full/${espnId}.png`;
-          if (existing.photoUrl !== photoUrl) {
+        // Set photo only if the player doesn't have one yet
+        if (!existing.photoUrl) {
+          const espnId = espnIdMap.get(normName);
+          if (espnId) {
+            const photoUrl = `https://a.espncdn.com/i/headshots/golf/players/full/${espnId}.png`;
             await db.update(golfPlayers)
               .set({ photoUrl })
               .where(eq(golfPlayers.id, existing.id));
