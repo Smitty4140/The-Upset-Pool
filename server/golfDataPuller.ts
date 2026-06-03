@@ -97,6 +97,17 @@ export async function pullGolfFieldFromOddsAPI(tournamentId: number, storage: IS
 
       if (existing) {
         playerId = existing.id;
+        // Update photo for existing players too — set if missing, refresh if ESPN has it
+        const espnId = espnIdMap.get(normName);
+        if (espnId) {
+          const photoUrl = `https://a.espncdn.com/i/headshots/golf/players/full/${espnId}.png`;
+          if (existing.photoUrl !== photoUrl) {
+            await db.update(golfPlayers)
+              .set({ photoUrl })
+              .where(eq(golfPlayers.id, existing.id));
+            results.photosSet++;
+          }
+        }
       } else {
         // Brand-new player — create them and assign ESPN photo immediately if available
         const espnId = espnIdMap.get(normName);
