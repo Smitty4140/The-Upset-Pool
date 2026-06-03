@@ -2900,6 +2900,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // List available golf sport keys from The Odds API (super user only)
+  app.get('/api/golf/odds-sports', isAuthenticated, isSuperUser, async (_req, res) => {
+    try {
+      const apiKey = process.env.THE_ODDS_API_KEY;
+      if (!apiKey) return res.status(500).json({ message: 'THE_ODDS_API_KEY is not configured' });
+      const url = `https://api.the-odds-api.com/v4/sports?apiKey=${apiKey}&all=true`;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`Odds API error: ${resp.status} ${resp.statusText}`);
+      const sports: any[] = await resp.json();
+      const golfSports = sports
+        .filter((s: any) => s.key?.startsWith('golf_'))
+        .map((s: any) => ({ key: s.key as string, title: s.title as string }))
+        .sort((a: any, b: any) => a.title.localeCompare(b.title));
+      res.json(golfSports);
+    } catch (error: any) {
+      console.error('Error fetching Odds API sports:', error);
+      res.status(500).json({ message: error.message || 'Failed to fetch sports from Odds API' });
+    }
+  });
+
   // List all golf tournaments
   app.get('/api/golf/tournaments', async (_req, res) => {
     try {
@@ -2939,6 +2959,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching golf tournament:", error);
       res.status(500).json({ message: "Failed to fetch golf tournament" });
+    }
+  });
+
+  // Create a golf tournament from ESPN + auto-pull field (super user only)
+  app.post('/api/golf/tournaments/create-and-pull', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const { name, espnEventId, startsAt, picksLockAt, oddsApiSportKey, location, picksRequired } = req.body;
+      if (!name || !picksLockAt) {
+        return res.status(400).json({ message: "name and picksLockAt are required" });
+      }
+      const season = startsAt ? new Date(startsAt).getFullYear() : new Date().getFullYear();
+      const tournament = await storage.createGolfTournament({
+        name: name.trim(),
+        location: location?.trim() || null,
+        season,
+        startsAt: startsAt ? new Date(startsAt) : null,
+        picksLockAt: new Date(picksLockAt),
+        status: 'upcoming',
+        picksRequired: picksRequired ? parseInt(picksRequired) : 4,
+        oddsApiSportKey: oddsApiSportKey?.trim() || null,
+        espnEventId: espnEventId?.trim() || null,
+      });
+
+      let fieldCount = 0;
+      let pullError: string | null = null;
+
+      // Pull field from Odds API if sport key is configured
+      if (tournament.oddsApiSportKey) {
+        try {
+          const { pullGolfFieldFromOddsAPI } = await import('./golfDataPuller.js');
+          const result = await pullGolfFieldFromOddsAPI(tournament.id, storage);
+          fieldCount = result.results.playersUpserted;
+        } catch (err: any) {
+          pullError = err.message || 'Field pull failed';
+          console.error('[create-and-pull] Field pull error:', err);
+        }
+      }
+
+      // Enrich with ESPN photos if event ID is configured
+      if (tournament.espnEventId && fieldCount > 0) {
+        try {
+          const { enrichGolfFieldWithESPNPhotos } = await import('./golfDataPuller.js');
+          await enrichGolfFieldWithESPNPhotos(tournament.id, storage);
+        } catch (err) {
+          console.warn('[create-and-pull] ESPN photo enrichment failed (non-fatal):', err);
+        }
+      }
+
+      res.status(201).json({ tournament, fieldCount, pullError });
+    } catch (error: any) {
+      console.error("Error in create-and-pull:", error);
+      res.status(500).json({ message: error.message || "Failed to create tournament" });
     }
   });
 
