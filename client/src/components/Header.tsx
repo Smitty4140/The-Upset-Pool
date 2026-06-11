@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,12 +11,6 @@ export default function Header() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isLoading, isAuthenticated } = useAuth();
-
-  const { data: superUserStatus } = useQuery<{ isSuperUser: boolean }>({
-    queryKey: ["/api/auth/super-user-status"],
-    enabled: isAuthenticated,
-  });
-  const isSuperUser = superUserStatus?.isSuperUser ?? false;
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -77,14 +70,9 @@ export default function Header() {
               <NavLink href="/rules" active={location === "/rules"}>
                 Rules
               </NavLink>
-              {isSuperUser && (
+              {user?.id === "42820911" && (
                 <NavLink href="/admin" active={location === "/admin"}>
                   Admin
-                </NavLink>
-              )}
-              {isSuperUser && (
-                <NavLink href="/manage-tournaments" active={location === "/manage-tournaments"}>
-                  Tournaments
                 </NavLink>
               )}
             </nav>
@@ -141,14 +129,9 @@ export default function Header() {
               <NavLink href="/rules" active={location === "/rules"} mobile>
                 Rules
               </NavLink>
-              {isSuperUser && (
+              {user?.id === "42820911" && (
                 <NavLink href="/admin" active={location === "/admin"} mobile>
                   Admin
-                </NavLink>
-              )}
-              {isSuperUser && (
-                <NavLink href="/manage-tournaments" active={location === "/manage-tournaments"} mobile>
-                  Tournaments
                 </NavLink>
               )}
             </div>
