@@ -4,6 +4,7 @@ import { golfTournaments } from '../shared/schema.js';
 import { eq, and, gt, lte, isNotNull } from 'drizzle-orm';
 import { pullGolfScoresFromESPN, pullGolfFieldFromOddsAPI, enrichGolfFieldWithESPNPhotos, enrichGolfFieldWithDataGolfOWGR } from './golfDataPuller.js';
 import type { IStorage } from './storage.js';
+import { seedUpcomingMajors } from './majorsSeeder.js';
 
 class GolfScheduler {
   private activeJobs: Map<number, cron.ScheduledTask> = new Map();
@@ -33,8 +34,67 @@ class GolfScheduler {
       await this.pullUpcomingTournamentFields();
     }, { timezone: 'America/New_York' });
 
+    // Daily at 6:30 AM ET: ensure upcoming majors from the ESPN calendar
+    // exist as tournament rows (so they appear in league creation).
+    cron.schedule('30 6 * * *', async () => {
+      await this.seedMajorsAndCatchUp();
+    }, { timezone: 'America/New_York' });
+
     // Run immediately on startup
     this.checkAndScheduleActiveTournaments();
+    this.seedMajorsAndCatchUp();
+  }
+
+  /**
+   * Seed upcoming majors from ESPN, then catch up any newly created
+   * tournament that already missed its Sunday-prior pull window
+   * (i.e. starts within the next 7 days) by pulling field + odds now.
+   */
+  async seedMajorsAndCatchUp(): Promise<void> {
+    try {
+      const created = await seedUpcomingMajors(this.storage);
+      if (created.length === 0) return;
+
+      const cutoff = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      for (const t of created) {
+        if (t.startsAt && new Date(t.startsAt) <= cutoff && t.oddsApiSportKey) {
+          console.log(`[GolfScheduler] "${t.name}" starts within 7 days — pulling field + odds now (missed Sunday window)`);
+          try {
+            await this.pullFieldAndActivate(t);
+          } catch (err) {
+            console.error(`[GolfScheduler] ❌ Catch-up pull failed for "${t.name}":`, err);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[GolfScheduler] Error seeding majors:', err);
+    }
+  }
+
+  /**
+   * Pull field + odds for one tournament, mark it active, and kick off
+   * non-blocking photo/OWGR enrichment. Throws if the field pull fails.
+   */
+  private async pullFieldAndActivate(t: { id: number; name: string }): Promise<void> {
+    await pullGolfFieldFromOddsAPI(t.id, this.storage);
+    await db.update(golfTournaments)
+      .set({ status: 'active', updatedAt: new Date() })
+      .where(eq(golfTournaments.id, t.id));
+    console.log(`[GolfScheduler] ✅ Field pulled + status → active for "${t.name}"`);
+
+    // Enrich with ESPN photos — non-blocking
+    enrichGolfFieldWithESPNPhotos(t.id, this.storage).then(r => {
+      console.log(`[GolfScheduler] ✅ ESPN photos enriched for "${t.name}" — updated: ${r.updated}, skipped: ${r.skipped}`);
+    }).catch(err => {
+      console.error(`[GolfScheduler] ⚠ ESPN photo enrichment failed for "${t.name}":`, err?.message);
+    });
+
+    // Enrich with DataGolf OWGR — non-blocking
+    enrichGolfFieldWithDataGolfOWGR(t.id, this.storage).then(r => {
+      console.log(`[GolfScheduler] ✅ DataGolf OWGR enriched for "${t.name}" — updated: ${r.updated}, skipped: ${r.skipped}`);
+    }).catch(err => {
+      console.error(`[GolfScheduler] ⚠ DataGolf OWGR enrichment failed for "${t.name}":`, err?.message);
+    });
   }
 
   /**
@@ -69,26 +129,7 @@ class GolfScheduler {
       for (const t of upcoming) {
         console.log(`[GolfScheduler] ⏰ Sunday auto-pull: pulling field + odds for "${t.name}" (id=${t.id})`);
         try {
-          await pullGolfFieldFromOddsAPI(t.id, this.storage);
-          await db.update(golfTournaments)
-            .set({ status: 'active', updatedAt: new Date() })
-            .where(eq(golfTournaments.id, t.id));
-          console.log(`[GolfScheduler] ✅ Field pulled + status → active for "${t.name}"`);
-
-          // Enrich with ESPN photos — non-blocking
-          enrichGolfFieldWithESPNPhotos(t.id, this.storage).then(r => {
-            console.log(`[GolfScheduler] ✅ ESPN photos enriched for "${t.name}" — updated: ${r.updated}, skipped: ${r.skipped}`);
-          }).catch(err => {
-            console.error(`[GolfScheduler] ⚠ ESPN photo enrichment failed for "${t.name}":`, err?.message);
-          });
-
-          // Enrich with DataGolf OWGR — non-blocking
-          enrichGolfFieldWithDataGolfOWGR(t.id, this.storage).then(r => {
-            console.log(`[GolfScheduler] ✅ DataGolf OWGR enriched for "${t.name}" — updated: ${r.updated}, skipped: ${r.skipped}`);
-          }).catch(err => {
-            console.error(`[GolfScheduler] ⚠ DataGolf OWGR enrichment failed for "${t.name}":`, err?.message);
-          });
-
+          await this.pullFieldAndActivate(t);
           pulled.push({ id: t.id, name: t.name });
         } catch (err: any) {
           console.error(`[GolfScheduler] ❌ Failed to pull field for "${t.name}":`, err);
