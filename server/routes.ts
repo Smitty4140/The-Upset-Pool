@@ -715,6 +715,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!tournament) {
           return res.status(400).json({ message: "Invalid golf tournament" });
         }
+        if (tournament.picksLockAt && new Date(tournament.picksLockAt) <= new Date()) {
+          return res.status(400).json({ message: "This tournament's picks have already locked — choose an upcoming tournament" });
+        }
       }
       
       const season = seasonParam ? parseInt(seasonParam) : new Date().getFullYear();
@@ -2911,8 +2914,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // List upcoming golf tournaments available for league creation
-  // Returns tournaments whose startsAt is in the future, ordered by date
+  // List upcoming golf tournaments available for league creation.
+  // Returns tournaments whose picks have not locked yet, ordered by start date.
+  // (picksLockAt, not startsAt: once picks lock, a new league could never run.)
   app.get('/api/golf/tournaments/available', async (_req, res) => {
     try {
       const { golfTournaments } = await import("@shared/schema");
@@ -2921,7 +2925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const available = await db
         .select()
         .from(golfTournaments)
-        .where(gt(golfTournaments.startsAt, now))
+        .where(gt(golfTournaments.picksLockAt, now))
         .orderBy(asc(golfTournaments.startsAt));
       res.json(available);
     } catch (error) {
