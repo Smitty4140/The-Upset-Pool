@@ -15,7 +15,7 @@ apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.
 // ---------------------------------------------------------------------------
 
 const SITE_URL = 'https://upsetpool.com';
-const LOGO_URL = `${SITE_URL}/upset-pool-logo.png`;
+const LOGO_URL = `${SITE_URL}/email-logo.png`;
 
 export interface EmailContent {
   subject: string;
