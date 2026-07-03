@@ -42,7 +42,6 @@ integrations = ["javascript_sendgrid:1.0.0"]
 [userenv]
 
 [userenv.development]
-DEV_DATABASE_URL = "postgresql://neondb_owner:REDACTED@ep-blue-star-ai2wyu6y-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
 [postMerge]
 path = "scripts/post-merge.sh"
