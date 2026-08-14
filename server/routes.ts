@@ -2722,6 +2722,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Scheduler management endpoints (admin only)
+  // One-time seed of the 2026 NFL regular season schedule (weeks 1-18) from ESPN.
+  // GET so the super user can trigger it from the browser on the production app.
+  // Refuses to overwrite existing 2026 user picks unless ?force=true.
+  app.get('/api/admin/system/seed-2026-schedule', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const force = req.query.force === 'true';
+      const { seedNFL2026Schedule } = await import("./seed2026Schedule.js");
+      const result = await seedNFL2026Schedule(force);
+      res.json({ message: "2026 NFL schedule seeded successfully", ...result });
+    } catch (error: any) {
+      console.error("Error seeding 2026 schedule:", error);
+      res.status(500).json({ message: error?.message || "Failed to seed 2026 schedule" });
+    }
+  });
+
   app.get('/api/admin/scheduler/status', isAuthenticated, isSuperUser, async (req: any, res) => {
     try {
       // Import scheduler and get status
