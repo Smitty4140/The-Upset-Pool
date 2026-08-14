@@ -83,8 +83,16 @@ export default function Header() {
             {isLoading ? (
               <Skeleton className="h-10 w-10 rounded-full" />
             ) : isAuthenticated ? (
-              <div className="ml-3 relative flex items-center">
-                <span className="mr-2 font-medium text-white">
+              <div className="ml-3 relative flex items-center gap-3">
+                <a
+                  href="https://buymeacoffee.com/theupsetpool"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-semibold text-sm px-3 py-1.5 rounded-full transition-colors"
+                >
+                  ☕ Buy me a coffee
+                </a>
+                <span className="font-medium text-white">
                   {user?.username || "User"}
                 </span>
                 <Avatar className="h-10 w-10 border-2 border-white">
@@ -144,15 +152,25 @@ export default function Header() {
                   <Skeleton className="ml-3 h-4 w-24" />
                 </div>
               ) : isAuthenticated ? (
-                <div className="flex items-center px-5">
-                  <Avatar className="h-10 w-10 border-2 border-white">
-                    <AvatarImage src={user?.profileImageUrl || ""} alt={user?.username || "User"} />
-                    <AvatarFallback className="bg-accent text-primary">{(user?.username || "U")[0].toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <div className="ml-3">
-                    <div className="text-base font-medium text-white">{user?.username || "User"}</div>
-                    <div className="text-sm font-medium text-gray-400">{user?.email || ""}</div>
+                <div className="px-5 space-y-3">
+                  <div className="flex items-center">
+                    <Avatar className="h-10 w-10 border-2 border-white">
+                      <AvatarImage src={user?.profileImageUrl || ""} alt={user?.username || "User"} />
+                      <AvatarFallback className="bg-accent text-primary">{(user?.username || "U")[0].toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="ml-3">
+                      <div className="text-base font-medium text-white">{user?.username || "User"}</div>
+                      <div className="text-sm font-medium text-gray-400">{user?.email || ""}</div>
+                    </div>
                   </div>
+                  <a
+                    href="https://buymeacoffee.com/theupsetpool"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 bg-yellow-400 hover:bg-yellow-300 text-gray-900 font-semibold text-sm px-3 py-2 rounded-full transition-colors w-full"
+                  >
+                    ☕ Buy me a coffee
+                  </a>
                 </div>
               ) : (
                 <div className="px-5">
