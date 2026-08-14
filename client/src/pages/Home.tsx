@@ -398,6 +398,12 @@ export default function Home() {
     return now >= new Date(currentWeek.picksLockAt);
   })();
 
+  // Spreads are considered "not pulled yet" when games exist but every game still has a 0 spread
+  const spreadsNotPulled =
+    !!games &&
+    games.length > 0 &&
+    games.every((game) => (parseFloat(String(game.spread)) || 0) === 0);
+
   // Determine if the selected week allows picks (only current week + not locked + not archived)
   const canMakePicks = activeWeekId === pickableWeekId && !arePicksLocked && !currentLeagueInfo?.isArchived;
 
@@ -591,6 +597,7 @@ export default function Home() {
           <WeeklyPicks
             leagueId={leagueId}
             weekId={selectedWeekId || activeWeekId}
+            weekNumber={selectedWeekDetails?.weekNumber}
             isPicksLocked={arePicksLocked}
           />
         )}
@@ -728,6 +735,7 @@ export default function Home() {
                               onSubmit={handleSubmitPick}
                               disabled={!canMakePicks || !isAuthenticated}
                               isViewingFutureWeek={isViewingFutureWeek}
+                              spreadsNotPulled={spreadsNotPulled}
                               isSubmitting={isSubmittingPick}
                               isInactive={
                                 memberStatus ? !memberStatus.isActive : null

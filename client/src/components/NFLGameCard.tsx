@@ -23,9 +23,10 @@ type NFLGameCardProps = {
   isSubmitting?: boolean;
   isInactive?: boolean;
   isPickLockedByKickoff?: boolean;
+  spreadsNotPulled?: boolean;
 };
 
-export default function NFLGameCard({ game, selectedTeamId, selectedGameId, submittedPickGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false, isInactive = false, isPickLockedByKickoff = false }: NFLGameCardProps) {
+export default function NFLGameCard({ game, selectedTeamId, selectedGameId, submittedPickGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false, isInactive = false, isPickLockedByKickoff = false, spreadsNotPulled = false }: NFLGameCardProps) {
   // State to track current time for automatic refresh (triggers re-renders)
   const [, setCurrentTime] = useState<Date>(new Date());
   
@@ -90,7 +91,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
   // Show the selected/submitted highlight if either locally selected or already submitted
   const showHighlight = isGameSelected || isSubmittedPick;
   
-  const isFullyLocked = disabled || isViewingFutureWeek || isInactive || hasGameStarted || isPickLockedByKickoff;
+  const isFullyLocked = disabled || isViewingFutureWeek || isInactive || hasGameStarted || isPickLockedByKickoff || spreadsNotPulled;
 
   // Always select the underdog team regardless of which team is clicked
   const handleHomeTeamClick = (e: React.MouseEvent) => {
@@ -115,6 +116,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
       ? "Your pick is locked — your selected game has already kicked off"
     : hasGameStarted
       ? "This game has already started and is no longer available for picks"
+    : spreadsNotPulled
+      ? "Games are available for selection after spreads are pulled."
     : isViewingFutureWeek 
       ? "Picks are not allowed until 8 hours before the first game of the week. Spreads may change until that point."
       : disabled 

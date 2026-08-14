@@ -30,10 +30,12 @@ type UserPick = {
 type WeeklyPicksProps = {
   leagueId: number;
   weekId: number;
+  weekNumber?: number;
   isPicksLocked?: boolean;
 };
 
-export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }: WeeklyPicksProps) {
+export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocked = false }: WeeklyPicksProps) {
+  const displayWeekNumber = weekNumber ?? weekId;
   const { data: weeklyPicks, isLoading } = useQuery<UserPick[]>({
     queryKey: [`/api/league/${leagueId}/week/${weekId}/picks`],
   });
@@ -109,7 +111,7 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
             <div className="bg-gradient-to-r from-amber-50 to-yellow-50 px-6 py-4 border-b border-amber-200">
               <h3 className="text-lg font-medium text-gray-900 flex items-center">
                 <Eye className="h-5 w-5 mr-2 text-amber-600" />
-                Week {weekId} Picks
+                Week {displayWeekNumber} Picks
               </h3>
               <p className="text-sm text-amber-700 mt-1">Picks are hidden until the deadline passes</p>
             </div>
@@ -493,7 +495,7 @@ export default function WeeklyPicks({ leagueId, weekId, isPicksLocked = false }:
       <Card className="bg-white shadow-md">
         <CardContent className="p-0">
           <div className="bg-gradient-to-r from-primary/20 to-secondary/20 px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Week {weekId} Picks</h3>
+            <h3 className="text-lg font-medium text-gray-900">Week {displayWeekNumber} Picks</h3>
             <p className="text-sm text-gray-500">
               {weeklyStats.hasResults 
                 ? `Results are in! ${weeklyStats.totalWinningPicks} winning picks this week.`
