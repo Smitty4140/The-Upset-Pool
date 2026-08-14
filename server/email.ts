@@ -341,9 +341,42 @@ Pick an underdog to win straight up — points are awarded based on the spread.$
   };
 }
 
+/** Notice sent to league members when an admin archives the league. */
+export function buildLeagueArchivedEmail(username: string, leagueName: string): EmailContent {
+  return {
+    subject: `${leagueName} has been archived — The Upset Pool`,
+    html: emailLayout({
+      preheader: `${leagueName} has moved to Past Seasons.`,
+      heading: 'League Archived',
+      subheading: leagueName,
+      bodyHtml: `
+        <p style="margin: 0 0 16px 0; font-size: 16px; color: #1f2937;">Hi ${username},</p>
+        <p style="margin: 0 0 12px 0; color: #4b5563; line-height: 1.6;">Your league admin has archived <strong>${leagueName}</strong>.</p>
+        ${calloutBox('📦 What this means', `The league now appears under "Past Seasons" on your home screen instead of your active leagues. You can still view all results and standings — nothing has been deleted.`)}
+        <p style="margin: 0 0 8px 0; color: #4b5563; line-height: 1.6;">If the league is restored by an admin, it will move back to your active list automatically.</p>
+        ${ctaButton('View Past Seasons')}`
+    }),
+    text: `League Archived — ${leagueName}
+
+Hi ${username},
+
+Your league admin has archived ${leagueName}.
+
+What this means: the league now appears under "Past Seasons" on your home screen instead of your active leagues. You can still view all results and standings — nothing has been deleted.
+
+If the league is restored by an admin, it will move back to your active list automatically.
+
+View past seasons: ${SITE_URL}${TEXT_FOOTER}`
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Send functions (signatures unchanged for existing callers)
 // ---------------------------------------------------------------------------
+
+export async function sendLeagueArchivedEmail(email: string, username: string, leagueName: string): Promise<boolean> {
+  return sendEmail({ to: email, ...buildLeagueArchivedEmail(username, leagueName) });
+}
 
 export async function sendWelcomeEmail(email: string, username: string): Promise<boolean> {
   return sendEmail({ to: email, ...buildWelcomeEmail(username) });

@@ -10,7 +10,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { db, pool } from "./db";
 import { userPicks, nflGames, nflWeeks, users, nflTeams } from "@shared/schema";
 import emailRoutes from "./routes/email";
-import { sendWelcomeEmail } from "./email";
+import { sendWelcomeEmail, sendLeagueArchivedEmail } from "./email";
 import { pullNFLGamesFromOddsAPI } from "./nflDataPuller";
 import { pullNFLResultsFromESPN } from "./espnResultsPuller";
 
@@ -1881,6 +1881,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isArchived,
         archivedAt: isArchived ? new Date() : null,
       } as any);
+      
+      // Notify members by email when the league transitions to archived
+      // (fire-and-forget — don't block or fail the request on email issues)
+      if (isArchived && !league.isArchived) {
+        (async () => {
+          try {
+            const members = await storage.getLeagueMembers(leagueId);
+            const recipients = members.filter(m => m.isActive && m.user?.email && m.userId !== userId);
+            const results = await Promise.allSettled(
+              recipients.map(m =>
+                sendLeagueArchivedEmail(
+                  m.user.email!,
+                  m.nickname || m.user.username || "there",
+                  league.name
+                )
+              )
+            );
+            const sent = results.filter(r => r.status === "fulfilled" && r.value === true).length;
+            console.log(`[Archive] League ${leagueId} archived — notification emails sent to ${sent}/${recipients.length} members`);
+          } catch (err) {
+            console.error(`[Archive] Failed to send archive notification emails for league ${leagueId}:`, err);
+          }
+        })();
+      }
       
       res.json({
         message: isArchived ? "League archived successfully" : "League unarchived successfully",

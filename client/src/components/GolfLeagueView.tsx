@@ -219,6 +219,23 @@ export default function GolfLeagueView({ leagueId, league, isSuperUser, isAdmin 
 
   return (
     <div className="space-y-6">
+      {/* Archived notice — visible to all members */}
+      {league.isArchived && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-3" data-testid="banner-league-archived">
+          <Archive className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">
+              This league has been archived by an admin.
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              It now appears under "Past Seasons" on your home screen instead of your active leagues.
+              You can still view all picks, results, and standings here.
+              {league.archivedAt && <> Archived on {format(new Date(league.archivedAt), "MMM d, yyyy")}.</>}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Tournament Header */}
       <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-6 border border-green-200 shadow-sm">
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
@@ -1672,7 +1689,7 @@ function LeagueAdminSection({ leagueId, league }: LeagueAdminSectionProps) {
           <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 space-y-3">
             <p className="text-sm text-red-800 font-medium">Archive this league?</p>
             <p className="text-xs text-red-700">
-              The league will move to "Past Seasons" on the home screen. Members will still be able to view results, but the league will no longer appear in the active list. You can restore it at any time.
+              The league will move to "Past Seasons" on the home screen for all members — it will no longer appear in their active leagues list. Members will see an archived notice when viewing the league and receive a notification email. They can still view results, and you can restore the league at any time.
             </p>
             <div className="flex gap-2">
               <Button
