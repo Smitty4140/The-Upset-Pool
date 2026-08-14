@@ -29,6 +29,8 @@ import {
   UserCheck,
   UserX,
   ShieldCheck,
+  Archive,
+  ArchiveRestore,
   Radio,
   RefreshCw,
   Activity,
@@ -1494,6 +1496,28 @@ interface LeagueAdminSectionProps {
 function LeagueAdminSection({ leagueId, league }: LeagueAdminSectionProps) {
   const { toast } = useToast();
   const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
+
+  const handleArchiveToggle = async (archive: boolean) => {
+    setIsArchiving(true);
+    try {
+      const res = await apiRequest("PATCH", `/api/leagues/${leagueId}/archive`, { isArchived: archive });
+      const data = await res.json();
+      toast({
+        title: archive ? "League archived" : "League restored",
+        description: data.message,
+      });
+      setShowArchiveConfirm(false);
+      // Move the league between Active Leagues and Past Seasons on Home immediately
+      queryClient.invalidateQueries({ queryKey: ["/api/user/leagues"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}`] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to update league", variant: "destructive" });
+    } finally {
+      setIsArchiving(false);
+    }
+  };
 
   const { data: members = [], isLoading: isLoadingMembers, refetch: refetchMembers } = useQuery<any[]>({
     queryKey: [`/api/leagues/${leagueId}/members`],
@@ -1610,6 +1634,81 @@ function LeagueAdminSection({ leagueId, league }: LeagueAdminSectionProps) {
                 </div>
               );
             })}
+          </div>
+        )}
+      </div>
+
+      {/* Archive League */}
+      <div className="border-t border-gray-200 pt-5">
+        <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+          <Archive className="h-4 w-4 text-gray-500" />
+          {league.isArchived ? "Archived League" : "Archive League"}
+        </p>
+        {league.isArchived ? (
+          <div className="space-y-3">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              <p className="text-sm text-amber-800 font-medium">This league is archived.</p>
+              {league.archivedAt && (
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Archived on {format(new Date(league.archivedAt), "MMM d, yyyy")}
+                </p>
+              )}
+              <p className="text-xs text-amber-700 mt-1">
+                It appears under "Past Seasons" on the home screen. Restore it to move it back to the active list.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleArchiveToggle(false)}
+              disabled={isArchiving}
+              className="gap-1.5"
+            >
+              <ArchiveRestore className="h-3.5 w-3.5" />
+              {isArchiving ? "Restoring..." : "Restore League"}
+            </Button>
+          </div>
+        ) : showArchiveConfirm ? (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 space-y-3">
+            <p className="text-sm text-red-800 font-medium">Archive this league?</p>
+            <p className="text-xs text-red-700">
+              The league will move to "Past Seasons" on the home screen. Members will still be able to view results, but the league will no longer appear in the active list. You can restore it at any time.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => handleArchiveToggle(true)}
+                disabled={isArchiving}
+                className="gap-1.5"
+              >
+                <Archive className="h-3.5 w-3.5" />
+                {isArchiving ? "Archiving..." : "Yes, Archive League"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowArchiveConfirm(false)}
+                disabled={isArchiving}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-gray-500">
+              Move this league to "Past Seasons" when the tournament is over. This can be undone at any time.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowArchiveConfirm(true)}
+              className="gap-1.5 border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+            >
+              <Archive className="h-3.5 w-3.5" />
+              Archive League
+            </Button>
           </div>
         )}
       </div>

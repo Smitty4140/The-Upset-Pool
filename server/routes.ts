@@ -1849,8 +1849,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Archive or unarchive a league (admin only)
-  app.patch('/api/leagues/:leagueId/archive', isAuthenticated, isSuperUser, async (req: any, res) => {
+  // Archive or unarchive a league (super user or league admin)
+  app.patch('/api/leagues/:leagueId/archive', isAuthenticated, async (req: any, res) => {
     try {
       const leagueId = parseInt(req.params.leagueId);
       const { isArchived } = req.body;
@@ -1866,6 +1866,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const league = await storage.getLeague(leagueId);
       if (!league) {
         return res.status(404).json({ message: "League not found" });
+      }
+      
+      // Allow super users; otherwise require league admin of this league
+      const userId = req.user?.id;
+      if (userId !== SUPER_USER_ID) {
+        const member = await storage.getLeagueMember(leagueId, userId);
+        if (!member?.isAdmin || !member?.isActive) {
+          return res.status(403).json({ message: "Only league admins can archive this league" });
+        }
       }
       
       const updatedLeague = await storage.updateLeague(leagueId, {
