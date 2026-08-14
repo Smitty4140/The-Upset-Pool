@@ -148,8 +148,9 @@ export default function Home() {
     }
   }, [currentWeek, selectedWeekId]);
 
-  // The active week is the selected week (for viewing) or current week (fallback)
-  const activeWeekId = selectedWeekId || currentWeek?.id;
+  // The active week is the selected week (for viewing) or current/upcoming week,
+  // falling back to the first week in the season so the selector always appears.
+  const activeWeekId = selectedWeekId || currentWeek?.id || allWeeks?.[0]?.id;
 
   // The week used for picks is always the current week (picks only allowed for current week)
   const pickableWeekId = currentWeek?.id;
@@ -578,6 +579,7 @@ export default function Home() {
             <WeekSelector
               currentWeekId={selectedWeekId || activeWeekId}
               onWeekChange={(weekId) => setSelectedWeekId(weekId)}
+              season={leagueSeason}
               className=""
             />
           </div>

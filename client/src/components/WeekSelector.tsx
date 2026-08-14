@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 interface WeekSelectorProps {
   currentWeekId: number | null;
   onWeekChange: (weekId: number) => void;
+  season?: number | null;
   className?: string;
 }
 
@@ -33,14 +34,11 @@ const formatDateRange = (startDate: string, endDate: string): string => {
   return `${startFormatted} - ${endFormatted}`;
 };
 
-export default function WeekSelector({ currentWeekId, onWeekChange, className }: WeekSelectorProps) {
-  // Fetch all NFL weeks
+export default function WeekSelector({ currentWeekId, onWeekChange, season, className }: WeekSelectorProps) {
+  // Fetch weeks scoped to the league's season when available
   const { data: weeks, isLoading } = useQuery<NFLWeek[]>({
-    queryKey: ["/api/nfl-weeks"],
+    queryKey: [season ? `/api/nfl-weeks?season=${season}` : "/api/nfl-weeks"],
   });
-
-  // Get the current displayed week
-  const currentWeek = weeks?.find(week => week.id === currentWeekId) || null;
 
   const handleWeekChange = (value: string) => {
     const weekId = parseInt(value);
