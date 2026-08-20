@@ -238,7 +238,8 @@ export default function Home() {
     leagueMembers &&
     Array.isArray(leagueMembers) &&
     leagueMembers.some(
-      (member: any) => member.userId === user.id && member.isAdmin,
+      (member: any) =>
+        member.userId === user.id && member.isAdmin && member.isActive,
     );
 
   // Mutation for submitting a pick

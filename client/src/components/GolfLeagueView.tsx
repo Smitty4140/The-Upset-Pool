@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import NewMemberDefaultStatusControl from "@/components/NewMemberDefaultStatusControl";
 import {
   AlertTriangle,
   Clock,
@@ -389,6 +390,7 @@ export default function GolfLeagueView({ leagueId, league, isSuperUser, isAdmin 
           tournament={tournament}
           field={field}
           isSuperUser={isSuperUser}
+          isLeagueAdmin={isAdmin}
           onFieldUpdated={() => {
             queryClient.invalidateQueries({ queryKey: [`/api/golf/tournaments/${tournamentId}/field`] });
           }}
@@ -1508,9 +1510,14 @@ function LeaderboardPanel({ leaderboard, isLoading, hasResults, currentUserId, t
 interface LeagueAdminSectionProps {
   leagueId: number;
   league: League;
+  canManageDefaultStatus: boolean;
 }
 
-function LeagueAdminSection({ leagueId, league }: LeagueAdminSectionProps) {
+function LeagueAdminSection({
+  leagueId,
+  league,
+  canManageDefaultStatus,
+}: LeagueAdminSectionProps) {
   const { toast } = useToast();
   const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
@@ -1591,6 +1598,15 @@ function LeagueAdminSection({ leagueId, league }: LeagueAdminSectionProps) {
           </Button>
         </div>
       </div>
+
+      {canManageDefaultStatus && (
+        <div className="border-t border-gray-200 pt-5">
+          <NewMemberDefaultStatusControl
+            leagueId={leagueId}
+            defaultMemberIsActive={league.defaultMemberIsActive}
+          />
+        </div>
+      )}
 
       {/* Member Management */}
       <div>
@@ -1742,12 +1758,13 @@ interface GolfAdminPanelProps {
   tournament: GolfTournament;
   field: GolfFieldEntry[];
   isSuperUser: boolean;
+  isLeagueAdmin: boolean;
   onFieldUpdated: () => void;
   onResultsUpdated: () => void;
   onTournamentUpdated: () => void;
 }
 
-function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isSuperUser, onFieldUpdated, onResultsUpdated, onTournamentUpdated }: GolfAdminPanelProps) {
+function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isSuperUser, isLeagueAdmin, onFieldUpdated, onResultsUpdated, onTournamentUpdated }: GolfAdminPanelProps) {
   const { toast } = useToast();
   const [adminTab, setAdminTab] = useState<"league" | "field" | "results" | "settings">("league");
 
@@ -1971,7 +1988,11 @@ function GolfAdminPanel({ leagueId, league, tournamentId, tournament, field, isS
 
         {/* League management */}
         {adminTab === "league" && (
-          <LeagueAdminSection leagueId={leagueId} league={league} />
+          <LeagueAdminSection
+            leagueId={leagueId}
+            league={league}
+            canManageDefaultStatus={isLeagueAdmin}
+          />
         )}
 
         {/* Field management */}

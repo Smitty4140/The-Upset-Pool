@@ -676,6 +676,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update the activation status assigned to future members of this league
+  app.patch('/api/leagues/:leagueId/default-member-status', isAuthenticated, async (req: any, res) => {
+    try {
+      const leagueId = parseInt(req.params.leagueId);
+      const { defaultMemberIsActive } = req.body;
+
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+
+      if (typeof defaultMemberIsActive !== "boolean") {
+        return res.status(400).json({ message: "defaultMemberIsActive must be a boolean" });
+      }
+
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
+
+      const member = await storage.getLeagueMember(leagueId, req.user.id);
+      if (!member?.isAdmin || !member.isActive) {
+        return res.status(403).json({
+          message: "An active league admin is required to update this setting",
+        });
+      }
+
+      const updatedLeague = await storage.updateLeague(leagueId, {
+        defaultMemberIsActive,
+      });
+
+      res.json({
+        message: `New users will now join as ${defaultMemberIsActive ? "Active" : "Inactive"}`,
+        league: updatedLeague,
+      });
+    } catch (error) {
+      console.error("Error updating default member status:", error);
+      res.status(500).json({ message: "Failed to update new user default status" });
+    }
+  });
+
   // Get user's leagues
   app.get('/api/user/leagues', isAuthenticated, async (req: any, res) => {
     try {
@@ -786,7 +826,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         leagueId: league.id,
         userId,
         isAdmin: false,
-        isActive: true,
+        isActive: league.defaultMemberIsActive,
         nickname: nicknameResult.value,
       });
       
@@ -897,7 +937,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         leagueId,
         userId,
         isAdmin: false,
-        isActive: true,
+        isActive: league.defaultMemberIsActive,
         nickname: userForNickname?.username || null,
       });
 
@@ -1759,6 +1799,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
       }
+
+      const league = await storage.getLeague(leagueId);
+      if (!league) {
+        return res.status(404).json({ message: "League not found" });
+      }
       
       // Verify user exists
       const user = await storage.getUser(userId);
@@ -1779,6 +1824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         leagueId,
         userId,
         isAdmin: !!isAdmin,
+        isActive: isAdmin ? true : league.defaultMemberIsActive,
       });
       
       res.status(201).json(leagueMember);

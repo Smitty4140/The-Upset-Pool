@@ -32,6 +32,7 @@ export interface League {
   season: number | null;
   sportType: string; // 'nfl' | 'golf'
   golfTournamentId: number | null;
+  defaultMemberIsActive: boolean;
   isArchived: boolean;
   archivedAt: string | null;
   createdAt: string;

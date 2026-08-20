@@ -350,10 +350,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async addUserToLeague(leagueId: number, userId: string, isAdmin: boolean): Promise<LeagueMember> {
+    const league = await this.getLeague(leagueId);
+    if (!league) {
+      throw new Error("League not found");
+    }
+
     return this.addLeagueMember({
       leagueId,
       userId,
       isAdmin,
+      isActive: isAdmin ? true : league.defaultMemberIsActive,
     });
   }
 

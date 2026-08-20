@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
+import NewMemberDefaultStatusControl from "@/components/NewMemberDefaultStatusControl";
 
 interface SchedulerStatus {
   isRunning: boolean;
@@ -277,7 +278,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
   // Check if user is an admin for this league
   const isAdmin = user && leagueMembers && Array.isArray(leagueMembers) && 
     leagueMembers.some((member: any) => 
-      member.userId === user.id && member.isAdmin
+      member.userId === user.id && member.isAdmin && member.isActive
     );
 
   // Check if picks are locked
@@ -787,6 +788,16 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
         )}
         
         <Separator className="my-6" />
+
+        {league && (
+          <>
+            <NewMemberDefaultStatusControl
+              leagueId={leagueId}
+              defaultMemberIsActive={league.defaultMemberIsActive}
+            />
+            <Separator className="my-6" />
+          </>
+        )}
         
         {/* Lock/Unlock Picks Section */}
         <div className="mb-6">

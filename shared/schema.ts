@@ -80,6 +80,7 @@ export const leagues = pgTable("leagues", {
   season: integer("season").notNull().default(sql`EXTRACT(YEAR FROM NOW())::int`),
   sportType: varchar("sport_type").default("nfl").notNull(), // 'nfl' | 'golf'
   golfTournamentId: integer("golf_tournament_id").references(() => golfTournaments.id), // null for NFL leagues
+  defaultMemberIsActive: boolean("default_member_is_active").default(true).notNull(),
   isArchived: boolean("is_archived").default(false),
   archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").defaultNow(),
