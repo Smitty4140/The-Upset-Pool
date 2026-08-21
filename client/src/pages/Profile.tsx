@@ -180,6 +180,7 @@ export default function Profile() {
                             variant="secondary"
                             size="icon"
                             className="absolute -bottom-2 -right-2 h-7 w-7 rounded-full"
+                            aria-label="Change profile image"
                           >
                             <Camera className="h-3.5 w-3.5" />
                           </Button>
