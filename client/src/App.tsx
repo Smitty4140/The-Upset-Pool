@@ -23,7 +23,13 @@ function Router() {
   const [location] = useLocation();
   
   // Fetch user's leagues
-  const { data: userLeagues, isLoading: isLoadingLeagues } = useQuery<any[]>({
+  const {
+    data: userLeagues,
+    isLoading: isLoadingLeagues,
+    isError: hasLeagueLoadError,
+    isFetching: isFetchingLeagues,
+    refetch: refetchLeagues,
+  } = useQuery<any[]>({
     queryKey: ["/api/user/leagues"],
     enabled: !!user && !!user.username,
   });
@@ -63,6 +69,28 @@ function Router() {
   // Show loading while checking leagues
   if (isLoadingLeagues) {
     return <div className="flex h-screen w-screen items-center justify-center">Loading...</div>;
+  }
+
+  // A failed request must not be mistaken for an account with no leagues.
+  if (user && user.username && hasLeagueLoadError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
+        <div className="w-full max-w-md rounded-lg border bg-background p-6 text-center shadow-sm" role="alert">
+          <h1 className="text-xl font-semibold">We couldn&apos;t load your leagues</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Your league memberships are still there. Please try loading them again.
+          </p>
+          <button
+            type="button"
+            onClick={() => refetchLeagues()}
+            disabled={isFetchingLeagues}
+            className="mt-5 inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+          >
+            {isFetchingLeagues ? "Retrying..." : "Try again"}
+          </button>
+        </div>
+      </div>
+    );
   }
   
   // Check if user needs to join a league

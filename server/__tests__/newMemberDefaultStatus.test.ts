@@ -139,6 +139,20 @@ describe("new member default status", () => {
   it("uses Active by default for a new league and invite-code join", async () => {
     expect(defaultLeague.defaultMemberIsActive).toBe(true);
 
+    const leaguesRes = await adminAgent.get("/api/user/leagues");
+    expect(leaguesRes.status).toBe(200);
+    expect(leaguesRes.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          leagueId: defaultLeague.id,
+          league: expect.objectContaining({
+            id: defaultLeague.id,
+            defaultMemberIsActive: true,
+          }),
+        }),
+      ]),
+    );
+
     const res = await defaultJoinerAgent.post("/api/leagues/join").send({
       inviteCode: defaultLeague.inviteCode,
       nickname: "Active Joiner",
@@ -146,6 +160,21 @@ describe("new member default status", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.member.isActive).toBe(true);
+
+    const joinedLeaguesRes = await defaultJoinerAgent.get("/api/user/leagues");
+    expect(joinedLeaguesRes.status).toBe(200);
+    expect(joinedLeaguesRes.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          leagueId: defaultLeague.id,
+          isActive: true,
+          league: expect.objectContaining({
+            id: defaultLeague.id,
+            defaultMemberIsActive: true,
+          }),
+        }),
+      ]),
+    );
   });
 
   it("applies an Inactive default to a new invite-code member", async () => {
@@ -193,6 +222,22 @@ describe("new member default status", () => {
     expect(createRes.status).toBe(201);
     expect(createRes.body.defaultMemberIsActive).toBe(true);
     leagueIds.push(createRes.body.id);
+
+    const leaguesRes = await adminAgent.get("/api/user/leagues");
+    expect(leaguesRes.status).toBe(200);
+    expect(leaguesRes.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          leagueId: createRes.body.id,
+          isAdmin: true,
+          isActive: true,
+          league: expect.objectContaining({
+            id: createRes.body.id,
+            defaultMemberIsActive: true,
+          }),
+        }),
+      ]),
+    );
 
     const updateRes = await adminAgent
       .patch(`/api/leagues/${createRes.body.id}/default-member-status`)
