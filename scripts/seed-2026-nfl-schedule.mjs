@@ -3,7 +3,7 @@
  * - Deletes incorrect 2026 weeks (Feb/Mar/Apr placeholder data)
  * - Creates weeks 1-18 with correct dates from ESPN calendar
  * - Fetches all games for each week and inserts them
- * - picks_lock_at = Sunday 1 PM ET (18:00 UTC) of that week
+ * - picks_lock_at = Sunday 1 PM ET of that week (17:00 or 18:00 UTC, DST-aware)
  */
 
 import pg from 'pg';
@@ -33,21 +33,43 @@ const ESPN_WEEKS = [
   { week: 18, startDate: '2027-01-06', endDate: '2027-01-12' },
 ];
 
-// Sunday 1 PM ET = 18:00 UTC (EST) or 17:00 UTC (EDT)
-// Season is Sep-Jan so weeks 1-9 are EDT (-4), weeks 10-18 are EST (-5)
-function getSundayLocksAt(startDate, weekNum) {
-  // Find the Sunday in that week (startDate is Sunday or Thursday/earlier)
-  const start = new Date(startDate + 'T00:00:00Z');
-  // startDate is always the week start; find the first Sunday on or after it
-  let sunday = new Date(start);
+// Convert 1 PM Eastern on a given calendar date to UTC, DST-aware.
+// Inline copy of server/timezoneUtils.ts easternTimeToUTC (this script can't
+// import the TypeScript module).
+function easternTimeToUTC(year, month, day, hour, minute = 0) {
+  const mm = String(month).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  const hh = String(hour).padStart(2, '0');
+  const mi = String(minute).padStart(2, '0');
+  const edt = new Date(`${year}-${mm}-${dd}T${hh}:${mi}:00-04:00`);
+  const est = new Date(`${year}-${mm}-${dd}T${hh}:${mi}:00-05:00`);
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', hour: 'numeric', hour12: false,
+  });
+  if (parseInt(fmt.format(edt)) === hour) return edt;
+  if (parseInt(fmt.format(est)) === hour) return est;
+  return edt;
+}
+
+// Lock at 1 PM ET on the week's game Sunday. Two traps here:
+// - The lock Sunday is the LAST Sunday in the week's window, not the first:
+//   week 1's ESPN window opens on the Sunday BEFORE kickoff (2026-09-06),
+//   while its games are played on 2026-09-13.
+// - The EDT/EST offset must come from the actual date, not a hardcoded week
+//   boundary: DST ends Nov 1 2026, which is week 8's Sunday, so a
+//   "weeks 1-9 are EDT" rule locks weeks 8 and 9 at noon ET.
+function getSundayLocksAt(endDate) {
+  const sunday = new Date(endDate + 'T00:00:00Z');
   while (sunday.getUTCDay() !== 0) {
-    sunday.setUTCDate(sunday.getUTCDate() + 1);
+    sunday.setUTCDate(sunday.getUTCDate() - 1);
   }
-  // EDT (UTC-4) for weeks 1-9, EST (UTC-5) for weeks 10-18
-  const offsetHours = weekNum <= 9 ? 4 : 5;
-  // 1 PM local = 13:00 local = 13 + offset UTC
-  sunday.setUTCHours(13 + offsetHours, 0, 0, 0);
-  return sunday.toISOString();
+  return easternTimeToUTC(
+    sunday.getUTCFullYear(),
+    sunday.getUTCMonth() + 1,
+    sunday.getUTCDate(),
+    13,
+    0,
+  ).toISOString();
 }
 
 async function fetchESPNWeek(weekNum) {
@@ -109,7 +131,7 @@ async function run() {
 
     // 2. For each ESPN week, create the week row and insert games
     for (const w of ESPN_WEEKS) {
-      const picksLockAt = getSundayLocksAt(w.startDate, w.week);
+      const picksLockAt = getSundayLocksAt(w.endDate);
 
       // Insert week
       const weekRes = await client.query(
