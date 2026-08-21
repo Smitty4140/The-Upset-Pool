@@ -84,14 +84,17 @@ export default function Header() {
           {/* Logo and Brand */}
           <div className="flex items-center">
             <div className="flex-shrink-0 flex items-center">
-              {/* The logo is the site's "home" affordance, so it links home.
-                  The Snood easter egg lives in the footer instead. */}
-              <Link href="/">
-                <span className="flex items-center cursor-pointer" aria-label="Upset Pool home">
-                  <img src={upsetPoolLogo} alt="" className="h-10 w-10 mr-2" />
-                  <h1 className="text-2xl font-bold text-white hover:text-gray-200 transition-colors">Upset Pool</h1>
-                </span>
-              </Link>
+              {/* Deliberate easter egg: the logo opens Snood rather than
+                  linking home. "My Leagues" is the route to the dashboard. */}
+              <a
+                href="https://playminigames.net/game/snood"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center cursor-pointer"
+              >
+                <img src={upsetPoolLogo} alt="Upset Pool" className="h-10 w-10 mr-2" />
+                <h1 className="text-2xl font-bold text-white hover:text-gray-200 transition-colors">Upset Pool</h1>
+              </a>
             </div>
             
             {/* Desktop Navigation */}

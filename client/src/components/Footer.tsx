@@ -24,15 +24,6 @@ export default function Footer() {
             >
               Support the pool
             </a>
-            <a
-              href="https://playminigames.net/game/snood"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-400 hover:text-gray-700 transition-colors"
-              title="Bye-bye, productivity"
-            >
-              Snood
-            </a>
           </nav>
         </div>
       </div>
