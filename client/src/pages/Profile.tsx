@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,15 +27,13 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Camera, Loader2, LogOut, Pencil, X } from "lucide-react";
+import { Camera, Loader2, Pencil, X } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Badge } from "@/components/ui/badge";
 
 const profileFormSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters").max(50),
-  email: z.string().email("Please enter a valid email address").optional().or(z.literal("")),
+  email: z.string().email("Please enter a valid email address"),
   profileImageUrl: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
-  receiveNotifications: z.boolean().default(true),
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -53,7 +50,6 @@ export default function Profile() {
       username: user?.username || "",
       email: user?.email || "",
       profileImageUrl: user?.profileImageUrl || "",
-      receiveNotifications: true,
     },
   });
 
@@ -63,7 +59,6 @@ export default function Profile() {
         username: user.username,
         email: user.email || "",
         profileImageUrl: user.profileImageUrl || "",
-        receiveNotifications: true,
       });
     }
   }, [user, form]);
@@ -89,33 +84,12 @@ export default function Profile() {
     },
   });
 
-  const { mutate: logout, isPending: isLoggingOut } = useMutation({
-    mutationFn: async () => {
-      const response = await fetch("/api/logout", { method: "POST", credentials: "include" });
-      if (!response.ok) throw new Error("Failed to logout");
-      return response;
-    },
-    onSuccess: () => {
-      queryClient.removeQueries({ queryKey: ["/api/auth/user"] });
-      queryClient.clear();
-      window.location.href = "/";
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to logout",
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleCancel = () => {
     if (user) {
       form.reset({
         username: user.username,
         email: user.email || "",
         profileImageUrl: user.profileImageUrl || "",
-        receiveNotifications: true,
       });
     }
     setIsEditing(false);
@@ -253,9 +227,9 @@ export default function Profile() {
                         name="username"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Username</FormLabel>
+                            <FormLabel>Default Username</FormLabel>
                             <FormControl>
-                              <Input placeholder="Username" {...field} />
+                              <Input placeholder="Default Username" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -274,24 +248,6 @@ export default function Profile() {
                           <Input type="email" placeholder="you@example.com" {...field} value={field.value || ""} />
                         </FormControl>
                         <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="receiveNotifications"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                        <div className="space-y-0.5">
-                          <FormLabel>Email Notifications</FormLabel>
-                          <div className="text-sm text-muted-foreground">
-                            Receive game reminders and weekly results
-                          </div>
-                        </div>
-                        <FormControl>
-                          <Switch checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
                       </FormItem>
                     )}
                   />
@@ -325,6 +281,7 @@ export default function Profile() {
                     </AvatarFallback>
                   </Avatar>
                   <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Default Username</p>
                     <p className="text-lg font-semibold">{user?.username}</p>
                     <p className="text-sm text-muted-foreground">{user?.email || "No email set"}</p>
                   </div>
@@ -333,7 +290,7 @@ export default function Profile() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Username</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-0.5">Default Username</p>
                       <p className="font-medium">{user?.username}</p>
                     </div>
                     <div>
@@ -342,36 +299,6 @@ export default function Profile() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="text-sm font-medium">Email Notifications</p>
-                      <p className="text-sm text-muted-foreground">Game reminders and weekly results</p>
-                    </div>
-                    <Badge variant={form.getValues("receiveNotifications") ? "default" : "secondary"}>
-                      {form.getValues("receiveNotifications") ? "On" : "Off"}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => logout()}
-                    disabled={isLoggingOut}
-                  >
-                    {isLoggingOut ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Signing out...
-                      </>
-                    ) : (
-                      <>
-                        <LogOut className="h-4 w-4 mr-2" />
-                        Sign Out
-                      </>
-                    )}
-                  </Button>
                 </div>
               </div>
             )}

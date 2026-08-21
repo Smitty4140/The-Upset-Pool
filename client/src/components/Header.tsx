@@ -1,21 +1,57 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { useMutation } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Menu, X } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import { Loader2, LogOut, Menu, UserRound, X } from "lucide-react";
 import upsetPoolLogo from "@assets/7ce37caf-c21f-4929-a667-365370f1324d_1766504568458.png";
 
 export default function Header() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { toast } = useToast();
 
   // Close mobile menu when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location]);
+
+  const { mutate: logout, isPending: isLoggingOut } = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to sign out");
+      }
+    },
+    onSuccess: () => {
+      queryClient.clear();
+      setIsMobileMenuOpen(false);
+      window.location.assign("/");
+    },
+    onError: (error) => {
+      toast({
+        title: "Couldn't sign out",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
   
   // Fix for nested anchor issue - using custom rendering for links
   const NavLink = ({ href, active, children, mobile = false }: { href: string; active: boolean; children: React.ReactNode; mobile?: boolean }) => {
@@ -64,9 +100,6 @@ export default function Header() {
               <NavLink href="/" active={location === "/"}>
                 My Leagues
               </NavLink>
-              <NavLink href="/profile" active={location === "/profile"}>
-                Profile
-              </NavLink>
               <NavLink href="/rules" active={location === "/rules"}>
                 Rules
               </NavLink>
@@ -92,13 +125,46 @@ export default function Header() {
                 >
                   ☕ Buy me a coffee
                 </a>
-                <span className="font-medium text-white">
-                  {user?.username || "User"}
-                </span>
-                <Avatar className="h-10 w-10 border-2 border-white">
-                  <AvatarImage src={user?.profileImageUrl || ""} alt={user?.username || "User"} />
-                  <AvatarFallback className="bg-accent text-primary">{(user?.username || "U")[0].toUpperCase()}</AvatarFallback>
-                </Avatar>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-white"
+                      aria-label={`Account menu for ${user?.username || "User"}`}
+                    >
+                      <span className="font-medium text-white">
+                        {user?.username || "User"}
+                      </span>
+                      <Avatar className="h-10 w-10 border-2 border-white">
+                        <AvatarImage src={user?.profileImageUrl || ""} alt={user?.username || "User"} />
+                        <AvatarFallback className="bg-accent text-primary">{(user?.username || "U")[0].toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile">
+                        <UserRound className="h-4 w-4" />
+                        Profile
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        logout();
+                      }}
+                      disabled={isLoggingOut}
+                    >
+                      {isLoggingOut ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <LogOut className="h-4 w-4" />
+                      )}
+                      {isLoggingOut ? "Signing out..." : "Sign Out"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ) : (
               <Button asChild variant="secondary" className="bg-white text-primary hover:bg-blue-50">
@@ -113,8 +179,9 @@ export default function Header() {
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
               aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-navigation"
             >
-              <span className="sr-only">Open main menu</span>
+              <span className="sr-only">{isMobileMenuOpen ? "Close main menu" : "Open main menu"}</span>
               {isMobileMenuOpen ? (
                 <X className="block h-6 w-6" aria-hidden="true" />
               ) : (
@@ -126,13 +193,10 @@ export default function Header() {
 
         {/* Mobile menu */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden">
+          <div id="mobile-navigation" className="lg:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-700">
               <NavLink href="/" active={location === "/"} mobile>
                 My Leagues
-              </NavLink>
-              <NavLink href="/profile" active={location === "/profile"} mobile>
-                Profile
               </NavLink>
               <NavLink href="/rules" active={location === "/rules"} mobile>
                 Rules
@@ -160,9 +224,27 @@ export default function Header() {
                     </Avatar>
                     <div className="ml-3">
                       <div className="text-base font-medium text-white">{user?.username || "User"}</div>
-                      <div className="text-sm font-medium text-gray-400">{user?.email || ""}</div>
                     </div>
                   </div>
+                  <NavLink href="/profile" active={location === "/profile"} mobile>
+                    <span className="flex items-center gap-2">
+                      <UserRound className="h-4 w-4" />
+                      Profile
+                    </span>
+                  </NavLink>
+                  <button
+                    type="button"
+                    onClick={() => logout()}
+                    disabled={isLoggingOut}
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isLoggingOut ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <LogOut className="h-4 w-4" />
+                    )}
+                    {isLoggingOut ? "Signing out..." : "Sign Out"}
+                  </button>
                   <a
                     href="https://buymeacoffee.com/theupsetpool"
                     target="_blank"

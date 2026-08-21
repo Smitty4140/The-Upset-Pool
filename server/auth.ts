@@ -300,23 +300,51 @@ export function setupAuth(app: Express) {
     }
 
     try {
-      const { username } = req.body;
+      const { username, email, profileImageUrl } = req.body;
       const userId = req.user.id;
 
-      if (username) {
-        // Check if username is already taken by another user
-        const existingUser = await storage.getUserByUsername(username);
-        if (existingUser && existingUser.id !== userId) {
-          return res.status(400).json({ message: "Username already taken" });
-        }
+      if (typeof username !== "string" || username.trim().length < 3) {
+        return res.status(400).json({ message: "Username must be at least 3 characters" });
       }
 
-      const updatedUser = await storage.updateUser(userId, {
-        username: username || null
-      });
+      const normalizedUsername = username.trim();
+      const existingUser = await storage.getUserByUsername(normalizedUsername);
+      if (existingUser && existingUser.id !== userId) {
+        return res.status(400).json({ message: "Username already taken" });
+      }
 
-      // Update the session with the new username
+      const updates: {
+        username: string;
+        email?: string;
+        profileImageUrl?: string | null;
+      } = { username: normalizedUsername };
+
+      if (email !== undefined) {
+        if (typeof email !== "string" || !email.trim()) {
+          return res.status(400).json({ message: "Email address is required" });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+        const existingEmailUser = await storage.getUserByEmail(normalizedEmail);
+        if (existingEmailUser && existingEmailUser.id !== userId) {
+          return res.status(400).json({ message: "User with this email already exists" });
+        }
+        updates.email = normalizedEmail;
+      }
+
+      if (profileImageUrl !== undefined) {
+        updates.profileImageUrl =
+          typeof profileImageUrl === "string" && profileImageUrl.trim()
+            ? profileImageUrl.trim()
+            : null;
+      }
+
+      const updatedUser = await storage.updateUser(userId, updates);
+
+      // Keep the authenticated session in sync with the updated account details.
       req.user.username = updatedUser.username;
+      req.user.email = updatedUser.email;
+      req.user.profileImageUrl = updatedUser.profileImageUrl;
 
       res.json({
         id: updatedUser.id,
