@@ -99,7 +99,9 @@ export default function JoinLeague() {
           </div>
           <CardTitle className="text-2xl font-bold">Join a League</CardTitle>
           <CardDescription>
-            Enter the invite code you received to join your league
+            Pools are private, so you need an invite code from whoever runs
+            yours. Don&apos;t have one? Start your own league below — you&apos;ll
+            get a code to share.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -117,8 +119,11 @@ export default function JoinLeague() {
                         <Input
                           {...field}
                           type="text"
-                          placeholder="Enter invite code (e.g., ABC123)"
+                          placeholder="e.g. ABC123"
                           className="pl-10 uppercase"
+                          autoCapitalize="characters"
+                          autoCorrect="off"
+                          spellCheck={false}
                           onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                         />
                       </div>

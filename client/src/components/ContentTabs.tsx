@@ -11,13 +11,16 @@ type ContentTabsProps = {
   isSuperUser?: boolean;
 };
 
+// "Game Spreads" was where you actually make your pick, and "Weekly Picks"
+// was where you read everyone else's — the labels described the data on each
+// tab rather than what you go there to do.
 const TAB_CONFIG: { id: Tab; label: string; icon: React.ReactNode; adminOnly?: boolean; superUserOnly?: boolean }[] = [
-  { id: "spreads",     label: "Game Spreads",  icon: <Shield className="h-4 w-4" /> },
-  { id: "weeklypicks", label: "Weekly Picks",  icon: <Eye className="h-4 w-4" /> },
-  { id: "leaderboard", label: "Leaderboard",   icon: <Trophy className="h-4 w-4" /> },
-  { id: "profile",     label: "Profile",       icon: <User className="h-4 w-4" /> },
-  { id: "results",     label: "Results",       icon: <Flag className="h-4 w-4" />, superUserOnly: true },
-  { id: "admin",       label: "Admin",         icon: <UserCog className="h-4 w-4" />, adminOnly: true },
+  { id: "spreads",     label: "Make Picks",      icon: <Shield className="h-4 w-4" /> },
+  { id: "weeklypicks", label: "Everyone's Picks", icon: <Eye className="h-4 w-4" /> },
+  { id: "leaderboard", label: "Leaderboard",     icon: <Trophy className="h-4 w-4" /> },
+  { id: "profile",     label: "Profile",         icon: <User className="h-4 w-4" /> },
+  { id: "results",     label: "Results",         icon: <Flag className="h-4 w-4" />, superUserOnly: true },
+  { id: "admin",       label: "Admin",           icon: <UserCog className="h-4 w-4" />, adminOnly: true },
 ];
 
 export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = false, isAdmin = false, isSuperUser = false }: ContentTabsProps) {
@@ -28,7 +31,11 @@ export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = fa
     if (tab.superUserOnly && !isSuperUser) return false;
     if (tab.adminOnly && !isAdmin) return false;
     return true;
-  });
+  }).map(tab =>
+    tab.id === "spreads" && isPicksLocked
+      ? { ...tab, label: "Games & Spreads" }
+      : tab,
+  );
 
   const activeConfig = visibleTabs.find(t => t.id === activeTab) ?? visibleTabs[0];
 

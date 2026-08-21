@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Trophy, Medal, Calendar, Check, X, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import React, { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface UserPick {
   id: number;
@@ -28,6 +29,7 @@ type LeaderboardProps = {
 };
 
 export default function Leaderboard({ leagueId }: LeaderboardProps) {
+  const { user: currentUser } = useAuth();
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [userPicksCache, setUserPicksCache] = useState<Record<string, UserPick[]>>({});
   
@@ -102,17 +104,6 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
 
   const rankedLeaderboard = leaderboard ? calculateRankings(leaderboard) : [];
 
-  const formatDate = () => {
-    const now = new Date();
-    return now.toLocaleDateString(undefined, { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   if (isLoading) {
     return (
       <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
@@ -148,7 +139,7 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
         </div>
         <div className="flex items-center text-sm text-gray-500 mt-1">
           <Calendar className="h-3.5 w-3.5 mr-1" />
-          <span>As of {formatDate()}</span>
+          <span>Season points to date. Choose a row to see that player's weekly picks.</span>
         </div>
       </div>
       <div className="px-2 sm:px-4 py-3">
@@ -157,10 +148,10 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
           <thead className="bg-gray-50">
             <tr>
               <th scope="col" className="px-1 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Place</th>
-              <th scope="col" className="px-1 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Score</th>
-              <th scope="col" className="px-1 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Pooler</th>
-              <th scope="col" className="px-1 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Pick</th>
-              <th scope="col" className="px-1 sm:px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Picked Every Week</th>
+              <th scope="col" className="px-1 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Points</th>
+              <th scope="col" className="px-1 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Player</th>
+              <th scope="col" className="px-1 sm:px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Last Pick</th>
+              <th scope="col" className="px-1 sm:px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Every Week</th>
               <th scope="col" className="px-1 sm:px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-6 sm:w-12"></th>
             </tr>
           </thead>
@@ -168,9 +159,23 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
             {rankedLeaderboard && rankedLeaderboard.length > 0 ? (
               rankedLeaderboard.map((user) => (
                 <React.Fragment key={user.id}>
-                  <tr 
-                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+                  <tr
+                    className={`cursor-pointer transition-colors ${
+                      currentUser?.id === user.id
+                        ? "bg-blue-50/70 hover:bg-blue-50"
+                        : "hover:bg-gray-50"
+                    }`}
                     onClick={() => handleToggleAccordion(user.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleToggleAccordion(user.id);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-expanded={expandedUserId === user.id}
+                    aria-label={`${user.nickname ?? user.username}, place ${user.rank}, ${user.totalPoints || 0} points. Show weekly picks.`}
                     data-testid={`leaderboard-row-${user.id}`}
                   >
                     <td className="px-1 sm:px-3 py-3 sm:py-4 whitespace-nowrap text-sm">
@@ -235,12 +240,22 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                     </td>
                     <td className="px-1 sm:px-3 py-3 sm:py-4 whitespace-nowrap text-center">
                       {user.everyWeekEligible ? (
-                        <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center text-green-600">
+                        <div
+                          data-testid={`eligible-status-${user.id}`}
+                          className="flex items-center justify-center text-green-600"
+                          title="Has picked every week — still eligible for the every-week prize"
+                        >
                           <Check className="h-4 w-4 sm:h-5 sm:w-5" />
+                          <span className="sr-only">Picked every week</span>
                         </div>
                       ) : (
-                        <div data-testid={`eligible-status-${user.id}`} className="flex items-center justify-center text-red-600">
+                        <div
+                          data-testid={`eligible-status-${user.id}`}
+                          className="flex items-center justify-center text-gray-400"
+                          title="Missed at least one week — no longer eligible for the every-week prize"
+                        >
                           <X className="h-4 w-4 sm:h-5 sm:w-5" />
+                          <span className="sr-only">Missed a week</span>
                         </div>
                       )}
                     </td>
@@ -330,7 +345,7 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
                   <div className="flex flex-col items-center text-gray-500">
                     <Trophy className="h-10 w-10 text-gray-300 mb-2" />
                     <p className="font-medium">No entries yet</p>
-                    <p className="text-xs mt-1">Make your pick to join the leaderboard!</p>
+                    <p className="text-xs mt-1">Standings appear once picks are locked for the week.</p>
                   </div>
                 </td>
               </tr>
@@ -338,6 +353,28 @@ export default function Leaderboard({ leagueId }: LeaderboardProps) {
           </tbody>
         </table>
         </div>
+
+        {/* Legend: the icon-only columns are meaningless without one */}
+        {rankedLeaderboard.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-gray-100 pt-3 text-xs text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <Check className="h-3.5 w-3.5 text-green-600" />
+              Picked every week so far
+            </span>
+            <span className="flex items-center gap-1.5">
+              <X className="h-3.5 w-3.5 text-gray-400" />
+              Missed at least one week
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm border border-green-200 bg-green-50" />
+              Last pick won
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm border border-red-200 bg-red-50" />
+              Last pick lost
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

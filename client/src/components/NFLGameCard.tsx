@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { NFLGame } from "@/lib/types";
 import { getTeamLogo } from "@/lib/teamLogos";
 import { formatGameTime } from "@/lib/formatDate";
-import { Clock, Check, Lock } from "lucide-react";
+import { Clock, Check, Lock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -90,7 +90,17 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
 
   // Show the selected/submitted highlight if either locally selected or already submitted
   const showHighlight = isGameSelected || isSubmittedPick;
-  
+
+  // A selection that exists only in the browser is NOT a saved pick. Saying
+  // "Selected Game" for both states is what made people think an unsaved
+  // choice had been submitted, so each state gets its own wording and colour.
+  const isUnsavedSelection = isGameSelected && !isSubmittedPick;
+  const bannerStyle = isSubmittedPick && isPickLockedByKickoff
+    ? { className: 'bg-amber-600 text-white', icon: <Lock size={16} />, label: 'Your pick — locked' }
+    : isSubmittedPick
+      ? { className: 'bg-green-600 text-white', icon: <Check size={16} />, label: 'Your pick for this week' }
+      : { className: 'bg-blue-600 text-white', icon: <AlertCircle size={16} />, label: 'Selected — not saved yet' };
+
   const isFullyLocked = disabled || isViewingFutureWeek || isInactive || hasGameStarted || isPickLockedByKickoff || spreadsNotPulled;
 
   // Always select the underdog team regardless of which team is clicked
@@ -111,17 +121,17 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
   };
 
   const tooltipContent = isInactive
-    ? "Your team is not activated. Contact your league admin to start picking upsets."
+    ? "Your membership in this league isn't active yet. Ask your league admin to activate you, then you can make picks."
     : isPickLockedByKickoff
-      ? "Your pick is locked — your selected game has already kicked off"
+      ? "Your pick is locked because the game you picked has already kicked off."
     : hasGameStarted
-      ? "This game has already started and is no longer available for picks"
+      ? "This game has already kicked off, so it can no longer be picked."
     : spreadsNotPulled
-      ? "Games are available for selection after spreads are pulled."
-    : isViewingFutureWeek 
-      ? "Picks are not allowed until 8 hours before the first game of the week. Spreads may change until that point."
-      : disabled 
-        ? "Picks are locked for this week"
+      ? "Spreads for this week haven't been posted yet. Picks open once they arrive, 8 hours before the first game."
+    : isViewingFutureWeek
+      ? "Picks for this week open 8 hours before the first game. Spreads can still change until then."
+      : disabled
+        ? "Picks are locked for this week."
         : null;
 
   const gameCard = (
@@ -133,11 +143,11 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
         ${isFullyLocked ? 'cursor-not-allowed' : ''}
         ${hasGameStarted || (isPickLockedByKickoff && !showHighlight) ? 'bg-gray-50 border-gray-300' : ''}`}
     >
-      {/* Selected / submitted pick indicator at the top */}
+      {/* Pick state banner: locked pick, saved pick, or an unsaved selection */}
       {showHighlight && (
-        <div className={`${isPickLockedByKickoff ? 'bg-amber-600' : 'bg-green-600'} text-white text-sm font-bold text-center py-2 flex items-center justify-center space-x-1`}>
-          {isPickLockedByKickoff ? <Lock size={16} /> : <Check size={16} />}
-          <span>{isPickLockedByKickoff ? 'Pick Locked' : 'Selected Game'}</span>
+        <div className={`${bannerStyle.className} text-sm font-bold text-center py-2 flex items-center justify-center space-x-1.5`}>
+          {bannerStyle.icon}
+          <span>{bannerStyle.label}</span>
         </div>
       )}
       
@@ -181,14 +191,19 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
           
           {/* Away Team spread if they're the underdog */}
           {isAwayUnderdog && (
-            <div className="bg-green-100 text-green-800 px-4 py-1.5 rounded-full font-bold text-lg">
-              {spreadText}
+            <div className="flex flex-col items-end flex-shrink-0">
+              <div className="bg-green-100 text-green-800 px-4 py-1.5 rounded-full font-bold text-lg">
+                {spreadText}
+              </div>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-green-700 mt-0.5">
+                Underdog
+              </span>
             </div>
           )}
         </div>
-        
-        {/* AT text aligned with team name */}
-        <div className="pl-19 ml-16 pb-1 text-xs text-gray-500 text-left">
+
+        {/* AT divider, aligned under the team names */}
+        <div className="ml-4 pl-16 pb-1 text-xs text-gray-500 text-left">
           AT
         </div>
         
@@ -217,15 +232,36 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
           
           {/* Home Team spread if they're the underdog */}
           {isHomeUnderdog && (
-            <div className="bg-green-100 text-green-800 px-4 py-1.5 rounded-full font-bold text-lg">
-              {spreadText}
+            <div className="flex flex-col items-end flex-shrink-0">
+              <div className="bg-green-100 text-green-800 px-4 py-1.5 rounded-full font-bold text-lg">
+                {spreadText}
+              </div>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-green-700 mt-0.5">
+                Underdog
+              </span>
             </div>
           )}
         </div>
       </div>
-      
+
+      {/* A card with no underdog is otherwise unexplained. The week-wide "no
+          spreads yet" case is announced once at the page level instead of
+          repeating on all sixteen cards. */}
+      {!underdogTeam && !spreadsNotPulled && (
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-600 text-center">
+          Even spread — no underdog in this game, so it can't be picked.
+        </div>
+      )}
+
+      {/* Tell first-time users that the underdog is the only pickable side */}
+      {!isFullyLocked && !showHighlight && underdogTeam && (
+        <div className="px-4 py-2.5 bg-blue-50/60 border-t border-blue-100 text-xs text-blue-800 text-center">
+          Choose this card to pick <span className="font-semibold">{underdogTeam.name}</span> — you can only pick underdogs.
+        </div>
+      )}
+
       {/* Submit button at the bottom only when newly selected (not already submitted) */}
-      {isGameSelected && !isSubmittedPick && onSubmit && !isFullyLocked && (
+      {isUnsavedSelection && onSubmit && !isFullyLocked && (
         <div className="bg-gray-50 px-4 py-3 border-t border-gray-100">
           <Button 
             onClick={(e) => {
@@ -244,7 +280,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
                 <span>Submitting...</span>
               </span>
             ) : (
-              "SUBMIT PICK"
+              "Submit Pick"
             )}
           </Button>
         </div>
