@@ -1,8 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { db } from "./db";
-import { sql } from "drizzle-orm";
+import { runLeagueDataBackfills } from "./leagueDataBackfill";
+import { pool } from "./db";
 
 const app = express();
 app.use(express.json());
@@ -39,6 +39,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const leagueBackfillResult = await runLeagueDataBackfills(pool);
+  log(
+    `League data verified (${leagueBackfillResult.leaguesUpdated} leagues, ` +
+      `${leagueBackfillResult.membershipsUpdated} memberships, ` +
+      `${leagueBackfillResult.nicknamesUpdated} nicknames updated)`,
+  );
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -68,20 +75,6 @@ app.use((req, res, next) => {
     reusePort: true,
   }, async () => {
     log(`serving on port ${port}`);
-    
-    // Backfill any league_members with null nickname from the user's username
-    try {
-      await db.execute(sql`
-        UPDATE league_members lm
-        SET nickname = u.username
-        FROM users u
-        WHERE lm.user_id = u.id
-          AND lm.nickname IS NULL
-          AND u.username IS NOT NULL
-      `);
-    } catch (err) {
-      console.error("[Startup] Nickname backfill failed:", err);
-    }
 
     // Start the game scheduler after server is running
     try {

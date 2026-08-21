@@ -1,0 +1,1 @@
+- [League database release sync](league-database-release-sync.md) — schema setup must cover both the app’s custom dev database and Replit’s managed dev database used for production diffs.

@@ -77,7 +77,7 @@ export const leagues = pgTable("leagues", {
   name: varchar("name").notNull(),
   description: text("description"),
   inviteCode: varchar("invite_code", { length: 6 }).notNull().unique(),
-  season: integer("season").notNull().default(sql`EXTRACT(YEAR FROM NOW())::int`),
+  season: integer("season").default(sql`EXTRACT(YEAR FROM NOW())::int`),
   sportType: varchar("sport_type").default("nfl").notNull(), // 'nfl' | 'golf'
   golfTournamentId: integer("golf_tournament_id").references(() => golfTournaments.id), // null for NFL leagues
   defaultMemberIsActive: boolean("default_member_is_active").default(true).notNull(),
@@ -99,7 +99,8 @@ export const leagueMembers = pgTable("league_members", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => {
   return {
-    leagueUserUnique: unique().on(table.leagueId, table.userId),
+    leagueUserUnique: unique("league_members_league_id_user_id_unique")
+      .on(table.leagueId, table.userId),
   };
 });
 
@@ -116,7 +117,8 @@ export const nflWeeks = pgTable("nfl_weeks", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => {
   return {
-    weekSeason: unique().on(table.weekNumber, table.season),
+    weekSeason: unique("nfl_weeks_week_number_season_unique")
+      .on(table.weekNumber, table.season),
     picksLockAtIdx: index("idx_nfl_weeks_picks_lock_at").on(table.picksLockAt),
     seasonActiveIdx: index("idx_nfl_weeks_season_active").on(table.season, table.active),
   };
@@ -160,7 +162,8 @@ export const userPicks = pgTable("user_picks", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => {
   return {
-    userWeekLeague: unique().on(table.userId, table.weekId, table.leagueId),
+    userWeekLeague: unique("user_picks_user_id_week_id_league_id_unique")
+      .on(table.userId, table.weekId, table.leagueId),
     leagueWeekIdx: index("idx_user_picks_league_week").on(table.leagueId, table.weekId),
     userLeagueIdx: index("idx_user_picks_user_league").on(table.userId, table.leagueId),
   };
@@ -184,7 +187,8 @@ export const golfTournamentField = pgTable("golf_tournament_field", {
   owgrAtLock: integer("owgr_at_lock"), // NULL = amateur with no OWGR → 200 points via COALESCE
   odds: integer("odds"), // e.g. 2000 = +2000 (to-1 odds). NULL if not available.
 }, (table) => ({
-  tournamentPlayerUnique: unique().on(table.tournamentId, table.playerId),
+  tournamentPlayerUnique: unique("golf_tournament_field_tournament_id_player_id_key")
+    .on(table.tournamentId, table.playerId),
 }));
 
 // Golf Picks header (one row per user per league per tournament)
@@ -196,7 +200,8 @@ export const golfPicks = pgTable("golf_picks", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
-  userLeagueTournamentUnique: unique().on(table.userId, table.leagueId, table.tournamentId),
+  userLeagueTournamentUnique: unique("golf_picks_user_id_league_id_tournament_id_key")
+    .on(table.userId, table.leagueId, table.tournamentId),
 }));
 
 // Golf Pick Selections (individual golfer choices for a pick session)
@@ -206,7 +211,8 @@ export const golfPickSelections = pgTable("golf_pick_selections", {
   pickId: integer("pick_id").notNull().references(() => golfPicks.id),
   playerId: integer("player_id").notNull().references(() => golfPlayers.id),
 }, (table) => ({
-  pickPlayerUnique: unique().on(table.pickId, table.playerId),
+  pickPlayerUnique: unique("golf_pick_selections_pick_id_player_id_key")
+    .on(table.pickId, table.playerId),
 }));
 
 // Golf Results (finishing positions per player per tournament)
@@ -219,7 +225,8 @@ export const golfResults = pgTable("golf_results", {
   topTen: boolean("top_ten").default(false).notNull(), // auto-set: finalPosition <= 10 (live or final)
   scoreToPar: integer("score_to_par"), // e.g. -3, 0, +2; null = not yet available
 }, (table) => ({
-  tournamentPlayerResultUnique: unique().on(table.tournamentId, table.playerId),
+  tournamentPlayerResultUnique: unique("golf_results_tournament_id_player_id_key")
+    .on(table.tournamentId, table.playerId),
 }));
 
 // Relationships
