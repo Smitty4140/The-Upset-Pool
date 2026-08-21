@@ -14,6 +14,7 @@
  */
 
 import { pool } from './db';
+import { easternTimeToUTC } from './timezoneUtils';
 
 // ESPN regular-season week calendar (from API)
 const ESPN_WEEKS = [
@@ -37,16 +38,25 @@ const ESPN_WEEKS = [
   { week: 18, startDate: '2027-01-06', endDate: '2027-01-12' },
 ];
 
-// Sunday 1 PM ET = 17:00 UTC (EDT, weeks 1-9) or 18:00 UTC (EST, weeks 10-18)
-function getSundayLocksAt(startDate: string, weekNum: number): string {
-  const start = new Date(startDate + 'T00:00:00Z');
-  const sunday = new Date(start);
+// Lock at 1 PM ET on the week's game Sunday. Two traps here:
+// - The lock Sunday is the LAST Sunday in the week's window, not the first:
+//   week 1's ESPN window opens on the Sunday BEFORE kickoff (2026-09-06),
+//   while its games are played on 2026-09-13.
+// - The EDT/EST offset must come from the actual date, not a hardcoded week
+//   boundary: DST ends Nov 1 2026, which is week 8's Sunday, so a
+//   "weeks 1-9 are EDT" rule locks weeks 8 and 9 at noon ET.
+function getSundayLocksAt(endDate: string): string {
+  const sunday = new Date(endDate + 'T00:00:00Z');
   while (sunday.getUTCDay() !== 0) {
-    sunday.setUTCDate(sunday.getUTCDate() + 1);
+    sunday.setUTCDate(sunday.getUTCDate() - 1);
   }
-  const offsetHours = weekNum <= 9 ? 4 : 5;
-  sunday.setUTCHours(13 + offsetHours, 0, 0, 0);
-  return sunday.toISOString();
+  return easternTimeToUTC(
+    sunday.getUTCFullYear(),
+    sunday.getUTCMonth() + 1,
+    sunday.getUTCDate(),
+    13,
+    0,
+  ).toISOString();
 }
 
 async function fetchESPNWeek(weekNum: number): Promise<any[]> {
@@ -123,7 +133,7 @@ export async function seedNFL2026Schedule(force = false): Promise<Seed2026Result
     const perWeek: { week: number; games: number }[] = [];
 
     for (const w of ESPN_WEEKS) {
-      const picksLockAt = getSundayLocksAt(w.startDate, w.week);
+      const picksLockAt = getSundayLocksAt(w.endDate);
       const weekRes = await client.query(
         `INSERT INTO nfl_weeks (week_number, season, start_date, end_date, active, picks_lock_at)
          VALUES ($1, 2026, $2, $3, false, $4)

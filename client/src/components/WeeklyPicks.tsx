@@ -126,7 +126,7 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
               </p>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-sm mx-auto">
                 <p className="text-sm text-blue-800 font-medium">
-                  Come back after 1:00 PM EST on Sunday to see everyone's picks!
+                  Come back after 1:00 PM ET on Sunday to see everyone's picks.
                 </p>
               </div>
             </div>
@@ -182,19 +182,19 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
   
   // Get spread distribution data
   const spreadRanges = {
-    'Less than 3': 0,
-    '3 to 6': 0,
-    'More than 6': 0
+    'Under 3 pts': 0,
+    '3 to 6 pts': 0,
+    'Over 6 pts': 0
   };
   
   weeklyPicks?.forEach(pick => {
     const spread = Math.abs(Number(pick.spreadAtTimeOfPick));
     if (spread < 3) {
-      spreadRanges['Less than 3']++;
+      spreadRanges['Under 3 pts']++;
     } else if (spread >= 3 && spread <= 6) {
-      spreadRanges['3 to 6']++;
+      spreadRanges['3 to 6 pts']++;
     } else {
-      spreadRanges['More than 6']++;
+      spreadRanges['Over 6 pts']++;
     }
   });
   
@@ -300,7 +300,7 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
                   <Trophy className="h-5 w-5 text-green-600" />
                 </div>
               </div>
-              <p className="text-xs text-green-600 mt-1">Earned by all poolers</p>
+              <p className="text-xs text-green-600 mt-1">Earned by all players this week</p>
             </CardContent>
           </Card>
 
@@ -315,7 +315,7 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
                   <TrendingUp className="h-5 w-5 text-blue-600" />
                 </div>
               </div>
-              <p className="text-xs text-blue-600 mt-1">Points per winning pick</p>
+              <p className="text-xs text-blue-600 mt-1">Average spread of winning picks</p>
             </CardContent>
           </Card>
 
@@ -343,14 +343,14 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-amber-600 uppercase tracking-wide">Unique Games Won</p>
+                  <p className="text-xs font-medium text-amber-600 uppercase tracking-wide">Upsets Hit</p>
                   <p className="text-2xl font-bold text-amber-700">{weeklyStats.uniqueGamesWon.size}</p>
                 </div>
                 <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
                   <Users className="h-5 w-5 text-amber-600" />
                 </div>
               </div>
-              <p className="text-xs text-amber-600 mt-1">Different upsets hit</p>
+              <p className="text-xs text-amber-600 mt-1">Different games won by an underdog</p>
             </CardContent>
           </Card>
         </div>
@@ -499,7 +499,7 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
             <p className="text-sm text-gray-500">
               {weeklyStats.hasResults 
                 ? `Results are in! ${weeklyStats.totalWinningPicks} winning picks this week.`
-                : 'Picks are locked! See what everyone chose.'
+                : 'Picks are locked. Here is what everyone chose.'
               }
             </p>
           </div>
@@ -530,7 +530,7 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
               ) : (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                   <X className="h-3 w-3 mr-1" />
-                  Loss
+                  Lost
                 </span>
               );
             };
@@ -570,7 +570,7 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
                                   {userPick.pickedTeam.name}
                                 </span>
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 flex-shrink-0">
-                                  {Number(userPick.spreadAtTimeOfPick) > 0 ? '+' : ''}{userPick.spreadAtTimeOfPick}
+                                  +{Math.abs(Number(userPick.spreadAtTimeOfPick)).toFixed(1)}
                                 </span>
                               </div>
                               <div className="flex-shrink-0 ml-2">
@@ -591,8 +591,8 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Standing</th>
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Season Total</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Place</th>
+                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Points</th>
                         <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
                         <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pick</th>
                         <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opponent</th>
@@ -663,7 +663,7 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
                             <td className="px-3 py-4 whitespace-nowrap">
                               {userPick ? (
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                  {Number(userPick.spreadAtTimeOfPick) > 0 ? '+' : ''}{userPick.spreadAtTimeOfPick}
+                                  +{Math.abs(Number(userPick.spreadAtTimeOfPick)).toFixed(1)}
                                 </span>
                               ) : (
                                 <span>-</span>
@@ -675,17 +675,17 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
                                   userPick.won ? (
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                       <Check className="h-3 w-3 mr-1" />
-                                      Winner (+{userPick.pointsEarned})
+                                      Won +{userPick.pointsEarned}
                                     </span>
                                   ) : (
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                       <X className="h-3 w-3 mr-1" />
-                                      Loser
+                                      Lost
                                     </span>
                                   )
                                 ) : (
                                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                    Result Pending
+                                    Pending
                                   </span>
                                 )
                               ) : (

@@ -37,7 +37,7 @@ export default function SubmittedPickDisplay({ userPick }: SubmittedPickDisplayP
       {/* Selected Pick Indicator */}
       <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-1 rounded-full text-xs font-semibold flex items-center shadow-md">
         <Check className="w-3 h-3 mr-1" />
-        SELECTED GAME
+        YOUR PICK
       </div>
 
       {/* Game Time */}
@@ -49,7 +49,7 @@ export default function SubmittedPickDisplay({ userPick }: SubmittedPickDisplayP
       </div>
 
       {/* Away Team (Top) */}
-      <div className="flex items-center justify-between mb-3 p-2 rounded-lg hover:bg-gray-50">
+      <div className="flex items-center justify-between mb-3 p-2 rounded-lg">
         <div className="flex items-center">
           <div className="w-8 h-8 mr-3">
             <img 
@@ -66,7 +66,7 @@ export default function SubmittedPickDisplay({ userPick }: SubmittedPickDisplayP
             <Check className="w-4 h-4 text-green-600" />
           )}
           {isAwayUnderdog && (
-            <span className="bg-lime-100 text-lime-800 px-2 py-1 rounded text-xs font-semibold">
+            <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold">
               {spreadText}
             </span>
           )}
@@ -77,7 +77,7 @@ export default function SubmittedPickDisplay({ userPick }: SubmittedPickDisplayP
       <div className="text-center text-xs text-gray-500 mb-3">AT</div>
 
       {/* Home Team (Bottom) */}
-      <div className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50">
+      <div className="flex items-center justify-between p-2 rounded-lg">
         <div className="flex items-center">
           <div className="w-8 h-8 mr-3">
             <img 
@@ -94,7 +94,7 @@ export default function SubmittedPickDisplay({ userPick }: SubmittedPickDisplayP
             <Check className="w-4 h-4 text-green-600" />
           )}
           {isHomeUnderdog && (
-            <span className="bg-lime-100 text-lime-800 px-2 py-1 rounded text-xs font-semibold">
+            <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold">
               {spreadText}
             </span>
           )}

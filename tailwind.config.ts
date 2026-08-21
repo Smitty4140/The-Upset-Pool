@@ -5,6 +5,12 @@ export default {
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        // Loaded in client/index.html; keeps the app on the typefaces the
+        // design guidelines specify instead of the browser default stack.
+        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["Roboto Mono", "ui-monospace", "SFMono-Regular", "monospace"],
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

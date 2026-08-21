@@ -61,6 +61,18 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick, sel
     [displayWeek?.picksLockAt]
   );
   
+  // Whether the week on screen differs from the week that can still be picked
+  const isViewingOtherWeek =
+    !!selectedWeekId && !!currentWeek && selectedWeekId !== currentWeek.id;
+  const isViewingPastWeek =
+    isViewingOtherWeek &&
+    !!displayWeek &&
+    !!currentWeek &&
+    displayWeek.weekNumber < currentWeek.weekNumber;
+  const currentWeekLabel = currentWeek
+    ? `Week ${currentWeek.weekNumber}`
+    : "this week";
+
   // Use appropriate countdown based on spreads availability
   const countdownTarget = spreadsAvailable ? lockDate : dataPullTime;
   const { days, hours, minutes, isExpired } = useCountdown(countdownTarget);
@@ -99,23 +111,31 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick, sel
                 <Calendar className="h-4 w-4 mr-1" />
                 <p className="text-sm">
                   Week {displayWeek.weekNumber} ({formatWeeklyDate(displayWeek.startDate)} - {formatWeeklyDate(displayWeek.endDate)})
-                  {selectedWeekId && selectedWeekId !== currentWeek?.id && (
-                    <span className="ml-2 text-amber-600 font-medium">(Viewing different week)</span>
+                  {isViewingOtherWeek && (
+                    <span className="ml-2 text-amber-600 font-medium">
+                      {isViewingPastWeek ? "(finished week)" : "(upcoming week)"}
+                    </span>
                   )}
                 </p>
               </div>
             )}
             
-            {/* Status message */}
+            {/* Status message — always about the current week, which is the
+                only week that can still be picked. Naming the week keeps it
+                from being read as a statement about the week on screen. */}
             {!hasSubmittedPick ? (
               <div className="flex items-center text-red-600">
                 <AlertTriangle className="h-5 w-5 mr-1" />
-                <p className="font-medium">You have not submitted a pick for this week</p>
+                <p className="font-medium">
+                  No pick yet for {currentWeekLabel}
+                </p>
               </div>
             ) : (
               <div className="flex items-center text-green-600">
                 <CheckCircle2 className="h-5 w-5 mr-1" />
-                <p className="font-medium">Pick submitted for this week</p>
+                <p className="font-medium">
+                  Pick saved for {currentWeekLabel}
+                </p>
               </div>
             )}
           </div>
@@ -146,7 +166,7 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick, sel
               <div>
                 {spreadsAvailable ? (
                   <>
-                    <div className="text-sm font-medium text-gray-700">Picks lock:</div>
+                    <div className="text-sm font-medium text-gray-700">Picks lock in</div>
                     {isExpired ? (
                       <div className="countdown-timer font-bold text-red-600 text-lg">
                         Picks are locked
@@ -159,10 +179,10 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick, sel
                   </>
                 ) : (
                   <>
-                    <div className="text-sm font-medium text-gray-700">Spreads available:</div>
+                    <div className="text-sm font-medium text-gray-700">Spreads post in</div>
                     {isExpired ? (
-                      <div className="countdown-timer font-bold text-green-600 text-lg">
-                        Data pull scheduled
+                      <div className="countdown-timer font-bold text-amber-800 text-lg">
+                        Any moment now
                       </div>
                     ) : (
                       <div className="countdown-timer font-bold text-amber-800 text-lg">

@@ -8,7 +8,6 @@ import Home from "@/pages/Home";
 import Profile from "@/pages/Profile";
 import Rules from "@/pages/Rules";
 import AdminDashboard from "@/pages/Admin";
-import Welcome from "@/pages/Welcome";
 import AuthPage from "@/pages/auth-page";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -107,6 +106,7 @@ function Router() {
           <Route path="/" component={Home} />
           <Route path="/profile" component={Profile} />
           <Route path="/rules" component={Rules} />
+          <Route path="/join-league" component={JoinLeague} />
           <Route path="/admin" component={AdminDashboard} />
           <Route component={NotFound} />
         </Switch>

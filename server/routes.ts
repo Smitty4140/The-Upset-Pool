@@ -449,29 +449,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Week not found" });
       }
       
-      // Calculate the correct Sunday for this NFL week
-      const weekStart = new Date(week.startDate);
-      const weekEnd = new Date(week.endDate);
-      
-      // Find the first Sunday within the week range (usually the only Sunday)
-      let sundayDate = new Date(weekStart);
-      while (sundayDate.getDay() !== 0 && sundayDate <= weekEnd) { // 0 = Sunday
-        sundayDate.setDate(sundayDate.getDate() + 1);
+      // Find the week's game Sunday: the LAST Sunday in the range, scanned in
+      // UTC so the result doesn't depend on the server's timezone. Scanning
+      // forward from the start date breaks for week 1, whose window opens on
+      // the Sunday BEFORE kickoff and so contains two Sundays.
+      const weekStart = new Date(String(week.startDate).slice(0, 10) + 'T00:00:00Z');
+      const sundayDate = new Date(String(week.endDate).slice(0, 10) + 'T00:00:00Z');
+      while (sundayDate.getUTCDay() !== 0 && sundayDate >= weekStart) {
+        sundayDate.setUTCDate(sundayDate.getUTCDate() - 1);
       }
-      
-      // If no Sunday found in range, use the start date (shouldn't happen with proper NFL weeks)
-      if (sundayDate > weekEnd) {
-        sundayDate = new Date(weekStart);
-      }
-      
+
       // Set lock time to 1:00 PM Eastern Time on the Sunday of this NFL week
-      const { getPicksLockTimeForSunday } = await import('./timezoneUtils.js');
+      const { easternTimeToUTC } = await import('./timezoneUtils.js');
       let picksLockAt: Date;
       if (locked) {
         picksLockAt = new Date(Date.now() - 60000); // 1 minute in the past for locking immediately
       } else {
-        // Use the shared timezone utility to get exactly 1:00 PM Eastern Time
-        picksLockAt = getPicksLockTimeForSunday(sundayDate);
+        // DST-aware: 17:00 UTC while EDT is in effect, 18:00 UTC under EST
+        picksLockAt = easternTimeToUTC(
+          sundayDate.getUTCFullYear(),
+          sundayDate.getUTCMonth() + 1,
+          sundayDate.getUTCDate(),
+          13,
+          0,
+        );
       }
       
       // Use direct SQL query to update the picksLockAt field
@@ -2252,7 +2253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if spreads are available (spreads are 0.0 until pulled by scheduler)
       if (Number(dbGame.spread) === 0.0) {
         return res.status(400).json({ 
-          message: "Picks are not yet available for this week. Spreads will be updated 12 hours before the first game.",
+          message: "Picks are not yet available for this week. Spreads are posted about 8 hours before the first game.",
           details: { 
             gameTime: dbGame.gameTime,
             homeTeam: dbGame.homeTeam.name,
@@ -2774,6 +2775,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error seeding 2026 schedule:", error);
       res.status(500).json({ message: error?.message || "Failed to seed 2026 schedule" });
+    }
+  });
+
+  // Audit/repair picks_lock_at for stored NFL weeks (1 PM ET on the game
+  // Sunday, DST-aware). GET so the super user can run it from the browser on
+  // production. Report-only by default; pass ?apply=true to write fixes.
+  app.get('/api/admin/system/fix-lock-times', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const apply = req.query.apply === 'true';
+      const { recomputeNFLLockTimes } = await import("./lockTimeRepair.js");
+      const result = await recomputeNFLLockTimes(apply);
+      res.json({
+        message: apply
+          ? "Lock times recomputed and applied"
+          : "Lock time audit only — no changes written. Pass ?apply=true to fix.",
+        ...result,
+      });
+    } catch (error: any) {
+      console.error("Error auditing lock times:", error);
+      res.status(500).json({ message: error?.message || "Failed to audit lock times" });
     }
   });
 

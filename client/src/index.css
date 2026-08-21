@@ -80,6 +80,16 @@
   .countdown-timer {
     font-variant-numeric: tabular-nums;
   }
+
+  /* Numbers that sit in columns must not jitter as their digits change. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  table td,
+  table th {
+    font-variant-numeric: tabular-nums;
+  }
   
   .team-selection-radio:checked + .team-selection-indicator {
     @apply border-primary bg-white;

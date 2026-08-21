@@ -84,7 +84,9 @@ export default function Header() {
           {/* Logo and Brand */}
           <div className="flex items-center">
             <div className="flex-shrink-0 flex items-center">
-              <a 
+              {/* Deliberate easter egg: the logo opens Snood rather than
+                  linking home. "My Leagues" is the route to the dashboard. */}
+              <a
                 href="https://playminigames.net/game/snood"
                 target="_blank"
                 rel="noopener noreferrer"

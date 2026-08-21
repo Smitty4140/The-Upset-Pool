@@ -90,7 +90,7 @@ export default function Welcome() {
                   </div>
                   <p>
                     Select one underdog team each week to win outright. Picks
-                    lock at 1 PM EST on Sundays.
+                    lock at 1:00 PM ET on Sundays.
                   </p>
                 </CardContent>
               </Card>

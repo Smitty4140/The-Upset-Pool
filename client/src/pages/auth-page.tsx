@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Trophy, Users, TrendingUp, Star, LogIn, UserPlus, Chrome } from "lucide-react";
+import { Users, LogIn, UserPlus } from "lucide-react";
 
 // Login form schema
 const loginSchema = z.object({
@@ -25,13 +25,26 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters long"),
-  username: z.string().min(3, "Username must be at least 3 characters long"),
+  username: z.string().min(3, "Display name must be at least 3 characters long"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 type RegisterFormData = z.infer<typeof registerSchema>;
+
+// Google's own mark — the Chrome browser logo previously stood in for it,
+// which misidentified the sign-in provider.
+function GoogleMark() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.51h6.47a5.54 5.54 0 0 1-2.4 3.64v3h3.86c2.26-2.09 3.56-5.17 3.56-8.88z" />
+      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09A11.99 11.99 0 0 0 12 24z" />
+      <path fill="#FBBC05" d="M5.27 14.29a7.2 7.2 0 0 1 0-4.58V6.62H1.29a11.99 11.99 0 0 0 0 10.76l3.98-3.09z" />
+      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.7 0 3.99 2.47 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" />
+    </svg>
+  );
+}
 
 interface AuthPageProps {
   authResult?: string | null;
@@ -166,51 +179,61 @@ export default function AuthPage({ authResult }: AuthPageProps) {
               NFL Upset Pool
             </h1>
             <p className="text-xl text-gray-600 max-w-md mx-auto lg:mx-0">
-              Pick underdog teams to win outright and earn points based on the spread. 
-              Compete with friends and enemies to earn a spot among the greatest heroes of our time.
+              Pick one NFL underdog each week. When it wins outright, you score
+              the points it was given. Simple to play, hard to win.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-6 max-w-md mx-auto lg:mx-0">
-            <div className="text-center space-y-2">
-              <div className="bg-white rounded-lg p-3 shadow-sm">
-                <Trophy className="h-8 w-8 text-yellow-500 mx-auto" />
+          {/* Three numbered steps, because this is the only page a new
+              visitor sees before signing up — it has to teach the game. */}
+          <div className="space-y-4 max-w-md mx-auto lg:mx-0 text-left">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              How it works
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white shadow-sm font-bold text-primary">
+                1
               </div>
               <div>
-                <div className="font-semibold text-gray-900">Compete</div>
-                <div className="text-sm text-gray-600">Pick underdog winners</div>
+                <div className="font-semibold text-gray-900">Pick one underdog a week</div>
+                <div className="text-sm text-gray-600">
+                  Choose a single team that oddsmakers expect to lose. Picks lock
+                  at 1:00 PM ET Sunday, or at kickoff for earlier games.
+                </div>
               </div>
             </div>
-            
-            <div className="text-center space-y-2">
-              <div className="bg-white rounded-lg p-3 shadow-sm">
-                <TrendingUp className="h-8 w-8 text-green-500 mx-auto" />
+
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white shadow-sm font-bold text-primary">
+                2
               </div>
               <div>
-                <div className="font-semibold text-gray-900">Strategy</div>
-                <div className="text-sm text-gray-600">Near zero needed, but it helps</div>
+                <div className="font-semibold text-gray-900">Win outright, score the spread</div>
+                <div className="text-sm text-gray-600">
+                  A +7.5 underdog that wins its game is worth 7.5 points. A loss
+                  or a tie is worth nothing — covering the spread doesn&apos;t count.
+                </div>
               </div>
             </div>
-            
-            <div className="text-center space-y-2">
-              <div className="bg-white rounded-lg p-3 shadow-sm">
-                <Users className="h-8 w-8 text-blue-500 mx-auto" />
+
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white shadow-sm font-bold text-primary">
+                3
               </div>
               <div>
-                <div className="font-semibold text-gray-900">Community</div>
-                <div className="text-sm text-gray-600">Volatile message boards</div>
+                <div className="font-semibold text-gray-900">Most points wins the season</div>
+                <div className="text-sm text-gray-600">
+                  Points add up across the regular season. Pick every week to stay
+                  eligible for the end-of-season prizes.
+                </div>
               </div>
             </div>
-            
-            <div className="text-center space-y-2">
-              <div className="bg-white rounded-lg p-3 shadow-sm">
-                <Star className="h-8 w-8 text-purple-500 mx-auto" />
-              </div>
-              <div>
-                <div className="font-semibold text-gray-900">Fame</div>
-                <div className="text-sm text-gray-600">Become insanely famous</div>
-              </div>
-            </div>
+
+            <p className="flex items-center gap-2 text-sm text-gray-500 pt-1">
+              <Users className="h-4 w-4 flex-shrink-0" />
+              Free to play. You&apos;ll need an invite code from your league to join.
+            </p>
           </div>
         </div>
 
@@ -245,7 +268,7 @@ export default function AuthPage({ authResult }: AuthPageProps) {
                     className="w-full flex items-center justify-center gap-2 hover:bg-gray-50"
                     size="lg"
                   >
-                    <Chrome className="h-5 w-5 text-red-500" />
+                    <GoogleMark />
                     Continue with Google
                   </Button>
 
@@ -340,10 +363,10 @@ export default function AuthPage({ authResult }: AuthPageProps) {
                         name="username"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Leaderboard Name</FormLabel>
+                            <FormLabel>Display name</FormLabel>
                             <FormControl>
                               <Input 
-                                placeholder="Choose a username" 
+                                placeholder="Shown on the leaderboard" 
                                 autoComplete="username"
                                 {...field} 
                               />

@@ -2,9 +2,23 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <!-- maximum-scale removed: it blocked pinch-zoom, which fails WCAG 1.4.4 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Upset Pool — Pick NFL underdogs, score the spread</title>
+    <meta
+      name="description"
+      content="Pick one NFL underdog each week. When it wins outright, you score the points it was given. Free weekly pool with live standings."
+    />
+    <meta name="theme-color" content="#00479b" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/favicon.png" />
+    <!-- Inter for UI text, Roboto Mono for scores/odds, per design_guidelines.md -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <div id="root"></div>

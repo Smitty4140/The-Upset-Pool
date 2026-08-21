@@ -273,10 +273,10 @@ export default function Home() {
           : null;
 
         toast({
-          title: "Pick Submitted!",
+          title: "Pick saved",
           description: selectedTeam
-            ? `You've selected ${selectedTeam.name} as your pick for this week`
-            : "Your pick has been saved",
+            ? `${selectedTeam.name} is your pick for this week. You can change it until picks lock.`
+            : "Your pick is saved. You can change it until picks lock.",
           variant: "default",
         });
       });
@@ -308,28 +308,14 @@ export default function Home() {
       return;
     }
 
-    // Get the selected team's information
-    const selectedGame = games?.find((game) => game.id === selectedGameId);
-    const isHomeTeamSelected = selectedGame?.homeTeam.id === selectedTeamId;
-    const selectedTeamInfo = isHomeTeamSelected
-      ? selectedGame?.homeTeam
-      : selectedGame?.awayTeam;
-
+    // The success toast is raised in the mutation's onSuccess handler, so that
+    // a failed submission never reports itself as saved.
     submitPick({
       gameId: selectedGameId,
       pickedTeamId: selectedTeamId,
       leagueId,
       weekId: pickableWeekId,
     });
-
-    // Show a toast with the selected team to make it obvious
-    if (selectedTeamInfo) {
-      toast({
-        title: "Pick Submitted",
-        description: `You've selected ${selectedTeamInfo.name} as your underdog pick!`,
-        variant: "default",
-      });
-    }
   };
 
   // Check if user has a pick
@@ -412,7 +398,16 @@ export default function Home() {
   const isViewingFutureWeek =
     activeWeekId !== pickableWeekId &&
     selectedWeekId &&
-    selectedWeekId !== pickableWeekId;
+    selectedWeekId !== pickableWeekId &&
+    !!selectedWeekDetails &&
+    !!currentWeek &&
+    selectedWeekDetails.weekNumber > currentWeek.weekNumber;
+
+  // Check if viewing a week that has already finished
+  const isViewingPastWeek =
+    !!selectedWeekDetails &&
+    !!currentWeek &&
+    selectedWeekDetails.weekNumber < currentWeek.weekNumber;
 
   // Loading state
   const isLoading =
@@ -621,13 +616,13 @@ export default function Home() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <h3 className="text-xl font-medium text-gray-900 flex items-center">
                     <Shield className="h-5 w-5 text-primary mr-2" />
-                    Pick Selection
+                    {arePicksLocked ? "Games & Spreads" : "Make Your Pick"}
                   </h3>
 
                   {selectedWeekPick && selectedWeekDetails && (
                     <div className="bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-medium flex items-center">
                       <span className="mr-2">
-                        Week {selectedWeekDetails.weekNumber} Pick:
+                        Your Week {selectedWeekDetails.weekNumber} pick:
                       </span>
                       <span className="font-bold">
                         {selectedWeekPick.pickedTeam?.name || "Selected Team"}
@@ -706,6 +701,19 @@ export default function Home() {
                   </div>
                 ) : (
                   <>
+                    {spreadsNotPulled && !arePicksLocked && (
+                      <div className="mb-4 bg-amber-50 border border-amber-300 rounded-lg p-4 flex items-center gap-3">
+                        <Clock className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                        <div>
+                          <p className="font-semibold text-amber-800">Spreads for this week aren't posted yet</p>
+                          <p className="text-sm text-amber-700">
+                            Games open for picks once spreads arrive, about 8
+                            hours before the first kickoff. If you have email
+                            notifications on, we'll let you know.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {isPickLockedByKickoff && !arePicksLocked && (
                       <div className="mb-4 bg-amber-50 border border-amber-300 rounded-lg p-4 flex items-center gap-3">
                         <Lock className="h-5 w-5 text-amber-600 flex-shrink-0" />
@@ -760,10 +768,11 @@ export default function Home() {
                             </p>
                           </div>
                         ) : arePicksLocked ? (
-                          <div className="mt-8 bg-red-50 p-6 rounded-md shadow-sm border border-red-200">
-                            <p className="text-center text-red-700 font-medium">
-                              Picks are locked - deadline has passed (1:00 PM
-                              EST Sunday)
+                          <div className="mt-8 bg-gray-50 p-6 rounded-md shadow-sm border border-gray-200">
+                            <p className="text-center text-gray-700 font-medium">
+                              {isViewingPastWeek
+                                ? "This week is finished. Picks can no longer be changed."
+                                : "Picks are locked. The deadline was 1:00 PM ET Sunday."}
                             </p>
                           </div>
                         ) : null}
@@ -773,14 +782,15 @@ export default function Home() {
                           {selectedTeamId && canMakePicks && (
                             <p className="text-gray-600">
                               {hasSubmittedPick
-                                ? "You can change your pick until the picks lock."
-                                : "Your pick will be locked at 1:00 PM EST on Sunday."}
+                                ? "Your pick is saved. You can change it until 1:00 PM ET Sunday, or until your game kicks off."
+                                : "Choose Submit Pick on a card to save your pick. Nothing is saved until you do."}
                             </p>
                           )}
                           {isViewingFutureWeek && (
                             <p className="text-amber-600 font-medium">
-                              You are viewing a future week. Picks will be
-                              available 8 hours before the first game.
+                              You're viewing an upcoming week. Picks open 8
+                              hours before the first game, once spreads are
+                              posted.
                             </p>
                           )}
                         </div>
@@ -802,10 +812,11 @@ export default function Home() {
                           />
                         </svg>
                         <h3 className="mt-2 text-lg font-medium text-gray-900">
-                          No games available
+                          No games scheduled yet
                         </h3>
                         <p className="mt-1 text-gray-500">
-                          There are no games available for this week.
+                          This week's schedule hasn't been loaded. Check back
+                          closer to game day, or pick another week above.
                         </p>
                       </div>
                     )}
