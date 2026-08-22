@@ -2786,12 +2786,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apply = req.query.apply === 'true';
       const { recomputeNFLLockTimes } = await import("./lockTimeRepair.js");
       const result = await recomputeNFLLockTimes(apply);
-      res.json({
-        message: apply
-          ? "Lock times recomputed and applied"
-          : "Lock time audit only — no changes written. Pass ?apply=true to fix.",
-        ...result,
-      });
+      const message = apply
+        ? "Lock times recomputed and applied."
+        : "Audit only — nothing was changed. Add ?apply=true to the URL to write the fixes.";
+
+      // A plain browser visit gets a readable table; API callers get JSON.
+      if (req.headers.accept?.includes('text/html')) {
+        const etFmt = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/New_York',
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        });
+        const rows = result.report.map((r) => {
+          const color = r.status === 'ok' ? '#0f7a4d' : r.status === 'fixed' ? '#00479b' : '#b45309';
+          const label = r.status === 'ok' ? 'OK' : r.status === 'fixed' ? 'FIXED' : 'NEEDS FIX';
+          return `<tr>
+            <td>${r.season}</td><td>${r.week}</td>
+            <td>${etFmt.format(new Date(r.stored))} ET</td>
+            <td>${etFmt.format(new Date(r.correct))} ET</td>
+            <td>${r.source}</td>
+            <td style="color:${color};font-weight:600">${label}</td>
+          </tr>`;
+        }).join('');
+        res.type('html').send(`<!DOCTYPE html><html><head><title>Pick Lock Audit</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:2rem;color:#1a202c}
+  h1{font-size:1.3rem} p{max-width:60ch}
+  table{border-collapse:collapse;margin-top:1rem;font-variant-numeric:tabular-nums}
+  th,td{padding:.4rem .9rem;border-bottom:1px solid #e2e8f0;text-align:left;font-size:.9rem}
+  th{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b}
+  .apply{display:inline-block;margin-top:1rem;padding:.5rem 1rem;background:#00479b;color:#fff;border-radius:6px;text-decoration:none}
+</style></head><body>
+<h1>Pick lock audit — ${result.weeksNeedingFix} of ${result.weeksChecked} weeks need fixing</h1>
+<p>${message}</p>
+<p>Every week should lock at 1:00 PM Eastern on its game Sunday. "Stored" is what the
+database has now; "Correct" is what it should be.</p>
+${!apply && result.weeksNeedingFix > 0
+  ? '<a class="apply" href="/api/admin/system/fix-lock-times?apply=true">Apply these fixes</a>'
+  : ''}
+<table><thead><tr><th>Season</th><th>Week</th><th>Stored</th><th>Correct</th><th>Derived from</th><th>Status</th></tr></thead>
+<tbody>${rows}</tbody></table>
+</body></html>`);
+        return;
+      }
+
+      res.json({ message, ...result });
     } catch (error: any) {
       console.error("Error auditing lock times:", error);
       res.status(500).json({ message: error?.message || "Failed to audit lock times" });
