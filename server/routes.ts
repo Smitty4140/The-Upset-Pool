@@ -302,7 +302,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin-only route to toggle member activation status
-  // League admins: all active members' email addresses, for emailing the league.
+  // League admins: members' email addresses for emailing the league.
+  // ?status=all|active|inactive selects which members (default: all).
   app.get('/api/admin/league/:leagueId/member-emails', isAuthenticated, async (req: any, res) => {
     try {
       const adminUserId = req.user.id;
@@ -310,6 +311,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (isNaN(leagueId)) {
         return res.status(400).json({ message: "Invalid league ID" });
+      }
+
+      const status = String(req.query.status || 'all');
+      if (!['all', 'active', 'inactive'].includes(status)) {
+        return res.status(400).json({ message: "status must be all, active, or inactive" });
       }
 
       // Check if the requesting user is an admin of this league
@@ -320,13 +326,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const members = await storage.getLeagueMembers(leagueId);
       const emails = new Set<string>();
-      let inactiveSkipped = 0;
       let missingEmail = 0;
       for (const member of members) {
-        if (!member.isActive) {
-          inactiveSkipped++;
-          continue;
-        }
+        if (status === 'active' && !member.isActive) continue;
+        if (status === 'inactive' && member.isActive) continue;
         const email = member.user?.email?.trim().toLowerCase();
         if (email) {
           emails.add(email);
@@ -336,9 +339,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({
+        status,
         emails: Array.from(emails).sort(),
         count: emails.size,
-        inactiveSkipped,
         missingEmail,
       });
     } catch (error) {

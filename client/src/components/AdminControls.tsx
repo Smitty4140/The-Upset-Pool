@@ -13,6 +13,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import NewMemberDefaultStatusControl from "@/components/NewMemberDefaultStatusControl";
 
@@ -284,14 +290,16 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
   // Check if picks are locked
   const arePicksLocked = currentWeek ? new Date() > new Date(currentWeek.picksLockAt) : false;
 
-  // Copy all active members' email addresses to the clipboard
+  // Copy members' email addresses to the clipboard (all/active/inactive)
   const [isCopyingEmails, setIsCopyingEmails] = useState(false);
-  const handleCopyMemberEmails = async () => {
+  const handleCopyMemberEmails = async (scope: "all" | "active" | "inactive") => {
+    const scopeLabel = scope === "all" ? "member" : `${scope} member`;
     setIsCopyingEmails(true);
     try {
-      const response = await fetch(`/api/admin/league/${leagueId}/member-emails`, {
-        credentials: "include",
-      });
+      const response = await fetch(
+        `/api/admin/league/${leagueId}/member-emails?status=${scope}`,
+        { credentials: "include" },
+      );
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         throw new Error(body?.message || "Failed to fetch member emails");
@@ -300,16 +308,16 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
       if (data.count === 0) {
         toast({
           title: "No emails to copy",
-          description: "No active members have an email address on file.",
+          description: `No ${scopeLabel}s have an email address on file.`,
           variant: "destructive",
         });
         return;
       }
       await navigator.clipboard.writeText(data.emails.join(", "));
       toast({
-        title: `Copied ${data.count} email address${data.count === 1 ? "" : "es"}`,
+        title: `Copied ${data.count} ${scopeLabel} email${data.count === 1 ? "" : "s"}`,
         description: data.missingEmail > 0
-          ? `Paste into your email's To field. ${data.missingEmail} member${data.missingEmail === 1 ? " has" : "s have"} no email on file.`
+          ? `Paste into your email's To field. ${data.missingEmail} ${scopeLabel}${data.missingEmail === 1 ? " has" : "s have"} no email on file.`
           : "Paste into your email's To field.",
       });
     } catch (error) {
@@ -833,24 +841,39 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
             <div className="flex items-center min-w-0">
               <Mail className="h-5 w-5 text-green-700 mr-3 flex-shrink-0" />
               <div className="text-sm text-green-800">
-                Copy every active member's email address, ready to paste into
-                the To field of your email app.
+                Copy members' email addresses, ready to paste into the To
+                field of your email app.
               </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-shrink-0"
-              disabled={isCopyingEmails}
-              onClick={handleCopyMemberEmails}
-            >
-              {isCopyingEmails ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Copy className="h-4 w-4 mr-2" />
-              )}
-              Copy emails
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-shrink-0"
+                  disabled={isCopyingEmails}
+                >
+                  {isCopyingEmails ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Copy className="h-4 w-4 mr-2" />
+                  )}
+                  Copy emails
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => handleCopyMemberEmails("all")}>
+                  All members
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleCopyMemberEmails("active")}>
+                  Active members only
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleCopyMemberEmails("inactive")}>
+                  Inactive members only
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
