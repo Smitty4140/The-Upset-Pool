@@ -302,6 +302,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin-only route to toggle member activation status
+  // League admins: members' email addresses for emailing the league.
+  // ?status=all|active|inactive selects which members (default: all).
+  app.get('/api/admin/league/:leagueId/member-emails', isAuthenticated, async (req: any, res) => {
+    try {
+      const adminUserId = req.user.id;
+      const leagueId = parseInt(req.params.leagueId);
+
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+
+      const status = String(req.query.status || 'all');
+      if (!['all', 'active', 'inactive'].includes(status)) {
+        return res.status(400).json({ message: "status must be all, active, or inactive" });
+      }
+
+      // Check if the requesting user is an admin of this league
+      const adminMember = await storage.getLeagueMember(leagueId, adminUserId);
+      if (!adminMember || !adminMember.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const members = await storage.getLeagueMembers(leagueId);
+      const emails = new Set<string>();
+      let missingEmail = 0;
+      for (const member of members) {
+        if (status === 'active' && !member.isActive) continue;
+        if (status === 'inactive' && member.isActive) continue;
+        const email = member.user?.email?.trim().toLowerCase();
+        if (email) {
+          emails.add(email);
+        } else {
+          missingEmail++;
+        }
+      }
+
+      res.json({
+        status,
+        emails: Array.from(emails).sort(),
+        count: emails.size,
+        missingEmail,
+      });
+    } catch (error) {
+      console.error("Error fetching member emails:", error);
+      res.status(500).json({ message: "Failed to fetch member emails" });
+    }
+  });
+
   app.post('/api/admin/league/:leagueId/member/:userId/toggle-active', isAuthenticated, async (req: any, res) => {
     try {
       const adminUserId = req.user.id;

@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share, Trash2, Archive } from "lucide-react";
+import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share, Trash2, Archive, Mail, Loader2 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatWeeklyDate } from "@/lib/formatDate";
 import { NFLWeek, League, NFLGame, NFLTeam, User, LeagueMember } from "@/lib/types";
@@ -13,6 +13,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import NewMemberDefaultStatusControl from "@/components/NewMemberDefaultStatusControl";
 
@@ -283,6 +289,47 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
 
   // Check if picks are locked
   const arePicksLocked = currentWeek ? new Date() > new Date(currentWeek.picksLockAt) : false;
+
+  // Copy members' email addresses to the clipboard (all/active/inactive)
+  const [isCopyingEmails, setIsCopyingEmails] = useState(false);
+  const handleCopyMemberEmails = async (scope: "all" | "active" | "inactive") => {
+    const scopeLabel = scope === "all" ? "member" : `${scope} member`;
+    setIsCopyingEmails(true);
+    try {
+      const response = await fetch(
+        `/api/admin/league/${leagueId}/member-emails?status=${scope}`,
+        { credentials: "include" },
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.message || "Failed to fetch member emails");
+      }
+      const data: { emails: string[]; count: number; missingEmail: number } = await response.json();
+      if (data.count === 0) {
+        toast({
+          title: "No emails to copy",
+          description: `No ${scopeLabel}s have an email address on file.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(data.emails.join(", "));
+      toast({
+        title: `Copied ${data.count} ${scopeLabel} email${data.count === 1 ? "" : "s"}`,
+        description: data.missingEmail > 0
+          ? `Paste into your email's To field. ${data.missingEmail} ${scopeLabel}${data.missingEmail === 1 ? " has" : "s have"} no email on file.`
+          : "Paste into your email's To field.",
+      });
+    } catch (error) {
+      toast({
+        title: "Couldn't copy emails",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCopyingEmails(false);
+    }
+  };
 
   // Get scheduler status
   const { 
@@ -786,7 +833,50 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
             </div>
           </div>
         )}
-        
+
+        {/* Email the League Section */}
+        <div className="mb-6">
+          <div className="text-sm font-medium mb-2">Email the League</div>
+          <div className="bg-green-50 border border-green-200 rounded-md p-4 flex items-center justify-between gap-3">
+            <div className="flex items-center min-w-0">
+              <Mail className="h-5 w-5 text-green-700 mr-3 flex-shrink-0" />
+              <div className="text-sm text-green-800">
+                Copy members' email addresses, ready to paste into the To
+                field of your email app.
+              </div>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-shrink-0"
+                  disabled={isCopyingEmails}
+                >
+                  {isCopyingEmails ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Copy className="h-4 w-4 mr-2" />
+                  )}
+                  Copy emails
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => handleCopyMemberEmails("all")}>
+                  All members
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleCopyMemberEmails("active")}>
+                  Active members only
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => handleCopyMemberEmails("inactive")}>
+                  Inactive members only
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
         <Separator className="my-6" />
 
         {league && (

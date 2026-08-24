@@ -394,6 +394,38 @@ export default function Home() {
   // Determine if the selected week allows picks (only current week + not locked + not archived)
   const canMakePicks = activeWeekId === pickableWeekId && !arePicksLocked && !currentLeagueInfo?.isArchived;
 
+  // ── Mobile sticky pick bar ─────────────────────────────────────────────
+  // On a phone the per-card submit button can sit below the fold, so the bar
+  // is the single always-visible answer to "is my pick in, and who is it?"
+  const selectedBarGame = selectedGameId
+    ? games?.find((g) => String(g.id) === String(selectedGameId))
+    : undefined;
+  const selectedBarTeamName = selectedBarGame
+    ? Number(selectedBarGame.spread) > 0
+      ? selectedBarGame.homeTeam.name
+      : Number(selectedBarGame.spread) < 0
+        ? selectedBarGame.awayTeam.name
+        : null
+    : null;
+  const selectedBarSpread = selectedBarGame
+    ? `+${Math.abs(Number(selectedBarGame.spread)).toFixed(1)}`
+    : "";
+  const hasUnsavedSelection =
+    !!selectedGameId && (!userPick || String(userPick.gameId) !== String(selectedGameId));
+  const savedBarTeamName = userPick?.pickedTeam?.name;
+  const savedBarSpread = userPick?.game
+    ? `+${Math.abs(Number(userPick.game.spread)).toFixed(1)}`
+    : "";
+  const showMobilePickBar =
+    activeTab === "spreads" &&
+    isAuthenticated &&
+    !!activeWeekId &&
+    activeWeekId === pickableWeekId &&
+    !currentLeagueInfo?.isArchived &&
+    memberStatus?.isActive !== false &&
+    sortedGames.length > 0 &&
+    !spreadsNotPulled;
+
   // Check if viewing a future week (picks not allowed yet)
   const isViewingFutureWeek =
     activeWeekId !== pickableWeekId &&
@@ -610,7 +642,66 @@ export default function Home() {
 
         {/* Pick Selection */}
         {activeTab === "spreads" && (
-          <div>
+          <div className={showMobilePickBar ? "pb-28 sm:pb-0" : ""}>
+            {/* Mobile sticky pick bar: always-visible answer to "is my pick
+                in, and who is it?" Fixed to the bottom on phones only; the
+                per-card submit button covers desktop. */}
+            {showMobilePickBar && (
+              <div className="sm:hidden fixed inset-x-0 bottom-0 z-40">
+                {arePicksLocked || isPickLockedByKickoff ? (
+                  <div className="bg-gray-800 text-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.15)] flex items-center gap-3">
+                    <Lock className="h-5 w-5 flex-shrink-0 text-gray-300" />
+                    <div className="min-w-0">
+                      {savedBarTeamName ? (
+                        <>
+                          <p className="text-xs text-gray-300">Locked in for Week {currentWeek?.weekNumber}</p>
+                          <p className="font-bold truncate">{savedBarTeamName} {savedBarSpread}</p>
+                        </>
+                      ) : (
+                        <p className="font-semibold text-sm">No pick this week — picks are locked</p>
+                      )}
+                    </div>
+                  </div>
+                ) : hasUnsavedSelection && selectedBarTeamName ? (
+                  <div className="bg-blue-600 text-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.15)] flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs text-blue-100">Selected — not saved yet</p>
+                      <p className="font-bold truncate">{selectedBarTeamName} {selectedBarSpread}</p>
+                    </div>
+                    <Button
+                      onClick={handleSubmitPick}
+                      disabled={isSubmittingPick}
+                      className="flex-shrink-0 bg-white text-blue-700 hover:bg-blue-50 font-bold"
+                    >
+                      {isSubmittingPick ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Submit Pick"
+                      )}
+                    </Button>
+                  </div>
+                ) : savedBarTeamName ? (
+                  <div className="bg-green-600 text-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.15)] flex items-center gap-3">
+                    <Check className="h-5 w-5 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs text-green-100">Your Week {currentWeek?.weekNumber} pick is in</p>
+                      <p className="font-bold truncate">{savedBarTeamName} {savedBarSpread} <span className="font-normal text-green-100 text-sm">· tap another game to change</span></p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white border-t border-gray-200 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.1)] flex items-center gap-3">
+                    <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-500" />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm">No pick yet for Week {currentWeek?.weekNumber}</p>
+                      <p className="text-xs text-gray-500">Tap an underdog above to select one.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6 border border-gray-200">
               <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-primary/10 to-secondary/10">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -783,7 +874,7 @@ export default function Home() {
                             <p className="text-gray-600">
                               {hasSubmittedPick
                                 ? "Your pick is saved. You can change it until 1:00 PM ET Sunday, or until your game kicks off."
-                                : "Choose Submit Pick on a card to save your pick. Nothing is saved until you do."}
+                                : "Nothing is saved until you press Submit Pick."}
                             </p>
                           )}
                           {isViewingFutureWeek && (

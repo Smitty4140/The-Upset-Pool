@@ -260,9 +260,11 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
         </div>
       )}
 
-      {/* Submit button at the bottom only when newly selected (not already submitted) */}
+      {/* Submit button at the bottom only when newly selected (not already
+          submitted). Hidden on mobile, where the sticky bottom bar is the one
+          submit affordance. */}
       {isUnsavedSelection && onSubmit && !isFullyLocked && (
-        <div className="bg-gray-50 px-4 py-3 border-t border-gray-100">
+        <div className="hidden sm:block bg-gray-50 px-4 py-3 border-t border-gray-100">
           <Button 
             onClick={(e) => {
               e.stopPropagation();
