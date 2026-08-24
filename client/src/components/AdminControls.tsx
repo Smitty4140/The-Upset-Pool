@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share, Trash2, Archive } from "lucide-react";
+import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share, Trash2, Archive, Mail, Loader2 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatWeeklyDate } from "@/lib/formatDate";
 import { NFLWeek, League, NFLGame, NFLTeam, User, LeagueMember } from "@/lib/types";
@@ -283,6 +283,45 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
 
   // Check if picks are locked
   const arePicksLocked = currentWeek ? new Date() > new Date(currentWeek.picksLockAt) : false;
+
+  // Copy all active members' email addresses to the clipboard
+  const [isCopyingEmails, setIsCopyingEmails] = useState(false);
+  const handleCopyMemberEmails = async () => {
+    setIsCopyingEmails(true);
+    try {
+      const response = await fetch(`/api/admin/league/${leagueId}/member-emails`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.message || "Failed to fetch member emails");
+      }
+      const data: { emails: string[]; count: number; missingEmail: number } = await response.json();
+      if (data.count === 0) {
+        toast({
+          title: "No emails to copy",
+          description: "No active members have an email address on file.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(data.emails.join(", "));
+      toast({
+        title: `Copied ${data.count} email address${data.count === 1 ? "" : "es"}`,
+        description: data.missingEmail > 0
+          ? `Paste into your email's To field. ${data.missingEmail} member${data.missingEmail === 1 ? " has" : "s have"} no email on file.`
+          : "Paste into your email's To field.",
+      });
+    } catch (error) {
+      toast({
+        title: "Couldn't copy emails",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCopyingEmails(false);
+    }
+  };
 
   // Get scheduler status
   const { 
@@ -786,7 +825,35 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
             </div>
           </div>
         )}
-        
+
+        {/* Email the League Section */}
+        <div className="mb-6">
+          <div className="text-sm font-medium mb-2">Email the League</div>
+          <div className="bg-green-50 border border-green-200 rounded-md p-4 flex items-center justify-between gap-3">
+            <div className="flex items-center min-w-0">
+              <Mail className="h-5 w-5 text-green-700 mr-3 flex-shrink-0" />
+              <div className="text-sm text-green-800">
+                Copy every active member's email address, ready to paste into
+                the To field of your email app.
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-shrink-0"
+              disabled={isCopyingEmails}
+              onClick={handleCopyMemberEmails}
+            >
+              {isCopyingEmails ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Copy className="h-4 w-4 mr-2" />
+              )}
+              Copy emails
+            </Button>
+          </div>
+        </div>
+
         <Separator className="my-6" />
 
         {league && (

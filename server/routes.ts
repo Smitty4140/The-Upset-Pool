@@ -302,6 +302,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin-only route to toggle member activation status
+  // League admins: all active members' email addresses, for emailing the league.
+  app.get('/api/admin/league/:leagueId/member-emails', isAuthenticated, async (req: any, res) => {
+    try {
+      const adminUserId = req.user.id;
+      const leagueId = parseInt(req.params.leagueId);
+
+      if (isNaN(leagueId)) {
+        return res.status(400).json({ message: "Invalid league ID" });
+      }
+
+      // Check if the requesting user is an admin of this league
+      const adminMember = await storage.getLeagueMember(leagueId, adminUserId);
+      if (!adminMember || !adminMember.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const members = await storage.getLeagueMembers(leagueId);
+      const emails = new Set<string>();
+      let inactiveSkipped = 0;
+      let missingEmail = 0;
+      for (const member of members) {
+        if (!member.isActive) {
+          inactiveSkipped++;
+          continue;
+        }
+        const email = member.user?.email?.trim().toLowerCase();
+        if (email) {
+          emails.add(email);
+        } else {
+          missingEmail++;
+        }
+      }
+
+      res.json({
+        emails: Array.from(emails).sort(),
+        count: emails.size,
+        inactiveSkipped,
+        missingEmail,
+      });
+    } catch (error) {
+      console.error("Error fetching member emails:", error);
+      res.status(500).json({ message: "Failed to fetch member emails" });
+    }
+  });
+
   app.post('/api/admin/league/:leagueId/member/:userId/toggle-active', isAuthenticated, async (req: any, res) => {
     try {
       const adminUserId = req.user.id;
