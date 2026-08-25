@@ -94,7 +94,8 @@ function Router() {
   
   // Check if user needs to join a league
   if (user && user.username && (!userLeagues || userLeagues.length === 0)) {
-    return <JoinLeague />;
+    // Rendered without the header, so this screen needs its own way out.
+    return <JoinLeague showSignOut />;
   }
   
   // If user is logged in, has username, and is in a league, show regular app layout
@@ -106,7 +107,9 @@ function Router() {
           <Route path="/" component={Home} />
           <Route path="/profile" component={Profile} />
           <Route path="/rules" component={Rules} />
-          <Route path="/join-league" component={JoinLeague} />
+          <Route path="/join-league">
+            <JoinLeague />
+          </Route>
           <Route path="/admin" component={SuperAdmin} />
           <Route component={NotFound} />
         </Switch>

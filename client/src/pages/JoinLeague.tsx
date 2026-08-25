@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -10,9 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
-import { Users, Plus, Hash } from "lucide-react";
+import { Users, Plus, Hash, Loader2, LogOut } from "lucide-react";
 import { User } from "@/lib/types";
 import { nicknameSchema } from "@/lib/nicknameSchema";
+import { useLogout } from "@/hooks/useLogout";
 
 const joinLeagueSchema = z.object({
   inviteCode: z.string().min(1, "Please enter a league invite code"),
@@ -21,13 +22,23 @@ const joinLeagueSchema = z.object({
 
 type JoinLeagueFormValues = z.infer<typeof joinLeagueSchema>;
 
-export default function JoinLeague() {
+type JoinLeagueProps = {
+  /**
+   * Rendered standalone (no header) for users who are signed in but not in a
+   * league yet. Without the header there is no other way out, so this screen
+   * carries its own sign-out control.
+   */
+  showSignOut?: boolean;
+};
+
+export default function JoinLeague({ showSignOut = false }: JoinLeagueProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showCreateLeague, setShowCreateLeague] = useState(false);
   const [leagueName, setLeagueName] = useState("");
 
   const { data: authUser } = useQuery<User>({ queryKey: ["/api/auth/user"] });
+  const { logout, isLoggingOut } = useLogout();
 
   const form = useForm<JoinLeagueFormValues>({
     resolver: zodResolver(joinLeagueSchema),
@@ -214,6 +225,27 @@ export default function JoinLeague() {
             </div>
           )}
         </CardContent>
+        {showSignOut && (
+          <CardFooter className="flex flex-col gap-2 border-t pt-6">
+            <p className="text-center text-sm text-muted-foreground">
+              Signed in as {authUser?.email || authUser?.username || "your account"}.
+              Wrong account?
+            </p>
+            <Button
+              variant="ghost"
+              className="w-full flex items-center justify-center gap-2"
+              onClick={() => logout()}
+              disabled={isLoggingOut}
+            >
+              {isLoggingOut ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <LogOut className="h-4 w-4" />
+              )}
+              {isLoggingOut ? "Signing out..." : "Sign Out"}
+            </Button>
+          </CardFooter>
+        )}
       </Card>
     </div>
   );

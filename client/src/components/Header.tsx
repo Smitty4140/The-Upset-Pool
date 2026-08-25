@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { useLogout } from "@/hooks/useLogout";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
-import { useMutation } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,8 +13,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
 import { Loader2, LogOut, Menu, ShieldCheck, UserRound, X } from "lucide-react";
 import upsetPoolLogo from "@assets/7ce37caf-c21f-4929-a667-365370f1324d_1766504568458.png";
 
@@ -23,36 +21,14 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isLoading, isAuthenticated } = useAuth();
   const { isSuperAdmin } = useSuperAdmin();
-  const { toast } = useToast();
 
   // Close mobile menu when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location]);
 
-  const { mutate: logout, isPending: isLoggingOut } = useMutation({
-    mutationFn: async () => {
-      const response = await fetch("/api/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to sign out");
-      }
-    },
-    onSuccess: () => {
-      queryClient.clear();
-      setIsMobileMenuOpen(false);
-      window.location.assign("/");
-    },
-    onError: (error) => {
-      toast({
-        title: "Couldn't sign out",
-        description: error instanceof Error ? error.message : "Please try again.",
-        variant: "destructive",
-      });
-    },
+  const { logout, isLoggingOut } = useLogout({
+    onLoggedOut: () => setIsMobileMenuOpen(false),
   });
   
   // Fix for nested anchor issue - using custom rendering for links
