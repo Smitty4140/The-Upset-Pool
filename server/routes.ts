@@ -2826,6 +2826,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send one of every email template to the super user's own inbox, so each
+  // design can be proofed in real mail clients before the league sees it.
+  app.get('/api/admin/system/test-emails', isAuthenticated, isSuperUser, async (req: any, res) => {
+    try {
+      const to = req.user.email;
+      if (!to) {
+        return res.status(400).json({ message: "Your account has no email address" });
+      }
+      const email = await import("./email.js");
+      const name = req.user.username || "Commish";
+
+      const samples: Array<[string, () => Promise<boolean>]> = [
+        ["welcome", () => email.sendWelcomeEmail(to, name)],
+        ["picks-live", () => email.sendPicksUnlockedEmail(to, name, 2)],
+        ["confirmation", () => email.sendWeeklyPickConfirmationEmail(to, name, 2, [
+          { leagueName: "NFL Upset Pool", teamName: "Carolina Panthers", teamAbbreviation: "CAR", spread: "+6.5" },
+        ])],
+        ["one-hour-warning", () => email.sendWeeklyPickReminderEmail(to, name, 2, [
+          { leagueName: "NFL Upset Pool" },
+        ])],
+        ["manual-reminder", () => email.sendPickReminderEmail(to, name, 2, "Sunday, September 20 at 1:00 PM ET")],
+        ["results-win", () => email.sendWeeklyResultsEmail(to, name, 2, [
+          { leagueName: "NFL Upset Pool", teamName: "Carolina Panthers", spread: "6.5", won: true, pointsEarned: 6.5, seasonTotal: 11, rank: 3, totalPlayers: 24 },
+        ])],
+        ["results-loss", () => email.sendWeeklyResultsEmail(to, name, 2, [
+          { leagueName: "NFL Upset Pool", teamName: "Carolina Panthers", spread: "6.5", won: false, pointsEarned: 0, seasonTotal: 4.5, rank: 9, totalPlayers: 24 },
+        ])],
+        ["league-archived", () => email.sendLeagueArchivedEmail(to, name, "NFL Upset Pool")],
+      ];
+
+      const results: Record<string, boolean> = {};
+      for (const [key, send] of samples) {
+        results[key] = await send();
+      }
+      const sent = Object.values(results).filter(Boolean).length;
+      res.json({
+        message: `Sent ${sent} of ${samples.length} test emails to ${to}. Failures usually mean BREVO_API_KEY or BREVO_FROM_EMAIL is missing or the sender isn't verified in Brevo.`,
+        results,
+      });
+    } catch (error: any) {
+      console.error("Error sending test emails:", error);
+      res.status(500).json({ message: error?.message || "Failed to send test emails" });
+    }
+  });
+
   // Audit/repair picks_lock_at for stored NFL weeks (1 PM ET on the game
   // Sunday, DST-aware). GET so the super user can run it from the browser on
   // production. Report-only by default; pass ?apply=true to write fixes.
