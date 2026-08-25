@@ -8,6 +8,7 @@ import { db, pool } from "../db";
 import { users, leagues, leagueMembers } from "@shared/schema";
 import { eq, inArray } from "drizzle-orm";
 import { runSuperAdminBackfill } from "../superAdminBackfill";
+import { OWNER_SUPER_ADMIN_EMAILS, isOwnerSuperAdminEmail, isSuperAdmin } from "../superAdmin";
 
 const RUN_ID = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const PASSWORD = "test-password-123";
@@ -160,6 +161,82 @@ describe("super admin vs league admin separation", () => {
     it("does not let an ordinary member read them", async () => {
       const res = await memberAgent.get(`/api/admin/league/${leagueId}/member-emails?status=all`);
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe("owner accounts", () => {
+    // The owner set is configured server-side (SUPER_ADMIN_EMAILS, defaulting
+    // to the site owner). These are the properties a deploy depends on.
+    it("configures at least one owner", () => {
+      expect(OWNER_SUPER_ADMIN_EMAILS.length).toBeGreaterThan(0);
+    });
+
+    it("matches owner emails case- and whitespace-insensitively", () => {
+      const owner = OWNER_SUPER_ADMIN_EMAILS[0];
+      expect(isOwnerSuperAdminEmail(owner)).toBe(true);
+      expect(isOwnerSuperAdminEmail(owner.toUpperCase())).toBe(true);
+      expect(isOwnerSuperAdminEmail(`  ${owner}  `)).toBe(true);
+      expect(isOwnerSuperAdminEmail(superAdmin.email)).toBe(false);
+      expect(isOwnerSuperAdminEmail(null)).toBe(false);
+      expect(isOwnerSuperAdminEmail("")).toBe(false);
+    });
+
+    it("grants an owner account super admin at boot, and refuses to revoke it", async () => {
+      const ownerEmail = OWNER_SUPER_ADMIN_EMAILS[0];
+
+      // Stand in for the real owner: an account on the configured email that
+      // starts with no flag at all.
+      const ownerAccount = await storage.getUserByEmail(ownerEmail);
+      const preExisting = Boolean(ownerAccount);
+      let ownerId: string;
+
+      if (ownerAccount) {
+        ownerId = ownerAccount.id;
+      } else {
+        const created = await storage.createUser({
+          id: `owner_test_${RUN_ID}`,
+          email: ownerEmail,
+          username: `owner_${RUN_ID}`.slice(0, 25),
+          password: null,
+          firstName: null,
+          lastName: null,
+          profileImageUrl: null,
+          totalPoints: "0",
+          emailVerified: false,
+          receiveNotifications: true,
+        } as any);
+        ownerId = created.id;
+        userIds.push(ownerId);
+      }
+
+      const wasSuper = Boolean((await storage.getUser(ownerId))?.isSuperUser);
+      try {
+        // Even starting from no flag, the owner is recognised immediately...
+        await storage.setSuperAdmin(ownerId, false);
+        expect(await isSuperAdmin(ownerId)).toBe(true);
+
+        // ...and a boot run writes the flag so they appear in the roster.
+        const result = await runSuperAdminBackfill(pool);
+        expect(result.ownersMissing).not.toContain(ownerEmail);
+        expect((await storage.getUser(ownerId))?.isSuperUser).toBe(true);
+
+        const roster = await superAgent.get("/api/admin/super-admins");
+        expect(roster.status).toBe(200);
+        const ownerRow = roster.body.find((u: any) => u.id === ownerId);
+        expect(ownerRow?.isOwner).toBe(true);
+
+        // Revoking an owner would only undo itself on the next deploy. The
+        // caller here is a different super admin, so this is the owner guard
+        // firing rather than the self-revoke or last-admin one.
+        const revoke = await superAgent.delete(`/api/admin/super-admins/${ownerId}`);
+        expect(revoke.status).toBe(400);
+        expect(revoke.body.message).toMatch(/owner account/i);
+        expect((await storage.getUser(ownerId))?.isSuperUser).toBe(true);
+      } finally {
+        if (preExisting) {
+          await storage.setSuperAdmin(ownerId, wasSuper);
+        }
+      }
     });
   });
 

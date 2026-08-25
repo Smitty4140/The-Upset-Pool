@@ -1,10 +1,12 @@
 import type { Pool } from "@neondatabase/serverless";
-import { BOOTSTRAP_SUPER_USER_IDS } from "./superAdmin";
+import { BOOTSTRAP_SUPER_USER_IDS, OWNER_SUPER_ADMIN_EMAILS } from "./superAdmin";
 
 export type SuperAdminBackfillResult = {
   columnAdded: boolean;
   superAdmins: number;
   bootstrapped: number;
+  ownersGranted: number;
+  ownersMissing: string[];
 };
 
 /**
@@ -37,6 +39,31 @@ export async function runSuperAdminBackfill(
       UPDATE users SET is_super_user = false WHERE is_super_user IS NULL
     `);
 
+    // Owner accounts are granted on every boot, so a deploy always comes up
+    // with them holding super admin — including the first boot after they sign
+    // up. The API refuses to revoke them, so this can't undo a deliberate
+    // removal.
+    let ownersGranted = 0;
+    let ownersMissing: string[] = [];
+    if (OWNER_SUPER_ADMIN_EMAILS.length > 0) {
+      const granted = await client.query(
+        `UPDATE users
+         SET is_super_user = true, updated_at = NOW()
+         WHERE LOWER(email) = ANY($1::varchar[]) AND is_super_user = false`,
+        [OWNER_SUPER_ADMIN_EMAILS],
+      );
+      ownersGranted = granted.rowCount ?? 0;
+
+      // An owner with no account yet is normal (they just haven't signed up),
+      // but it is worth saying out loud rather than silently doing nothing.
+      const present = await client.query(
+        `SELECT LOWER(email) AS email FROM users WHERE LOWER(email) = ANY($1::varchar[])`,
+        [OWNER_SUPER_ADMIN_EMAILS],
+      );
+      const presentEmails = new Set(present.rows.map((row: any) => row.email));
+      ownersMissing = OWNER_SUPER_ADMIN_EMAILS.filter((email) => !presentEmails.has(email));
+    }
+
     // Seed the bootstrap accounts only when nobody holds the flag. Once a
     // real super admin exists, membership is managed entirely from the app —
     // this must never resurrect an account the owners deliberately removed.
@@ -62,6 +89,8 @@ export async function runSuperAdminBackfill(
       columnAdded,
       superAdmins: total.rows[0].count,
       bootstrapped,
+      ownersGranted,
+      ownersMissing,
     };
   } catch (error) {
     await client.query("ROLLBACK");

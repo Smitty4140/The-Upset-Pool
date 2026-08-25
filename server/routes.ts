@@ -13,7 +13,13 @@ import emailRoutes from "./routes/email";
 import { sendWelcomeEmail, sendLeagueArchivedEmail } from "./email";
 import { pullNFLGamesFromOddsAPI } from "./nflDataPuller";
 import { pullNFLResultsFromESPN } from "./espnResultsPuller";
-import { isSuperAdmin, requireSuperAdmin, requireLeagueAdmin, countSuperAdmins } from "./superAdmin";
+import {
+  isSuperAdmin,
+  requireSuperAdmin,
+  requireLeagueAdmin,
+  countSuperAdmins,
+  isOwnerSuperAdminEmail,
+} from "./superAdmin";
 
 // Account fields safe to return from admin endpoints — never the password hash.
 function toPublicUser(user: any) {
@@ -1129,7 +1135,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/super-admins', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const admins = await storage.getSuperAdmins();
-      res.json(admins.map(toPublicUser));
+      res.json(admins.map((admin) => ({
+        ...toPublicUser(admin),
+        isOwner: isOwnerSuperAdminEmail(admin.email),
+      })));
     } catch (error) {
       console.error("Error fetching super admins:", error);
       res.status(500).json({ message: "Failed to fetch super admins" });
@@ -1191,6 +1200,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!target.isSuperUser) {
         return res.status(400).json({ message: "That user is not a super admin" });
+      }
+
+      // Owner accounts are re-granted at boot, so allowing this would only
+      // undo itself on the next deploy.
+      if (isOwnerSuperAdminEmail(target.email)) {
+        return res.status(400).json({
+          message: `${target.username || target.email} is an owner account and always has super admin access`,
+        });
       }
 
       // Never leave the site without one, or the Site Admin page becomes

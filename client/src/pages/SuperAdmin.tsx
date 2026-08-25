@@ -44,6 +44,8 @@ interface SuperAdminUser {
   email: string | null;
   profileImageUrl: string | null;
   isSuperUser: boolean;
+  // Owner accounts are configured server-side and always hold super admin.
+  isOwner?: boolean;
   createdAt: string | null;
 }
 
@@ -605,6 +607,9 @@ export default function SuperAdminPage() {
                         {admin.id === user?.id && (
                           <Badge variant="secondary" className="ml-2">You</Badge>
                         )}
+                        {admin.isOwner && (
+                          <Badge variant="outline" className="ml-2">Owner</Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm text-gray-600">{admin.email || "No email"}</TableCell>
                       <TableCell className="text-center">
@@ -614,15 +619,18 @@ export default function SuperAdminPage() {
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           disabled={
                             admin.id === user?.id ||
+                            admin.isOwner ||
                             (superAdmins?.length ?? 0) <= 1 ||
                             removeSuperAdminMutation.isPending
                           }
                           title={
-                            admin.id === user?.id
-                              ? "Another super admin has to remove your access"
-                              : (superAdmins?.length ?? 0) <= 1
-                                ? "The last super admin can't be removed"
-                                : "Remove super admin access"
+                            admin.isOwner
+                              ? "Owner accounts always have super admin access"
+                              : admin.id === user?.id
+                                ? "Another super admin has to remove your access"
+                                : (superAdmins?.length ?? 0) <= 1
+                                  ? "The last super admin can't be removed"
+                                  : "Remove super admin access"
                           }
                           onClick={() => {
                             const label = admin.username || admin.email || "this user";
