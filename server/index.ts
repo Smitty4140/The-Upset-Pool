@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { runLeagueDataBackfills } from "./leagueDataBackfill";
+import { runSuperAdminBackfill } from "./superAdminBackfill";
 import { pool } from "./db";
 
 const app = express();
@@ -45,6 +46,21 @@ app.use((req, res, next) => {
       `${leagueBackfillResult.membershipsUpdated} memberships, ` +
       `${leagueBackfillResult.nicknamesUpdated} nicknames updated)`,
   );
+
+  const superAdminResult = await runSuperAdminBackfill(pool);
+  log(
+    `Super admins verified (${superAdminResult.superAdmins} total` +
+      `${superAdminResult.ownersGranted > 0 ? `, ${superAdminResult.ownersGranted} owner granted` : ""}` +
+      `${superAdminResult.bootstrapped > 0 ? `, ${superAdminResult.bootstrapped} bootstrapped` : ""}` +
+      `${superAdminResult.columnAdded ? ", is_super_user column added" : ""})`,
+  );
+  if (superAdminResult.ownersMissing.length > 0) {
+    // Not fatal: they get the flag on the next boot after signing up, and
+    // isSuperAdmin recognises them by email in the meantime.
+    log(
+      `Owner super admin has no account yet: ${superAdminResult.ownersMissing.join(", ")}`,
+    );
+  }
 
   const server = await registerRoutes(app);
 

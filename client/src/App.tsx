@@ -7,7 +7,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Profile from "@/pages/Profile";
 import Rules from "@/pages/Rules";
-import AdminDashboard from "@/pages/Admin";
+import SuperAdmin from "@/pages/SuperAdmin";
 import AuthPage from "@/pages/auth-page";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -110,7 +110,7 @@ function Router() {
           <Route path="/join-league">
             <JoinLeague />
           </Route>
-          <Route path="/admin" component={AdminDashboard} />
+          <Route path="/admin" component={SuperAdmin} />
           <Route component={NotFound} />
         </Switch>
       </main>

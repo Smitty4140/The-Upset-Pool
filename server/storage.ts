@@ -59,6 +59,8 @@ export interface IStorage {
   updateUser(userId: string, updateData: Partial<InsertUser>): Promise<User>;
   upsertUser(user: Partial<InsertUser> & { id: string }): Promise<User>;
   getAllUsers(): Promise<User[]>;
+  getSuperAdmins(): Promise<User[]>;
+  setSuperAdmin(userId: string, isSuperUser: boolean): Promise<User | undefined>;
 
   // NFL Team operations
   getNFLTeams(): Promise<NFLTeam[]>;
@@ -213,6 +215,23 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(users.username);
+  }
+
+  async getSuperAdmins(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.isSuperUser, true))
+      .orderBy(users.username);
+  }
+
+  async setSuperAdmin(userId: string, isSuperUser: boolean): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ isSuperUser, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
   }
 
   // NFL Team operations

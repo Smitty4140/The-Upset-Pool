@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useLogout } from "@/hooks/useLogout";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,13 +13,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Loader2, LogOut, Menu, UserRound, X } from "lucide-react";
+import { Loader2, LogOut, Menu, ShieldCheck, UserRound, X } from "lucide-react";
 import upsetPoolLogo from "@assets/7ce37caf-c21f-4929-a667-365370f1324d_1766504568458.png";
 
 export default function Header() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { isSuperAdmin } = useSuperAdmin();
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -81,11 +83,6 @@ export default function Header() {
               <NavLink href="/rules" active={location === "/rules"}>
                 Rules
               </NavLink>
-              {user?.id === "42820911" && (
-                <NavLink href="/admin" active={location === "/admin"}>
-                  Admin
-                </NavLink>
-              )}
             </nav>
           </div>
 
@@ -126,6 +123,14 @@ export default function Header() {
                         Profile
                       </Link>
                     </DropdownMenuItem>
+                    {isSuperAdmin && (
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin">
+                          <ShieldCheck className="h-4 w-4" />
+                          Site Admin
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onSelect={(event) => {
@@ -179,11 +184,6 @@ export default function Header() {
               <NavLink href="/rules" active={location === "/rules"} mobile>
                 Rules
               </NavLink>
-              {user?.id === "42820911" && (
-                <NavLink href="/admin" active={location === "/admin"} mobile>
-                  Admin
-                </NavLink>
-              )}
             </div>
             
             {/* Mobile user section */}
@@ -210,6 +210,14 @@ export default function Header() {
                       Profile
                     </span>
                   </NavLink>
+                  {isSuperAdmin && (
+                    <NavLink href="/admin" active={location === "/admin"} mobile>
+                      <span className="flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4" />
+                        Site Admin
+                      </span>
+                    </NavLink>
+                  )}
                   <button
                     type="button"
                     onClick={() => logout()}

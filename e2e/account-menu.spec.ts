@@ -105,7 +105,7 @@ test("desktop account menu supports profile navigation and a failed sign-out ret
   await openDesktopAccountMenu(page);
   await page.getByRole("menuitem", { name: "Sign Out" }).press("Enter");
 
-  await expect(page.getByText("Couldn't sign out")).toBeVisible();
+  await expect(page.getByText("Couldn't sign out", { exact: true })).toBeVisible();
   await expect(
     page.locator(`button[aria-label="Account menu for ${user.username}"]`),
   ).toHaveAttribute("aria-expanded", "true");
@@ -145,7 +145,7 @@ test("mobile hamburger account area keeps email private and recovers from sign-o
 
   await page.getByRole("button", { name: "Open main menu" }).press("Enter");
   await page.getByRole("button", { name: "Sign Out" }).press("Enter");
-  await expect(page.getByText("Couldn't sign out")).toBeVisible();
+  await expect(page.getByText("Couldn't sign out", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign Out" })).toBeEnabled();
 
   await page.getByRole("button", { name: "Sign Out" }).press("Enter");

@@ -3,15 +3,24 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Lock, Unlock, UserCog, RefreshCw, Database, CheckCircle, Edit, Clock, Activity, Users, UserCheck, UserX, ChevronDown, Copy, Share, Trash2, Archive, Mail, Loader2 } from "lucide-react";
+import {
+  Archive,
+  ChevronDown,
+  Copy,
+  Loader2,
+  Mail,
+  Share,
+  Trash2,
+  UserCheck,
+  UserCog,
+  UserX,
+  Users,
+} from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { formatWeeklyDate } from "@/lib/formatDate";
-import { NFLWeek, League, NFLGame, NFLTeam, User, LeagueMember } from "@/lib/types";
+import { League, LeagueMember } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
@@ -19,279 +28,42 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { format } from "date-fns";
 import NewMemberDefaultStatusControl from "@/components/NewMemberDefaultStatusControl";
-
-interface SchedulerStatus {
-  isRunning: boolean;
-  jobCount: number;
-}
-
-interface GameResultsManagerProps {
-  weekId: number;
-}
-
-const GameResultsManager = ({ weekId }: GameResultsManagerProps) => {
-  const { toast } = useToast();
-  const [editingGameId, setEditingGameId] = useState<number | null>(null);
-  const [homeScore, setHomeScore] = useState<string>("");
-  const [awayScore, setAwayScore] = useState<string>("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Fetch games for this week
-  const { data: games, isLoading, refetch } = useQuery<(NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam })[]>({
-    queryKey: [`/api/nfl-games/week/${weekId}`],
-  });
-  
-  const startEditing = (game: NFLGame & { homeTeam: NFLTeam, awayTeam: NFLTeam }) => {
-    setEditingGameId(Number(game.id));
-    setHomeScore(game.homeTeamScore?.toString() || "");
-    setAwayScore(game.awayTeamScore?.toString() || "");
-  };
-  
-  const cancelEditing = () => {
-    setEditingGameId(null);
-    setHomeScore("");
-    setAwayScore("");
-  };
-  
-  const saveGameResult = async (gameId: number) => {
-    if (!homeScore.trim() || !awayScore.trim()) {
-      toast({
-        title: "Missing scores",
-        description: "Please enter both home and away team scores",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const homeScoreNum = parseInt(homeScore);
-    const awayScoreNum = parseInt(awayScore);
-    
-    if (isNaN(homeScoreNum) || isNaN(awayScoreNum)) {
-      toast({
-        title: "Invalid scores",
-        description: "Scores must be valid numbers",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    try {
-      const response = await fetch(`/api/admin/games/${gameId}/update-result`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          homeTeamScore: homeScoreNum,
-          awayTeamScore: awayScoreNum,
-          completed: true
-        }),
-        credentials: "include"
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to update game result: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      // Refetch games data to update UI
-      await refetch();
-      
-      // Refetch leaderboard data since points will have changed
-      queryClient.invalidateQueries({ queryKey: ["/api/league/1/leaderboard"] });
-      
-      toast({
-        title: "Success",
-        description: result.message || "Game result updated successfully",
-        variant: "default"
-      });
-      
-      // Reset state
-      cancelEditing();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update game result",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-  
-  if (isLoading) {
-    return <div className="text-center py-4">Loading games...</div>;
-  }
-  
-  if (!games || games.length === 0) {
-    return <div className="text-center py-4">No games found for this week.</div>;
-  }
-  
-  return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[200px]">Game</TableHead>
-            <TableHead className="w-[120px]">Time</TableHead>
-            <TableHead className="w-[120px]">Spread</TableHead>
-            <TableHead className="w-[120px]">Home Score</TableHead>
-            <TableHead className="w-[120px]">Away Score</TableHead>
-            <TableHead className="w-[120px]">Status</TableHead>
-            <TableHead className="w-[120px]">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {games.map(game => (
-            <TableRow key={game.id}>
-              <TableCell className="font-medium">
-                {game.awayTeam.name} @ {game.homeTeam.name}
-              </TableCell>
-              <TableCell className="text-sm">
-                {format(new Date(game.gameTime), "MMM d, h:mm a")}
-              </TableCell>
-              <TableCell>
-                {parseFloat(game.spread.toString()) > 0 
-                  ? `${game.homeTeam.abbreviation} +${game.spread}` 
-                  : parseFloat(game.spread.toString()) < 0
-                    ? `${game.awayTeam.abbreviation} ${-parseFloat(game.spread.toString())}`
-                    : "Even"}
-              </TableCell>
-              <TableCell>
-                {editingGameId === Number(game.id) ? (
-                  <Input
-                    type="number"
-                    min="0"
-                    value={homeScore}
-                    onChange={e => setHomeScore(e.target.value)}
-                    className="w-16"
-                  />
-                ) : (
-                  game.homeTeamScore ?? "-"
-                )}
-              </TableCell>
-              <TableCell>
-                {editingGameId === Number(game.id) ? (
-                  <Input
-                    type="number"
-                    min="0"
-                    value={awayScore}
-                    onChange={e => setAwayScore(e.target.value)}
-                    className="w-16"
-                  />
-                ) : (
-                  game.awayTeamScore ?? "-"
-                )}
-              </TableCell>
-              <TableCell>
-                {game.completed ? (
-                  <Badge className="bg-green-500 hover:bg-green-600">
-                    <CheckCircle className="h-3 w-3 mr-1" /> Completed
-                  </Badge>
-                ) : (
-                  <Badge variant="outline">Pending</Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                {editingGameId === Number(game.id) ? (
-                  <div className="flex space-x-2">
-                    <Button 
-                      size="sm" 
-                      variant="default"
-                      disabled={isSubmitting}
-                      onClick={() => saveGameResult(Number(game.id))}
-                    >
-                      {isSubmitting ? "Saving..." : "Save"}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      disabled={isSubmitting}
-                      onClick={cancelEditing}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => startEditing(game)}
-                    disabled={editingGameId !== null}
-                  >
-                    <Edit className="h-4 w-4 mr-1" /> 
-                    {game.completed ? "Edit" : "Enter Score"}
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-};
 
 interface AdminControlsProps {
   leagueId: number;
 }
 
+/**
+ * The league Admin tab: everything scoped to ONE league — its invite code, its
+ * members, its defaults, its archive state.
+ *
+ * Site-wide controls (API pulls, results corrections, the scheduler, the pick
+ * deadline) deliberately do NOT live here: they change every league at once,
+ * so they belong to super admins on the Site Admin page reached from the
+ * account menu.
+ */
 export default function AdminControls({ leagueId }: AdminControlsProps) {
   const { user, isLoading: isLoadingAuth } = useAuth();
   const { toast } = useToast();
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [isLoadingGames, setIsLoadingGames] = useState(false);
-  const [isLoadingResults, setIsLoadingResults] = useState(false);
-  const [isLoadingScheduler, setIsLoadingScheduler] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [isCopyingEmails, setIsCopyingEmails] = useState(false);
 
-  // Check if current user is super user
-  const { data: superUserStatus } = useQuery<{ isSuperUser: boolean }>({
-    queryKey: ["/api/auth/super-user-status"],
-  });
-  const isSuperUser = superUserStatus?.isSuperUser || false;
-
-  // Get current NFL week
-  const { 
-    data: currentWeek, 
-    isLoading: isLoadingWeek,
-    refetch: refetchWeek
-  } = useQuery<NFLWeek>({
-    queryKey: ["/api/nfl-weeks/current"],
-  });
-
-  // Get league info
-  const { 
-    data: league, 
-    isLoading: isLoadingLeague 
-  } = useQuery<League>({
+  const { data: league, isLoading: isLoadingLeague } = useQuery<League>({
     queryKey: [`/api/leagues/${leagueId}`],
   });
 
-  // Get league members to check admin status
-  const { 
-    data: leagueMembers, 
-    isLoading: isLoadingMembers 
-  } = useQuery({
+  const { data: leagueMembers, isLoading: isLoadingMembers } = useQuery({
     queryKey: [`/api/leagues/${leagueId}/members`],
   });
 
-  // Check if user is an admin for this league
-  const isAdmin = user && leagueMembers && Array.isArray(leagueMembers) && 
-    leagueMembers.some((member: any) => 
+  // Admin of THIS league — the only authority this tab acts on.
+  const isAdmin = user && leagueMembers && Array.isArray(leagueMembers) &&
+    leagueMembers.some((member: any) =>
       member.userId === user.id && member.isAdmin && member.isActive
     );
 
-  // Check if picks are locked
-  const arePicksLocked = currentWeek ? new Date() > new Date(currentWeek.picksLockAt) : false;
-
   // Copy members' email addresses to the clipboard (all/active/inactive)
-  const [isCopyingEmails, setIsCopyingEmails] = useState(false);
   const handleCopyMemberEmails = async (scope: "all" | "active" | "inactive") => {
     const scopeLabel = scope === "all" ? "member" : `${scope} member`;
     setIsCopyingEmails(true);
@@ -337,416 +109,11 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
     }
   };
 
-  // Get scheduler status
-  const { 
-    data: schedulerStatus, 
-    isLoading: isLoadingSchedulerStatus,
-    refetch: refetchSchedulerStatus
-  } = useQuery<SchedulerStatus>({
-    queryKey: ["/api/admin/scheduler/status"],
-    enabled: !!isAdmin,
-    refetchInterval: 30000, // Refresh every 30 seconds
-  });
-
-  const togglePickLockStatus = async () => {
-    if (!currentWeek || !user) return;
-    
-    setIsUpdating(true);
-    try {
-      const response = await fetch(`/api/admin/week/${currentWeek.id}/toggle-lock`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          leagueId,
-          locked: !arePicksLocked
-        }),
-        credentials: "include"
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to toggle pick lock status: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-
-      // Refetch current week to update the UI
-      await refetchWeek();
-      
-      toast({
-        title: "Success",
-        description: result.message,
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update pick lock status",
-        variant: "destructive"
-      });
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-  
-  const pullNFLGamesFromAPI = async () => {
-    if (!currentWeek || !user) return;
-    
-    setIsLoadingGames(true);
-    try {
-      const response = await fetch(`/api/admin/games/fetch-from-api`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          weekId: currentWeek.id
-        }),
-        credentials: "include"
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to pull NFL games: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      // Refetch games data
-      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games/week/${currentWeek.id}`] });
-      
-      toast({
-        title: "Success",
-        description: result.message || `Successfully pulled ${result.games?.length || 0} NFL games for Week ${currentWeek.weekNumber}`,
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to pull NFL games from API",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingGames(false);
-    }
-  };
-
-  const pullNFLResultsFromAPI = async () => {
-    if (!currentWeek || !user) return;
-    
-    setIsLoadingResults(true);
-    try {
-      const response = await fetch(`/api/admin/games/fetch-results`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          weekId: currentWeek.id
-        }),
-        credentials: "include"
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to pull NFL results: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      // Refetch all related data
-      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games/week/${currentWeek.id}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/week/${currentWeek.id}/picks`] });
-      
-      toast({
-        title: "Success",
-        description: result.message || `Successfully updated ${result.results?.gamesUpdated || 0} game results for Week ${currentWeek.weekNumber}`,
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to pull NFL results from API",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingResults(false);
-    }
-  };
-
-  const triggerManualSchedulerPull = async () => {
-    if (!user) return;
-    
-    setIsLoadingScheduler(true);
-    try {
-      const response = await fetch("/api/admin/scheduler/manual-pull", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "include"
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to trigger manual pull: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      // Refetch all related data
-      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games/week/${currentWeek?.id}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/week/${currentWeek?.id}/picks`] });
-      refetchSchedulerStatus();
-      
-      toast({
-        title: "Success",
-        description: result.message || "Manual data pull completed successfully",
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to trigger manual data pull",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingScheduler(false);
-    }
-  };
-
-  const testScheduledJob = async () => {
-    if (!user) return;
-    
-    setIsLoadingScheduler(true);
-    try {
-      const response = await fetch("/api/admin/scheduler/test-job", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "include"
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to test scheduled job: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      // Refetch all related data
-      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games/week/${currentWeek?.id}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/week/${currentWeek?.id}/picks`] });
-      refetchSchedulerStatus();
-      
-      toast({
-        title: "Success",
-        description: result.message || "Scheduled job test completed successfully",
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to test scheduled job",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingScheduler(false);
-    }
-  };
-
-  const testResultsJob = async () => {
-    if (!user) return;
-    
-    setIsLoadingScheduler(true);
-    try {
-      const response = await fetch("/api/admin/scheduler/test-results-job", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "include"
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to test results job: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      // Refetch all related data
-      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games/week/${currentWeek?.id}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/leaderboard`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/league/${leagueId}/week/${currentWeek?.id}/picks`] });
-      refetchSchedulerStatus();
-      
-      toast({
-        title: "Success",
-        description: result.message || "Results job test completed successfully",
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to test results job",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingScheduler(false);
-    }
-  };
-
-  const testWeeklyEmails = async () => {
-    if (!user) return;
-    
-    setIsLoadingScheduler(true);
-    try {
-      const response = await fetch("/api/admin/scheduler/test-weekly-emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "include"
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to test weekly emails: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      toast({
-        title: "Success",
-        description: result.message || "Weekly email test completed successfully",
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to test weekly emails",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingScheduler(false);
-    }
-  };
-
-  const testPicksUnlockedEmails = async () => {
-    if (!user) return;
-    
-    setIsLoadingScheduler(true);
-    try {
-      const response = await fetch("/api/admin/scheduler/test-picks-unlocked", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ weekNumber: 1 }),
-        credentials: "include"
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to test picks unlocked emails: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      toast({
-        title: "Success",
-        description: result.message || "Picks unlocked email test completed successfully",
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to test picks unlocked emails",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingScheduler(false);
-    }
-  };
-
-  const fetchPreseasonGames = async () => {
-    if (!user) return;
-    
-    setIsLoadingScheduler(true);
-    try {
-      const response = await fetch("/api/admin/testing/fetch-preseason-games", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "include"
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch preseason games: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      // Refetch all related data to show the new test week
-      queryClient.invalidateQueries({ queryKey: [`/api/nfl-games`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/nfl-weeks`] });
-      
-      toast({
-        title: "Success",
-        description: result.message || `Fetched ${result.created} preseason games for testing`,
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to fetch preseason games",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingScheduler(false);
-    }
-  };
-
-  const schedulePreseasonResults = async () => {
-    if (!user) return;
-    
-    setIsLoadingScheduler(true);
-    try {
-      const response = await fetch("/api/admin/testing/schedule-preseason-results", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        credentials: "include"
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to schedule preseason results: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      toast({
-        title: "Success",
-        description: result.message || "Preseason results scheduled for tomorrow at 7 AM",
-        variant: "default"
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to schedule preseason results",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingScheduler(false);
-    }
-  };
-
   const toggleLeagueArchive = async () => {
     if (!user || !league) return;
-    
+
     const newArchiveStatus = !league.isArchived;
-    
+
     setIsArchiving(true);
     try {
       const response = await fetch(`/api/leagues/${leagueId}/archive`, {
@@ -759,17 +126,17 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
         }),
         credentials: "include"
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || `Failed to ${newArchiveStatus ? 'archive' : 'unarchive'} league`);
       }
-      
+
       const result = await response.json();
-      
+
       queryClient.invalidateQueries({ queryKey: [`/api/leagues/${leagueId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/user/leagues`] });
-      
+
       toast({
         title: "Success",
         description: result.message || `League ${newArchiveStatus ? 'archived' : 'unarchived'} successfully`,
@@ -786,7 +153,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
     }
   };
 
-  if (isLoadingAuth || isLoadingWeek || isLoadingLeague || isLoadingMembers) {
+  if (isLoadingAuth || isLoadingLeague || isLoadingMembers) {
     return null; // Don't show anything while loading
   }
 
@@ -798,13 +165,13 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center">
           <UserCog className="h-5 w-5 mr-2 text-primary" />
-          League Admin Controls
+          League Admin
         </CardTitle>
         <CardDescription>
-          Manage pick locks and other settings for Week {currentWeek?.weekNumber}
+          Settings for {league?.name || "this league"} — who's in it, how they join, and its defaults.
         </CardDescription>
       </CardHeader>
-      
+
       <CardContent>
         {/* League Invite Code Section */}
         {league?.inviteCode && (
@@ -885,6 +252,7 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
 
         <Separator className="my-6" />
 
+        {/* League Defaults */}
         {league && (
           <>
             <NewMemberDefaultStatusControl
@@ -894,296 +262,56 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
             <Separator className="my-6" />
           </>
         )}
-        
-        {/* Lock/Unlock Picks Section */}
-        <div className="mb-6">
-          <div className="text-sm font-medium mb-2">Lock/Unlock Picks</div>
-          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 mb-4 flex items-start">
-            <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 mr-2 flex-shrink-0" />
-            <div className="text-sm text-amber-800">
-              Toggling the pick lock status will affect all users in this league. 
-              {arePicksLocked
-                ? " Unlocking picks will allow users to change their selections."
-                : " Locking picks will prevent users from making or changing their selections."}
+
+        {/* User Management Section */}
+        <UserManagement leagueId={leagueId} />
+
+        <Separator className="my-6" />
+
+        {/* League Archive Section */}
+        <div>
+          <div className="text-sm font-medium mb-2">League Archive</div>
+          <div className={`${league?.isArchived ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'} border rounded-md p-3 mb-4 flex items-start`}>
+            <Archive className={`h-5 w-5 ${league?.isArchived ? 'text-red-500' : 'text-orange-500'} mt-0.5 mr-2 flex-shrink-0`} />
+            <div className={`text-sm ${league?.isArchived ? 'text-red-800' : 'text-orange-800'}`}>
+              {league?.isArchived
+                ? `This league is archived${league?.season ? ` (Season ${league.season})` : ''}. No new members can join and no picks can be submitted. Unarchive to reactivate.`
+                : 'Archiving a league will prevent new members from joining and block all pick submissions. Use this at the end of a season.'}
             </div>
           </div>
-          
+
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
             <div className="mb-3 sm:mb-0">
               <div className="text-sm font-medium">
-                Current status: 
-                <span className={arePicksLocked ? " text-red-600" : " text-green-600"}>
-                  {arePicksLocked ? " Picks are locked" : " Picks are unlocked"}
+                Archive Status:
+                <span className={league?.isArchived ? " text-red-600" : " text-green-600"}>
+                  {league?.isArchived ? " Archived" : " Active"}
                 </span>
               </div>
-              <div className="text-sm text-muted-foreground">
-                {currentWeek && `Week ${currentWeek.weekNumber}: ${formatWeeklyDate(currentWeek.startDate)} - ${formatWeeklyDate(currentWeek.endDate)}`}
-              </div>
+              {league?.archivedAt && (
+                <div className="text-sm text-muted-foreground">
+                  Archived on: {new Date(league.archivedAt).toLocaleDateString()}
+                </div>
+              )}
             </div>
-            
+
             <Button
-              variant={arePicksLocked ? "default" : "destructive"}
+              variant={league?.isArchived ? "default" : "destructive"}
               size="sm"
-              disabled={isUpdating}
-              onClick={togglePickLockStatus}
+              disabled={isArchiving}
+              onClick={toggleLeagueArchive}
               className="ml-auto"
             >
-              {isUpdating ? "Updating..." : (
-                arePicksLocked ? (
-                  <><Unlock className="h-4 w-4 mr-2" /> Unlock Picks</>
+              {isArchiving ? "Updating..." : (
+                league?.isArchived ? (
+                  <><Archive className="h-4 w-4 mr-2" /> Unarchive League</>
                 ) : (
-                  <><Lock className="h-4 w-4 mr-2" /> Lock Picks</>
+                  <><Archive className="h-4 w-4 mr-2" /> Archive League</>
                 )
               )}
             </Button>
           </div>
         </div>
-        
-        
-        {/* Super User Only - System Admin Controls */}
-        {superUserStatus?.isSuperUser && (
-          <>
-            <Separator className="my-4" />
-            
-            {/* NFL Games Section */}
-        <div className="mb-6">
-          <div className="text-sm font-medium mb-2">Manage NFL Games</div>
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 flex items-start">
-            <Database className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
-            <div className="text-sm text-blue-800">
-              This will populate this week's NFL games from The Odds API, using DraftKings spreads.
-              Existing games will be updated with the latest odds data.
-            </div>
-          </div>
-          
-          <div className="flex justify-end">
-            <Button
-              variant="default"
-              size="sm"
-              disabled={isLoadingGames}
-              onClick={pullNFLGamesFromAPI}
-              className="ml-auto"
-            >
-              {isLoadingGames ? "Loading..." : (
-                <><RefreshCw className="h-4 w-4 mr-2" /> Pull NFL Games from API</>
-              )}
-            </Button>
-          </div>
-        </div>
-        
-        <Separator className="my-4" />
-        
-        {/* Scheduler Status Section */}
-        <div className="mb-6">
-          <div className="text-sm font-medium mb-2">Automated Data Scheduler</div>
-          <div className="bg-purple-50 border border-purple-200 rounded-md p-3 mb-4 flex items-start">
-            <Clock className="h-5 w-5 text-purple-500 mt-0.5 mr-2 flex-shrink-0" />
-            <div className="text-sm text-purple-800">
-              The scheduler automatically pulls game data 8 hours before the first NFL game and results 5 hours after the last game of each week.
-              You can check the status and manually trigger pulls if needed.
-            </div>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
-            <div className="mb-3 sm:mb-0">
-              <div className="text-sm font-medium">
-                Scheduler Status: 
-                <span className={schedulerStatus?.isRunning ? " text-green-600" : " text-red-600"}>
-                  {isLoadingSchedulerStatus ? " Loading..." : (schedulerStatus?.isRunning ? " Running" : " Stopped")}
-                </span>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {schedulerStatus && `${schedulerStatus.jobCount || 0} scheduled job${schedulerStatus.jobCount !== 1 ? 's' : ''}`}
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap gap-2 ml-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isLoadingScheduler}
-                onClick={triggerManualSchedulerPull}
-              >
-                {isLoadingScheduler ? "Pulling..." : (
-                  <><Activity className="h-4 w-4 mr-2" /> Manual Data Pull</>
-                )}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={isLoadingScheduler}
-                onClick={testScheduledJob}
-              >
-                {isLoadingScheduler ? "Testing..." : (
-                  <><Clock className="h-4 w-4 mr-2" /> Test Data Pull</>
-                )}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={isLoadingScheduler}
-                onClick={testResultsJob}
-              >
-                {isLoadingScheduler ? "Testing..." : (
-                  <><CheckCircle className="h-4 w-4 mr-2" /> Test Results Pull</>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Email Testing Section */}
-        <div className="mb-6">
-          <div className="text-sm font-medium mb-2">Email System Testing</div>
-          <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-4 flex items-start">
-            <Users className="h-5 w-5 text-green-500 mt-0.5 mr-2 flex-shrink-0" />
-            <div className="text-sm text-green-800">
-              Test email notifications. For safety, test emails are only sent to league admins.
-            </div>
-          </div>
-          
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isLoadingScheduler}
-              onClick={testWeeklyEmails}
-            >
-              {isLoadingScheduler ? "Sending..." : "Test Weekly Reminders"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isLoadingScheduler}
-              onClick={testPicksUnlockedEmails}
-            >
-              {isLoadingScheduler ? "Sending..." : "Test Picks Unlocked"}
-            </Button>
-          </div>
-        </div>
-        
-        <Separator className="my-4" />
-        
-        {/* Game Results Section */}
-        <div>
-          <div className="text-sm font-medium mb-2">Update Game Results</div>
-          <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-4 flex items-start">
-            <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 mr-2 flex-shrink-0" />
-            <div className="text-sm text-green-800">
-              Pull completed game results from ESPN API to automatically update scores and calculate user points.
-              This will fetch final scores for all completed games and process winning picks.
-            </div>
-          </div>
-          
-          <div className="flex justify-end">
-            <Button
-              variant="default"
-              size="sm"
-              disabled={isLoadingResults}
-              onClick={pullNFLResultsFromAPI}
-              className="ml-auto"
-            >
-              {isLoadingResults ? "Loading..." : (
-                <><Database className="h-4 w-4 mr-2" /> Pull Game Results from API</>
-              )}
-            </Button>
-          </div>
-        </div>
-            
-            <Separator className="my-6" />
-            
-            {/* League Archive Section - Super User Only */}
-            <div className="mb-6">
-              <div className="text-sm font-medium mb-2">League Archive Management</div>
-              <div className={`${league?.isArchived ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'} border rounded-md p-3 mb-4 flex items-start`}>
-                <Archive className={`h-5 w-5 ${league?.isArchived ? 'text-red-500' : 'text-orange-500'} mt-0.5 mr-2 flex-shrink-0`} />
-                <div className={`text-sm ${league?.isArchived ? 'text-red-800' : 'text-orange-800'}`}>
-                  {league?.isArchived 
-                    ? `This league is archived${league?.season ? ` (Season ${league.season})` : ''}. No new members can join and no picks can be submitted. Unarchive to reactivate.`
-                    : 'Archiving a league will prevent new members from joining and block all pick submissions. Use this at the end of a season.'}
-                </div>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
-                <div className="mb-3 sm:mb-0">
-                  <div className="text-sm font-medium">
-                    Archive Status: 
-                    <span className={league?.isArchived ? " text-red-600" : " text-green-600"}>
-                      {league?.isArchived ? " Archived" : " Active"}
-                    </span>
-                  </div>
-                  {league?.archivedAt && (
-                    <div className="text-sm text-muted-foreground">
-                      Archived on: {new Date(league.archivedAt).toLocaleDateString()}
-                    </div>
-                  )}
-                </div>
-                
-                <Button
-                  variant={league?.isArchived ? "default" : "destructive"}
-                  size="sm"
-                  disabled={isArchiving}
-                  onClick={toggleLeagueArchive}
-                  className="ml-auto"
-                >
-                  {isArchiving ? "Updating..." : (
-                    league?.isArchived ? (
-                      <><Archive className="h-4 w-4 mr-2" /> Unarchive League</>
-                    ) : (
-                      <><Archive className="h-4 w-4 mr-2" /> Archive League</>
-                    )
-                  )}
-                </Button>
-              </div>
-            </div>
-            
-            <Separator className="my-6" />
-          </>
-        )}
-
-        {/* Preseason Testing Section - Super User Only */}
-        {isSuperUser && (
-          <>
-            <div>
-              <div className="text-sm font-medium mb-2">Preseason Testing (Super User Only)</div>
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 flex items-start">
-                <Activity className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
-                <div className="text-sm text-blue-800">
-                  Test the complete game workflow using preseason games. This will pull preseason games 
-                  for the next 4 days and schedule results to be pulled tomorrow at 7 AM Eastern Time.
-                </div>
-              </div>
-              
-              <div className="flex flex-col space-y-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={isLoadingScheduler}
-                  onClick={fetchPreseasonGames}
-                >
-                  {isLoadingScheduler ? "Loading..." : (
-                    <><Database className="h-4 w-4 mr-2" /> Pull Preseason Games (Next 4 Days)</>
-                  )}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={isLoadingScheduler}
-                  onClick={schedulePreseasonResults}
-                >
-                  {isLoadingScheduler ? "Loading..." : (
-                    <><Clock className="h-4 w-4 mr-2" /> Schedule Results for Tomorrow 7 AM</>
-                  )}
-                </Button>
-              </div>
-            </div>
-            
-            <Separator className="my-6" />
-          </>
-        )}
-        
-        {/* User Management Section */}
-        <UserManagement leagueId={leagueId} />
       </CardContent>
     </Card>
   );

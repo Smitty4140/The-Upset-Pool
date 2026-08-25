@@ -34,7 +34,7 @@ Preferred communication style: Simple, everyday language.
     - Automated game data and results pulling via scheduled jobs (e.g., 12 hours before first game for data, 5 hours after last game for results).
     - Comprehensive tie handling in leaderboards.
     - League management including unique invite codes and member management.
-    - Super user system for critical system-wide administrative functions.
+    - Two distinct admin roles: league admin (one league's settings) and super admin (site-wide).
     - Game-specific pick locking based on kickoff times.
     - Fixed logout functionality to properly terminate sessions using correct POST method.
     - Fixed game time display inconsistencies to show all times correctly in Eastern Time (EDT/EST).
@@ -139,7 +139,7 @@ Preferred communication style: Simple, everyday language.
   - Added season, isArchived, and archivedAt fields to leagues table
   - Archived leagues cannot accept new members (blocked on both API endpoints)
   - Archived leagues cannot have picks submitted (blocked on pick submission API)
-  - Super users can archive/unarchive leagues via PATCH /api/leagues/:leagueId/archive
+  - League admins archive/unarchive their own league via PATCH /api/leagues/:leagueId/archive (super admins can act on any league)
   - Frontend displays archived league banner with season info
   - Pick submission is disabled for archived leagues in the UI
 - **Dual Database Environment**: Separate databases for development and production
@@ -167,3 +167,26 @@ Preferred communication style: Simple, everyday language.
   - **Automated API pulls**: `server/golfDataPuller.ts` pulls field+odds from The Odds API, scores from ESPN
   - **Golf Scheduler** (`server/golfScheduler.ts`): hourly ESPN score polling for active tournaments; auto-completes when ESPN reports 'post' state
   - Setting tournament status to 'active' starts hourly score polling; 'completed' stops it
+
+- **Admin Role Separation**: League admin and super admin are two different roles
+  - **League admin** (`league_members.is_admin`, must also be `is_active`): authority inside ONE league.
+    Lives on that league's **Admin tab** — invite code, copy member emails, new-member default
+    status, member active/inactive and admin roles, removing members, archiving the league.
+  - **Super admin** (`users.is_super_user`): authority across the whole site. Lives on the
+    **Site Admin** page at `/admin`, reached from the account dropdown in the top navigation —
+    shown only to super admins. Covers Odds API game pulls, ESPN results pulls, manual result
+    corrections, the shared pick deadline (lock/unlock), scheduler status and manual/test pulls,
+    email job tests, preseason testing, and managing who else is a super admin.
+  - Neither role implies the other: a league admin gets no site-wide access, and a super admin gets
+    no authority inside a league they do not administer (the one exception is archiving, where a
+    super admin can act on any league).
+  - The pick deadline moved from the league Admin tab to Site Admin because `nfl_weeks.picks_lock_at`
+    is shared by every league — a league admin toggling it changed the deadline site-wide.
+  - The super-user Results tab moved off the league tab bar for the same reason: correcting a result
+    recalculates points in every league.
+  - Super admin membership is stored in the database, not hardcoded. `server/superAdmin.ts` holds the
+    `isSuperAdmin` check and the `requireSuperAdmin` / `requireLeagueAdmin` middleware;
+    `server/superAdminBackfill.ts` runs at boot to add the column and, only when no super admin
+    exists, seed the bootstrap account so the site can never be locked out.
+  - Super admins manage each other via GET/POST/DELETE `/api/admin/super-admins`. You cannot revoke
+    your own access, and the last super admin cannot be removed.

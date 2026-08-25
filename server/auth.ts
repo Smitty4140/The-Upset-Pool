@@ -363,16 +363,19 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Check if current user is super user
-  app.get("/api/auth/super-user-status", (req, res) => {
+  // Check if current user is a site-wide super admin
+  app.get("/api/auth/super-user-status", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    
-    const SUPER_USER_ID = "user_1753731196994_qfjmyp5i2";
-    res.json({
-      isSuperUser: req.user.id === SUPER_USER_ID
-    });
+
+    try {
+      const { isSuperAdmin } = await import("./superAdmin.js");
+      res.json({ isSuperUser: await isSuperAdmin(req.user.id) });
+    } catch (error) {
+      console.error("Error checking super admin status:", error);
+      res.status(500).json({ message: "Failed to check super admin status" });
+    }
   });
 
   // Google OAuth routes with dynamic callback URL support

@@ -13,9 +13,27 @@ import emailRoutes from "./routes/email";
 import { sendLeagueArchivedEmail } from "./email";
 import { pullNFLGamesFromOddsAPI } from "./nflDataPuller";
 import { pullNFLResultsFromESPN } from "./espnResultsPuller";
+import {
+  isSuperAdmin,
+  requireSuperAdmin,
+  requireLeagueAdmin,
+  countSuperAdmins,
+  isOwnerSuperAdminEmail,
+} from "./superAdmin";
 
-// Super user configuration - only this account has access to system admin functions
-const SUPER_USER_ID = "user_1753731196994_qfjmyp5i2";
+// Account fields safe to return from admin endpoints — never the password hash.
+function toPublicUser(user: any) {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    profileImageUrl: user.profileImageUrl,
+    isSuperUser: Boolean(user.isSuperUser),
+    createdAt: user.createdAt,
+  };
+}
 
 // Shared nickname validation: 3-25 characters, letters/numbers/spaces/hyphens/underscores
 const NICKNAME_REGEX = /^[a-zA-Z0-9 _-]+$/;
@@ -34,19 +52,6 @@ function validateNickname(nickname: unknown): { valid: true; value: string } | {
     return { valid: false, error: "Nickname may only contain letters, numbers, spaces, hyphens, and underscores" };
   }
   return { valid: true, value: trimmed };
-}
-
-// Middleware to check if user is super user
-function isSuperUser(req: any, res: any, next: any) {
-  if (!req.user) {
-    return res.status(401).json({ message: "Authentication required" });
-  }
-  
-  if (req.user.id !== SUPER_USER_ID) {
-    return res.status(403).json({ message: "Super user access required" });
-  }
-  
-  next();
 }
 
 // Helper function to ensure all NFL teams exist in the database
@@ -304,24 +309,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin-only route to toggle member activation status
   // League admins: members' email addresses for emailing the league.
   // ?status=all|active|inactive selects which members (default: all).
-  app.get('/api/admin/league/:leagueId/member-emails', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/league/:leagueId/member-emails', isAuthenticated, requireLeagueAdmin(), async (req: any, res) => {
     try {
-      const adminUserId = req.user.id;
       const leagueId = parseInt(req.params.leagueId);
-
-      if (isNaN(leagueId)) {
-        return res.status(400).json({ message: "Invalid league ID" });
-      }
 
       const status = String(req.query.status || 'all');
       if (!['all', 'active', 'inactive'].includes(status)) {
         return res.status(400).json({ message: "status must be all, active, or inactive" });
-      }
-
-      // Check if the requesting user is an admin of this league
-      const adminMember = await storage.getLeagueMember(leagueId, adminUserId);
-      if (!adminMember || !adminMember.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
       }
 
       const members = await storage.getLeagueMembers(leagueId);
@@ -350,21 +344,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/league/:leagueId/member/:userId/toggle-active', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/league/:leagueId/member/:userId/toggle-active', isAuthenticated, requireLeagueAdmin(), async (req: any, res) => {
     try {
-      const adminUserId = req.user.id;
       const leagueId = parseInt(req.params.leagueId);
       const targetUserId = req.params.userId;
-      
-      if (isNaN(leagueId)) {
-        return res.status(400).json({ message: "Invalid league ID" });
-      }
-      
-      // Check if the requesting user is an admin of this league
-      const adminMember = await storage.getLeagueMember(leagueId, adminUserId);
-      if (!adminMember || !adminMember.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
-      }
       
       // Get the target member
       const targetMember = await storage.getLeagueMember(leagueId, targetUserId);
@@ -388,21 +371,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin-only route to toggle member admin status
-  app.post('/api/admin/league/:leagueId/member/:userId/toggle-admin', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/league/:leagueId/member/:userId/toggle-admin', isAuthenticated, requireLeagueAdmin(), async (req: any, res) => {
     try {
       const adminUserId = req.user.id;
       const leagueId = parseInt(req.params.leagueId);
       const targetUserId = req.params.userId;
-      
-      if (isNaN(leagueId)) {
-        return res.status(400).json({ message: "Invalid league ID" });
-      }
-      
-      // Check if the requesting user is an admin of this league
-      const adminMember = await storage.getLeagueMember(leagueId, adminUserId);
-      if (!adminMember || !adminMember.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
-      }
       
       // Get the target member
       const targetMember = await storage.getLeagueMember(leagueId, targetUserId);
@@ -431,21 +404,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin-only route to remove a member from a league
-  app.delete('/api/admin/league/:leagueId/member/:userId', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/admin/league/:leagueId/member/:userId', isAuthenticated, requireLeagueAdmin(), async (req: any, res) => {
     try {
       const adminUserId = req.user.id;
       const leagueId = parseInt(req.params.leagueId);
       const targetUserId = req.params.userId;
-      
-      if (isNaN(leagueId)) {
-        return res.status(400).json({ message: "Invalid league ID" });
-      }
-      
-      // Check if the requesting user is an admin of this league
-      const adminMember = await storage.getLeagueMember(leagueId, adminUserId);
-      if (!adminMember || !adminMember.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
-      }
       
       // Get the target member to verify they exist
       const targetMember = await storage.getLeagueMember(leagueId, targetUserId);
@@ -470,25 +433,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Toggle lock status for picks in a week (admin only)
-  app.post('/api/admin/week/:id/toggle-lock', isAuthenticated, async (req: any, res) => {
+  // Toggle lock status for picks in a week (super admin only).
+  // nfl_weeks.picks_lock_at is shared by every league, so this is a site-wide
+  // action even though it used to live behind a league's Admin tab.
+  app.post('/api/admin/week/:id/toggle-lock', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      const userId = req.user.id;
       const weekId = parseInt(req.params.id);
-      const leagueId = parseInt(req.body.leagueId);
       const locked = req.body.locked;
       
-      // Validate input
-      if (isNaN(weekId) || isNaN(leagueId)) {
-        return res.status(400).json({ message: "Invalid week ID or league ID" });
-      }
-      
-      // Verify user is an admin for this league
-      const leagueMembers = await storage.getLeagueMembers(leagueId);
-      const userMembership = leagueMembers.find(member => member.userId === userId);
-      
-      if (!userMembership || !userMembership.isAdmin) {
-        return res.status(403).json({ message: "You do not have admin permission for this league" });
+      if (isNaN(weekId)) {
+        return res.status(400).json({ message: "Invalid week ID" });
       }
       
       // Get the current week
@@ -1164,19 +1118,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all users
-  app.get('/api/users', isAuthenticated, async (req: any, res) => {
+  app.get('/api/users', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      // Only allow admins to access this route (your account)
-      const userId = req.user.id;
-      if (userId !== "42820911") {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
-      }
-      
-      const users = await storage.getAllUsers();
-      res.json(users);
+      const allUsers = await storage.getAllUsers();
+      res.json(allUsers.map(toPublicUser));
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // ── Super admin management (site-wide roles) ──────────────────────────
+  // Super admins hold site-wide authority — results corrections, API pulls,
+  // the scheduler — and are the only ones who can grant or revoke it.
+
+  app.get('/api/admin/super-admins', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const admins = await storage.getSuperAdmins();
+      res.json(admins.map((admin) => ({
+        ...toPublicUser(admin),
+        isOwner: isOwnerSuperAdminEmail(admin.email),
+      })));
+    } catch (error) {
+      console.error("Error fetching super admins:", error);
+      res.status(500).json({ message: "Failed to fetch super admins" });
+    }
+  });
+
+  app.post('/api/admin/super-admins', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const identifier = typeof req.body?.identifier === "string" ? req.body.identifier.trim() : "";
+      if (!identifier) {
+        return res.status(400).json({ message: "An email address or username is required" });
+      }
+
+      const target =
+        (await storage.getUserByEmail(identifier.toLowerCase())) ||
+        (await storage.getUserByUsername(identifier));
+
+      if (!target) {
+        return res.status(404).json({
+          message: `No account found for "${identifier}". They need to sign up before they can be made a super admin.`,
+        });
+      }
+
+      if (target.isSuperUser) {
+        return res.status(400).json({
+          message: `${target.username || target.email} is already a super admin`,
+        });
+      }
+
+      const updated = await storage.setSuperAdmin(target.id, true);
+      if (!updated) {
+        return res.status(500).json({ message: "Failed to grant super admin access" });
+      }
+
+      res.status(201).json({
+        message: `${updated.username || updated.email} is now a super admin`,
+        user: toPublicUser(updated),
+      });
+    } catch (error) {
+      console.error("Error granting super admin access:", error);
+      res.status(500).json({ message: "Failed to grant super admin access" });
+    }
+  });
+
+  app.delete('/api/admin/super-admins/:userId', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const targetUserId = req.params.userId;
+
+      // Self-revocation is blocked so nobody can accidentally drop their own
+      // access mid-session; another super admin can always do it for them.
+      if (targetUserId === req.user.id) {
+        return res.status(400).json({ message: "You cannot remove your own super admin access" });
+      }
+
+      const target = await storage.getUser(targetUserId);
+      if (!target) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!target.isSuperUser) {
+        return res.status(400).json({ message: "That user is not a super admin" });
+      }
+
+      // Owner accounts are re-granted at boot, so allowing this would only
+      // undo itself on the next deploy.
+      if (isOwnerSuperAdminEmail(target.email)) {
+        return res.status(400).json({
+          message: `${target.username || target.email} is an owner account and always has super admin access`,
+        });
+      }
+
+      // Never leave the site without one, or the Site Admin page becomes
+      // unreachable for everyone.
+      if ((await countSuperAdmins()) <= 1) {
+        return res.status(400).json({ message: "The last super admin cannot be removed" });
+      }
+
+      const updated = await storage.setSuperAdmin(targetUserId, false);
+      if (!updated) {
+        return res.status(500).json({ message: "Failed to remove super admin access" });
+      }
+
+      res.json({
+        message: `${updated.username || updated.email} is no longer a super admin`,
+        user: toPublicUser(updated),
+      });
+    } catch (error) {
+      console.error("Error removing super admin access:", error);
+      res.status(500).json({ message: "Failed to remove super admin access" });
     }
   });
   
@@ -1229,22 +1280,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Admin route to fetch NFL games from API for all weeks
-  app.post('/api/admin/games/fetch-from-api', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/games/fetch-from-api', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const { weekId } = req.body;
       
-      console.log("Fetch from API route called", { weekId, user: req.user });
-      
-      // Check if user is an admin for any league
-      const userId = req.user.id;
-      console.log("Checking admin status for user:", userId);
-      const userLeagues = await storage.getUserLeagues(userId);
-      console.log("User leagues:", userLeagues);
-      const isAdmin = userLeagues.some(ul => ul.isAdmin);
-      
-      if (!isAdmin) {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
-      }
+      console.log("Fetch from API route called", { weekId, user: req.user?.id });
       
       // Check for API key
       const apiKey = process.env.THE_ODDS_API_KEY;
@@ -1389,14 +1429,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Testing endpoint: Pull preseason games using Sports Odds API
-  app.post('/api/admin/testing/fetch-preseason-games', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/testing/fetch-preseason-games', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      // Check if user is a super user
-      const userId = req.user.id;
-      if (userId !== "user_1753731196994_qfjmyp5i2") {
-        return res.status(403).json({ message: "Unauthorized: Super user access required" });
-      }
-
       const apiKey = process.env.THE_ODDS_API_KEY || process.env.ODDS_API_KEY;
       if (!apiKey) {
         return res.status(500).json({ message: "Sports Odds API key not configured" });
@@ -1644,14 +1678,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Testing endpoint: Schedule preseason results pull for tomorrow 7am
-  app.post('/api/admin/testing/schedule-preseason-results', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/testing/schedule-preseason-results', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      // Check if user is a super user
-      const userId = req.user.id;
-      if (userId !== "user_1753731196994_qfjmyp5i2") {
-        return res.status(403).json({ message: "Unauthorized: Super user access required" });
-      }
-      
       // Calculate tomorrow at 7 AM Eastern Time
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1759,23 +1787,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin route to fetch NFL game results from ESPN API
-  app.post('/api/admin/games/fetch-results', isAuthenticated, async (req: any, res) => {
+  app.post('/api/admin/games/fetch-results', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const { weekId } = req.body;
       
-      console.log("Fetch results route called", { weekId, user: req.user });
+      console.log("Fetch results route called", { weekId, user: req.user?.id });
       
       if (!weekId || isNaN(parseInt(weekId))) {
         return res.status(400).json({ message: "Invalid week ID" });
-      }
-      
-      // Check if user is an admin for any league
-      const userId = req.user.id;
-      const userLeagues = await storage.getUserLeagues(userId);
-      const isAdmin = userLeagues.some(ul => ul.isAdmin);
-      
-      if (!isAdmin) {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
       }
       
       // Use the shared ESPN results puller function
@@ -1792,19 +1811,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Add user to league (admin only)
-  app.post('/api/leagues/:id/members', isAuthenticated, async (req: any, res) => {
+  app.post('/api/leagues/:id/members', isAuthenticated, requireLeagueAdmin('id'), async (req: any, res) => {
     try {
       const leagueId = parseInt(req.params.id);
-      if (isNaN(leagueId)) {
-        return res.status(400).json({ message: "Invalid league ID" });
-      }
-      
-      // Only allow admins to access this route (your account)
-      const adminId = req.user.claims.sub;
-      if (adminId !== "42820911") {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
-      }
-      
       const { userId, isAdmin } = req.body;
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
@@ -1845,21 +1854,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update league member (toggle admin status)
-  app.patch('/api/leagues/:leagueId/members/:userId', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/leagues/:leagueId/members/:userId', isAuthenticated, requireLeagueAdmin(), async (req: any, res) => {
     try {
       const leagueId = parseInt(req.params.leagueId);
       const memberId = req.params.userId;
       const { isAdmin } = req.body;
-      
-      if (isNaN(leagueId)) {
-        return res.status(400).json({ message: "Invalid league ID" });
-      }
-      
-      // Only allow admins to access this route (your account)
-      const adminId = req.user.claims.sub;
-      if (adminId !== "42820911") {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
-      }
       
       // Check if membership exists
       const userLeagues = await storage.getUserLeagues(memberId);
@@ -1880,20 +1879,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Remove user from league
-  app.delete('/api/leagues/:leagueId/members/:userId', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/leagues/:leagueId/members/:userId', isAuthenticated, requireLeagueAdmin(), async (req: any, res) => {
     try {
       const leagueId = parseInt(req.params.leagueId);
       const memberId = req.params.userId;
-      
-      if (isNaN(leagueId)) {
-        return res.status(400).json({ message: "Invalid league ID" });
-      }
-      
-      // Only allow admins to access this route (your account)
-      const adminId = req.user.claims.sub;
-      if (adminId !== "42820911") {
-        return res.status(403).json({ message: "Unauthorized: Admin access required" });
-      }
       
       // Remove user from league
       await storage.removeLeagueMember(leagueId, memberId);
@@ -1924,11 +1913,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "League not found" });
       }
       
-      // Allow super users; otherwise require league admin of this league
+      // League admins own their league's archive state; super admins can
+      // also act on any league for site-wide cleanup.
       const userId = req.user?.id;
-      if (userId !== SUPER_USER_ID) {
-        const member = await storage.getLeagueMember(leagueId, userId);
-        if (!member?.isAdmin || !member?.isActive) {
+      const member = await storage.getLeagueMember(leagueId, userId);
+      if (!member?.isAdmin || !member?.isActive) {
+        if (!(await isSuperAdmin(userId))) {
           return res.status(403).json({ message: "Only league admins can archive this league" });
         }
       }
@@ -1973,7 +1963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Super user only route to set game winner and calculate points
-  app.post('/api/games/:id/result', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/games/:id/result', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const gameId = parseInt(req.params.id);
       const { winningTeamId } = req.body;
@@ -2019,7 +2009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Clear/delete game result
-  app.delete('/api/games/:id/result', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.delete('/api/games/:id/result', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const gameId = parseInt(req.params.id);
       
@@ -2053,7 +2043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Sync NFL games from The Odds API to our database - improved version
-  app.get('/api/sync-nfl-games', isAuthenticated, isSuperUser, async (req, res) => {
+  app.get('/api/sync-nfl-games', isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
       // Get current week
       const currentWeek = await storage.getCurrentNFLWeek();
@@ -2511,7 +2501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
   
   // Admin endpoint to pull games from The Odds API and populate the database
-  app.post('/api/admin/pull-games', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/admin/pull-games', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const userId = req.user.id;
       
@@ -2814,7 +2804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // One-time seed of the 2026 NFL regular season schedule (weeks 1-18) from ESPN.
   // GET so the super user can trigger it from the browser on the production app.
   // Refuses to overwrite existing 2026 user picks unless ?force=true.
-  app.get('/api/admin/system/seed-2026-schedule', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.get('/api/admin/system/seed-2026-schedule', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const force = req.query.force === 'true';
       const { seedNFL2026Schedule } = await import("./seed2026Schedule.js");
@@ -2826,9 +2816,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Send one of every email template to the super user's own inbox, so each
+  // Send one of every email template to the super admin's own inbox, so each
   // design can be proofed in real mail clients before the league sees it.
-  app.get('/api/admin/system/test-emails', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.get('/api/admin/system/test-emails', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const to = req.user.email;
       if (!to) {
@@ -2864,7 +2854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Audit/repair picks_lock_at for stored NFL weeks (1 PM ET on the game
   // Sunday, DST-aware). GET so the super user can run it from the browser on
   // production. Report-only by default; pass ?apply=true to write fixes.
-  app.get('/api/admin/system/fix-lock-times', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.get('/api/admin/system/fix-lock-times', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const apply = req.query.apply === 'true';
       const { recomputeNFLLockTimes } = await import("./lockTimeRepair.js");
@@ -2920,7 +2910,7 @@ ${!apply && result.weeksNeedingFix > 0
     }
   });
 
-  app.get('/api/admin/scheduler/status', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.get('/api/admin/scheduler/status', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       // Import scheduler and get status
       const { gameScheduler } = await import("./scheduler.js");
@@ -2933,7 +2923,7 @@ ${!apply && result.weeksNeedingFix > 0
     }
   });
 
-  app.post('/api/admin/scheduler/manual-pull', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/admin/scheduler/manual-pull', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       // Import scheduler and trigger manual pull
       const { gameScheduler } = await import("./scheduler.js");
@@ -2949,7 +2939,7 @@ ${!apply && result.weeksNeedingFix > 0
     }
   });
 
-  app.post('/api/admin/scheduler/test-job', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/admin/scheduler/test-job', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       // Import scheduler and test the scheduled job
       const { gameScheduler } = await import("./scheduler.js");
@@ -2966,7 +2956,7 @@ ${!apply && result.weeksNeedingFix > 0
   });
 
   // Test the weekly email reminders
-  app.post('/api/admin/scheduler/test-weekly-emails', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/admin/scheduler/test-weekly-emails', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const { gameScheduler } = await import("./scheduler.js");
       await gameScheduler.sendWeeklyEmailRemindersTest();
@@ -2984,7 +2974,7 @@ ${!apply && result.weeksNeedingFix > 0
   });
 
   // Test the picks unlocked notifications
-  app.post('/api/admin/scheduler/test-picks-unlocked', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/admin/scheduler/test-picks-unlocked', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const weekNumber = req.body.weekNumber || 1; // Default to week 1 for testing
       const { gameScheduler } = await import("./scheduler.js");
@@ -3002,7 +2992,7 @@ ${!apply && result.weeksNeedingFix > 0
     }
   });
 
-  app.post('/api/admin/scheduler/test-results-job', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/admin/scheduler/test-results-job', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       // Import scheduler and test the results job
       const { gameScheduler } = await import("./scheduler.js");
@@ -3019,7 +3009,7 @@ ${!apply && result.weeksNeedingFix > 0
   });
 
   // Weekly email reminder endpoints (admin only)
-  app.post('/api/admin/scheduler/test-weekly-emails', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/admin/scheduler/test-weekly-emails', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       // Import scheduler and test the weekly email reminders
       const { gameScheduler } = await import("./scheduler.js");
@@ -3035,7 +3025,7 @@ ${!apply && result.weeksNeedingFix > 0
     }
   });
 
-  app.post('/api/admin/scheduler/send-weekly-emails', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/admin/scheduler/send-weekly-emails', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       // Import scheduler and manually trigger weekly email reminders
       const { gameScheduler } = await import("./scheduler.js");
@@ -3145,7 +3135,7 @@ ${!apply && result.weeksNeedingFix > 0
   });
 
   // Create a golf tournament (super user only)
-  app.post('/api/golf/tournaments', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/golf/tournaments', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const { name, location, season, startsAt, picksLockAt, picksRequired } = req.body;
       if (!name || !season || !picksLockAt) {
@@ -3168,7 +3158,7 @@ ${!apply && result.weeksNeedingFix > 0
   });
 
   // Update a golf tournament (super user only)
-  app.patch('/api/golf/tournaments/:id', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.patch('/api/golf/tournaments/:id', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const { name, location, season, startsAt, picksLockAt, status, picksRequired, oddsApiSportKey, espnEventId } = req.body;
@@ -3203,7 +3193,7 @@ ${!apply && result.weeksNeedingFix > 0
   });
 
   // Pull tournament field + odds from The Odds API (super user only)
-  app.post('/api/golf/tournaments/:id/pull-field', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/golf/tournaments/:id/pull-field', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const tournamentId = parseInt(req.params.id);
       const { pullGolfFieldFromOddsAPI } = await import('./golfDataPuller.js');
@@ -3221,7 +3211,7 @@ ${!apply && result.weeksNeedingFix > 0
   });
 
   // Pull live / final scores from ESPN (super user only)
-  app.post('/api/golf/tournaments/:id/pull-results', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/golf/tournaments/:id/pull-results', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const tournamentId = parseInt(req.params.id);
       const { pullGolfScoresFromESPN } = await import('./golfDataPuller.js');
@@ -3255,9 +3245,8 @@ ${!apply && result.weeksNeedingFix > 0
       const tournamentId = parseInt(req.params.id);
       const userId = req.user?.id || req.session?.userId;
 
-      // Allow super users; also allow admins of any league linked to this tournament
-      const userIsSuperUser = req.user?.isSuperUser || req.session?.isSuperUser;
-      if (!userIsSuperUser) {
+      // Allow super admins; also allow admins of any league linked to this tournament
+      if (!(await isSuperAdmin(userId))) {
         // Find leagues tied to this tournament and check admin status
         const { leagues: leaguesTable, leagueMembers } = await import('../shared/schema.js');
         const linkedLeagues = await db
@@ -3275,7 +3264,7 @@ ${!apply && result.weeksNeedingFix > 0
         }
 
         if (!isLeagueAdmin) {
-          return res.status(403).json({ message: 'Only super users or league admins can refresh photos and rankings' });
+          return res.status(403).json({ message: 'Only super admins or league admins can refresh photos and rankings' });
         }
       }
 
@@ -3303,7 +3292,7 @@ ${!apply && result.weeksNeedingFix > 0
   });
 
   // Manually trigger the Sunday odds-pull for upcoming tournaments (super user only)
-  app.post('/api/golf/scheduler/pull-upcoming', isAuthenticated, isSuperUser, async (_req, res) => {
+  app.post('/api/golf/scheduler/pull-upcoming', isAuthenticated, requireSuperAdmin, async (_req, res) => {
     try {
       const { golfScheduler } = await import('./golfScheduler.js');
       const result = await golfScheduler.pullUpcomingTournamentFields();
@@ -3330,7 +3319,7 @@ ${!apply && result.weeksNeedingFix > 0
 
   // Bulk upsert tournament field entries (super user only)
   // Body: { players: [{ name, country, isAmateur, owgrAtLock }] }
-  app.post('/api/golf/tournaments/:id/field', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/golf/tournaments/:id/field', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const tournamentId = parseInt(req.params.id);
       const { players } = req.body;
@@ -3491,7 +3480,7 @@ ${!apply && result.weeksNeedingFix > 0
 
   // Bulk upsert tournament results (super user only)
   // Body: { results: [{ playerId, finalPosition, status }] }
-  app.post('/api/golf/tournaments/:id/results', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.post('/api/golf/tournaments/:id/results', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const tournamentId = parseInt(req.params.id);
       const { results } = req.body;
