@@ -2,7 +2,6 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import type { Express } from "express";
 import { storage } from "./storage";
-import { sendWelcomeEmail } from "./email";
 
 /**
  * Setup Google OAuth authentication
@@ -75,11 +74,6 @@ export async function setupGoogleAuth(app: Express) {
             profileImageUrl: profileImageUrl || null,
             emailVerified: true, // Google accounts are pre-verified
           });
-
-          // Welcome email — fire-and-forget so a mail hiccup never blocks signup
-          sendWelcomeEmail(googleEmail, firstName || googleEmail).catch((err) =>
-            console.error("Failed to send welcome email:", err),
-          );
         }
       }
 
