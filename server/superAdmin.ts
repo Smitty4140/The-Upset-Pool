@@ -55,7 +55,18 @@ export async function isSuperAdmin(userId: string | undefined | null): Promise<b
 
   // Checked live, not just at boot, so an owner who signs up after the server
   // started has access immediately rather than after the next deploy.
-  if (isOwnerSuperAdminEmail(user?.email)) return true;
+  if (isOwnerSuperAdminEmail(user?.email)) {
+    // Persist the flag on first sight rather than waiting for the next boot,
+    // so the owner also appears in the Site Admin roster. Otherwise they hold
+    // access while the page reports no super admins at all.
+    if (user && !user.isSuperUser) {
+      await db
+        .update(users)
+        .set({ isSuperUser: true, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+    }
+    return true;
+  }
 
   // The bootstrap accounts only count while nobody holds the flag, so
   // revoking the last real super admin can't silently hand the site back to

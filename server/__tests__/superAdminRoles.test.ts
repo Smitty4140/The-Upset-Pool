@@ -216,7 +216,12 @@ describe("super admin vs league admin separation", () => {
         await storage.setSuperAdmin(ownerId, false);
         expect(await isSuperAdmin(ownerId)).toBe(true);
 
-        // ...and a boot run writes the flag so they appear in the roster.
+        // ...and that first check persists the flag, so they show up in the
+        // roster straight away instead of after the next deploy.
+        expect((await storage.getUser(ownerId))?.isSuperUser).toBe(true);
+        expect((await storage.getSuperAdmins()).map((u) => u.id)).toContain(ownerId);
+
+        // A boot run is idempotent on top of that.
         const result = await runSuperAdminBackfill(pool);
         expect(result.ownersMissing).not.toContain(ownerEmail);
         expect((await storage.getUser(ownerId))?.isSuperUser).toBe(true);
