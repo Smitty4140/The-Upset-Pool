@@ -126,6 +126,7 @@ describe("super admin vs league admin separation", () => {
         "POST /api/admin/testing/fetch-preseason-games",
         (a) => a.post("/api/admin/testing/fetch-preseason-games").send({}),
       ],
+      ["GET /api/admin/system/test-emails", (a) => a.get("/api/admin/system/test-emails")],
     ];
 
     for (const [label, send] of siteWideRequests) {

@@ -495,7 +495,28 @@ export default function SuperAdminPage() {
                   "Test Picks Unlocked"
                 )}
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={anyBusy}
+                onClick={() =>
+                  runAction("proof-templates", "/api/admin/system/test-emails", {
+                    method: "GET",
+                    successTitle: "Template proofs sent",
+                  })
+                }
+              >
+                {busy("proof-templates") ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
+                ) : (
+                  "Proof All Templates"
+                )}
+              </Button>
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              "Proof All Templates" sends one of every email design to your own address, so you can
+              check them in a real mail client before the league sees them.
+            </p>
           </Section>
 
           <Separator className="my-4" />

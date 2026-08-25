@@ -2816,9 +2816,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Send one of every email template to the super user's own inbox, so each
+  // Send one of every email template to the super admin's own inbox, so each
   // design can be proofed in real mail clients before the league sees it.
-  app.get('/api/admin/system/test-emails', isAuthenticated, isSuperUser, async (req: any, res) => {
+  app.get('/api/admin/system/test-emails', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const to = req.user.email;
       if (!to) {
