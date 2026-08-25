@@ -140,140 +140,32 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
 // Templates (exported builders so previews/tests can render without sending)
 // ---------------------------------------------------------------------------
 
-/** Welcome email — sport-neutral (users may join NFL or golf leagues). */
-export function buildWelcomeEmail(username: string): EmailContent {
-  return {
-    subject: 'Welcome to The Upset Pool!',
-    html: emailLayout({
-      preheader: 'Pick underdogs. Earn points when they come through.',
-      heading: 'Welcome to The Upset Pool!',
-      bodyHtml: `
-        <p style="margin: 0 0 16px 0; font-size: 16px; color: #1f2937;">Hi ${username},</p>
-        <p style="margin: 0 0 20px 0; color: #4b5563; line-height: 1.6;">Thanks for joining The Upset Pool — the underdog prediction game. The idea is simple: back the longshots, and the bigger the upset, the more points you earn.</p>
-        <h2 style="color: #1e3a5f; font-size: 18px; margin: 0 0 12px 0;">How it works</h2>
-        <ul style="color: #4b5563; line-height: 1.8; margin: 0 0 8px 0; padding-left: 20px;">
-          <li><strong>NFL leagues:</strong> pick one underdog each week to win outright. If they win, you earn the spread in points. Picks lock Sundays at 1:00 PM ET.</li>
-          <li><strong>Golf leagues:</strong> pick golfers to finish in the top 10 of a major. If they do, you earn their odds in points. Picks lock before round one tees off.</li>
-          <li>No points for losses — pick boldly, but pick wisely.</li>
-        </ul>
-        ${ctaButton('Make Your First Pick')}
-        <p style="margin: 0; font-size: 13px; color: #6b7280; text-align: center;">Questions? Just reply to this email.</p>`
-    }),
-    text: `Welcome to The Upset Pool!
-
-Hi ${username},
-
-Thanks for joining The Upset Pool — the underdog prediction game. Back the longshots, and the bigger the upset, the more points you earn.
-
-How it works:
-- NFL leagues: pick one underdog each week to win outright. If they win, you earn the spread in points. Picks lock Sundays at 1:00 PM ET.
-- Golf leagues: pick golfers to finish in the top 10 of a major. If they do, you earn their odds in points. Picks lock before round one.
-- No points for losses — pick boldly, but pick wisely.
-
-Make your first pick: ${SITE_URL}${TEXT_FOOTER}`
-  };
-}
-
 /** Reminder for users who haven't picked yet this week (manual admin trigger). */
 export function buildPickReminderEmail(username: string, weekNumber: number, deadline: string): EmailContent {
   return {
-    subject: `Week ${weekNumber} Pick Reminder — The Upset Pool`,
+    subject: `No Week ${weekNumber} pick yet — locks Sunday 1:00 PM ET`,
     html: emailLayout({
-      preheader: `You haven't made your Week ${weekNumber} pick yet.`,
-      heading: 'Pick Reminder',
+      preheader: `Friendly nudge from the Commish: you have no Week ${weekNumber} pick in.`,
+      heading: 'No Pick Yet',
       subheading: `NFL Week ${weekNumber}`,
       bodyHtml: `
         <p style="margin: 0 0 16px 0; font-size: 16px; color: #1f2937;">Hi ${username},</p>
-        <p style="margin: 0 0 12px 0; color: #4b5563; line-height: 1.6;">You haven't made your Week ${weekNumber} underdog pick yet!</p>
-        ${calloutBox('⏰ Deadline', deadline)}
-        <p style="margin: 0 0 8px 0; color: #4b5563;">Don't miss your chance to earn points — make your selection now.</p>
-        ${ctaButton('Make Your Pick')}`
+        <p style="margin: 0 0 12px 0; color: #4b5563; line-height: 1.6;">Friendly nudge from the Commish: you don't have a Week ${weekNumber} pick in. Every game is still on the board.</p>
+        ${calloutBox('⏰ Picks lock', deadline)}
+        ${ctaButton('Make Your Pick')}
+        <p style="margin: 0; font-size: 13px; color: #6b7280; text-align: center;">Zero points and a dead drawing ticket is a bad Sunday. Fix it in 20 seconds.</p>`
     }),
-    text: `Pick Reminder — NFL Week ${weekNumber}
+    text: `No Week ${weekNumber} pick yet — The Upset Pool
 
 Hi ${username},
 
-You haven't made your Week ${weekNumber} underdog pick yet!
+Friendly nudge from the Commish: you don't have a Week ${weekNumber} pick in. Every game is still on the board.
 
-Deadline: ${deadline}
+Picks lock: ${deadline}
 
-Make your pick: ${SITE_URL}${TEXT_FOOTER}`
-  };
-}
+Make your pick: ${SITE_URL}
 
-/** Weekly results email (currently not scheduled anywhere). */
-export function buildWeeklyResultsEmail(username: string, weekNumber: number, userPick: any, userPoints: number): EmailContent {
-  const resultText = userPick.isCorrect
-    ? `Congratulations! Your pick (${userPick.teamName}) won and you earned <strong>${userPoints} points</strong>!`
-    : `Unfortunately, your pick (${userPick.teamName}) didn't win this week.`;
-  const resultTextPlain = userPick.isCorrect
-    ? `Congratulations! Your pick (${userPick.teamName}) won and you earned ${userPoints} points!`
-    : `Unfortunately, your pick (${userPick.teamName}) didn't win this week.`;
-  const nextWeekNote = weekNumber < 18
-    ? `Good luck with your Week ${weekNumber + 1} pick!`
-    : `That's a wrap on the season — thanks for playing!`;
-
-  return {
-    subject: `Week ${weekNumber} Results — The Upset Pool`,
-    html: emailLayout({
-      preheader: resultTextPlain,
-      heading: `Week ${weekNumber} Results`,
-      bodyHtml: `
-        <p style="margin: 0 0 16px 0; font-size: 16px; color: #1f2937;">Hi ${username},</p>
-        <p style="margin: 0 0 16px 0; color: #4b5563; line-height: 1.6;">${resultText}</p>
-        <p style="margin: 0 0 8px 0; color: #4b5563;">Check the leaderboard to see how you stack up against the competition.</p>
-        ${ctaButton('View Leaderboard')}
-        <p style="margin: 0; font-size: 13px; color: #6b7280; text-align: center;">${nextWeekNote}</p>`
-    }),
-    text: `Week ${weekNumber} Results — The Upset Pool
-
-Hi ${username},
-
-${resultTextPlain}
-
-Check the leaderboard: ${SITE_URL}
-
-${nextWeekNote}${TEXT_FOOTER}`
-  };
-}
-
-/** Sunday-noon confirmation for users who have made all their picks. */
-export function buildWeeklyPickConfirmationEmail(
-  username: string,
-  weekNumber: number,
-  userPicks: Array<{ leagueName: string; teamName: string; teamAbbreviation: string; spread: string }>
-): EmailContent {
-  const picksListHtml = userPicks.map(pick =>
-    `<div style="background-color: #f3f4f6; padding: 12px; margin: 8px 0; border-radius: 8px; color: #1f2937;">
-      <strong>${pick.leagueName}:</strong> ${pick.teamName} (${pick.teamAbbreviation}) ${pick.spread}
-    </div>`
-  ).join('');
-  const picksListPlain = userPicks.map(p => `- ${p.leagueName}: ${p.teamName} (${p.teamAbbreviation}) ${p.spread}`).join('\n');
-
-  return {
-    subject: `Your Week ${weekNumber} picks are in — locks at 1:00 PM ET`,
-    html: emailLayout({
-      preheader: `Your Week ${weekNumber} picks, and one hour to change your mind.`,
-      heading: 'Your Picks Are In',
-      subheading: `NFL Week ${weekNumber}`,
-      bodyHtml: `
-        <p style="margin: 0 0 16px 0; font-size: 16px; color: #1f2937;">Hi ${username},</p>
-        <p style="margin: 0 0 20px 0; color: #4b5563; line-height: 1.6;">Here's what you've selected for Week ${weekNumber}:</p>
-        ${picksListHtml}
-        ${calloutBox('⏰ Locks at 1:00 PM ET today', 'You can still change your picks until then. After that, they\'re final.')}
-        ${ctaButton('View Your Picks')}
-        <p style="margin: 0; font-size: 13px; color: #6b7280; text-align: center;">Good luck! May the underdogs be with you. 🎯</p>`
-    }),
-    text: `Your Week ${weekNumber} picks are in — The Upset Pool
-
-Hi ${username},
-
-Here's what you've selected for Week ${weekNumber}:
-${picksListPlain}
-
-Picks lock at 1:00 PM ET today. You can still change them until then.
-
-View your picks: ${SITE_URL}${TEXT_FOOTER}`
+Zero points and a dead drawing ticket is a bad Sunday. Fix it in 20 seconds.${TEXT_FOOTER}`
   };
 }
 
@@ -292,59 +184,75 @@ export function buildWeeklyPickReminderEmail(
     : `You still need picks in ${missingLeagues.length} leagues:`;
 
   return {
-    subject: `Picks lock in 1 hour — Week ${weekNumber}`,
+    subject: `⏳ 1 hour left — you have no Week ${weekNumber} pick`,
     html: emailLayout({
-      preheader: `One hour until Week ${weekNumber} picks lock. You're not in yet.`,
-      heading: 'Picks Lock in 1 Hour!',
+      preheader: `Picks lock at 1:00 PM ET and you're not in. One missed week ends your drawing run.`,
+      heading: 'Picks Lock in 1 Hour',
       subheading: `NFL Week ${weekNumber}`,
       bodyHtml: `
         <p style="margin: 0 0 16px 0; font-size: 16px; color: #1f2937;">Hi ${username},</p>
-        <p style="margin: 0 0 16px 0; color: #4b5563; line-height: 1.6;">One hour until picks are <strong style="color: #dc2626;">locked in</strong> at 1:00 PM ET. ${leagueCountNote}</p>
+        <p style="margin: 0 0 16px 0; color: #4b5563; line-height: 1.6;">Picks lock at <strong style="color: #dc2626;">1:00 PM ET</strong>. Right now you're getting zero points this week — and one missed week ends your run at the pick-every-week drawing. For the whole season. ${leagueCountNote}</p>
         ${leaguesHtml}
-        ${ctaButton('Make Your Pick Now')}
-        <p style="margin: 0; font-size: 13px; color: #6b7280; text-align: center;">No pick means no points this week — don't leave them on the table.</p>`
+        ${ctaButton('Pick Now')}
+        <p style="margin: 0; font-size: 13px; color: #6b7280; text-align: center;">Takes about 20 seconds. Any dog will do.</p>`
     }),
-    text: `Picks lock in 1 hour — NFL Week ${weekNumber}
+    text: `1 hour left — you have no Week ${weekNumber} pick
 
 Hi ${username},
 
-One hour until picks lock at 1:00 PM ET. ${leagueCountNote}
+Picks lock at 1:00 PM ET. Right now you're getting zero points this week — and one missed week ends your run at the pick-every-week drawing. For the whole season. ${leagueCountNote}
 ${leaguesPlain}
 
-Make your pick now: ${SITE_URL}${TEXT_FOOTER}`
+Pick now: ${SITE_URL}
+
+Takes about 20 seconds. Any dog will do.${TEXT_FOOTER}`
   };
 }
 
 /** Notification that spreads are posted and picks are open for the week. */
-export function buildPicksUnlockedEmail(username: string, weekNumber: number): EmailContent {
+export function buildPicksUnlockedEmail(username: string, weekNumber: number, leagueNames: string[]): EmailContent {
+  const singleLeague = leagueNames.length === 1 ? leagueNames[0] : null;
+  const subject = singleLeague
+    ? `🏈 ${singleLeague}: Week ${weekNumber} is open — pick your underdog`
+    : `🏈 Week ${weekNumber} is open — pick your underdog`;
+  const leagueLine = singleLeague
+    ? `The Week ${weekNumber} spreads just posted in <strong>${singleLeague}</strong>.`
+    : `The Week ${weekNumber} spreads just posted in your leagues: <strong>${leagueNames.join('</strong>, <strong>')}</strong>.`;
+  const leagueLinePlain = singleLeague
+    ? `The Week ${weekNumber} spreads just posted in ${singleLeague}.`
+    : `The Week ${weekNumber} spreads just posted in your leagues: ${leagueNames.join(', ')}.`;
+
   return {
-    subject: `🏈 Picks are live — Week ${weekNumber}`,
+    subject,
     html: emailLayout({
-      preheader: `NFL Week ${weekNumber} spreads are posted. Make your picks.`,
-      heading: 'Picks Are Live!',
-      subheading: `NFL Week ${weekNumber} is ready for your predictions`,
+      preheader: `${leagueLinePlain} Find the dog that wins outright.`,
+      heading: 'Week Is Open',
+      subheading: singleLeague ? `${singleLeague} · NFL Week ${weekNumber}` : `NFL Week ${weekNumber} spreads are posted`,
       bodyHtml: `
         <p style="margin: 0 0 16px 0; font-size: 16px; color: #1f2937;">Hi ${username},</p>
-        <p style="margin: 0 0 16px 0; color: #4b5563; line-height: 1.6;">The spreads for NFL Week ${weekNumber} are posted and picks are now open. Time to find this week's upset and climb the leaderboard.</p>
-        ${ctaButton('Make Your Picks Now')}
-        <p style="margin: 0; font-size: 13px; color: #6b7280; text-align: center;">Pick an underdog to win straight up — points are awarded based on the spread.</p>`
+        <p style="margin: 0 0 16px 0; color: #4b5563; line-height: 1.6;">${leagueLine} Sixteen games, one pick — find the dog that's going to win outright.</p>
+        ${calloutBox('⏰ Picks lock Sunday at 1:00 PM ET', 'Or at kickoff if you take a Thursday or Saturday game.')}
+        ${ctaButton('Pick Your Underdog')}
+        <p style="margin: 0; font-size: 13px; color: #6b7280; text-align: center;">Win outright and you earn the spread. Covering doesn't count.</p>`
     }),
-    text: `Picks are live — NFL Week ${weekNumber}
+    text: `${subject}
 
 Hi ${username},
 
-The spreads for NFL Week ${weekNumber} are posted and picks are now open.
+${leagueLinePlain} Sixteen games, one pick — find the dog that's going to win outright.
 
-Make your picks: ${SITE_URL}
+Picks lock Sunday at 1:00 PM ET, or at kickoff if you take a Thursday or Saturday game.
 
-Pick an underdog to win straight up — points are awarded based on the spread.${TEXT_FOOTER}`
+Pick your underdog: ${SITE_URL}
+
+Win outright and you earn the spread. Covering doesn't count.${TEXT_FOOTER}`
   };
 }
 
 /** Notice sent to league members when an admin archives the league. */
 export function buildLeagueArchivedEmail(username: string, leagueName: string): EmailContent {
   return {
-    subject: `${leagueName} has been archived — The Upset Pool`,
+    subject: `${leagueName} moved to Past Seasons`,
     html: emailLayout({
       preheader: `${leagueName} has moved to Past Seasons.`,
       heading: 'League Archived',
@@ -378,25 +286,8 @@ export async function sendLeagueArchivedEmail(email: string, username: string, l
   return sendEmail({ to: email, ...buildLeagueArchivedEmail(username, leagueName) });
 }
 
-export async function sendWelcomeEmail(email: string, username: string): Promise<boolean> {
-  return sendEmail({ to: email, ...buildWelcomeEmail(username) });
-}
-
 export async function sendPickReminderEmail(email: string, username: string, weekNumber: number, deadline: string): Promise<boolean> {
   return sendEmail({ to: email, ...buildPickReminderEmail(username, weekNumber, deadline) });
-}
-
-export async function sendWeeklyResultsEmail(email: string, username: string, weekNumber: number, userPick: any, userPoints: number): Promise<boolean> {
-  return sendEmail({ to: email, ...buildWeeklyResultsEmail(username, weekNumber, userPick, userPoints) });
-}
-
-export async function sendWeeklyPickConfirmationEmail(
-  email: string,
-  username: string,
-  weekNumber: number,
-  userPicks: Array<{ leagueName: string; teamName: string; teamAbbreviation: string; spread: string }>
-): Promise<boolean> {
-  return sendEmail({ to: email, ...buildWeeklyPickConfirmationEmail(username, weekNumber, userPicks) });
 }
 
 export async function sendWeeklyPickReminderEmail(
@@ -411,7 +302,8 @@ export async function sendWeeklyPickReminderEmail(
 export async function sendPicksUnlockedEmail(
   email: string,
   username: string,
-  weekNumber: number
+  weekNumber: number,
+  leagueNames: string[]
 ): Promise<boolean> {
-  return sendEmail({ to: email, ...buildPicksUnlockedEmail(username, weekNumber) });
+  return sendEmail({ to: email, ...buildPicksUnlockedEmail(username, weekNumber, leagueNames) });
 }

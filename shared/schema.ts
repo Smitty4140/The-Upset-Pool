@@ -116,7 +116,7 @@ export const nflWeeks = pgTable("nfl_weeks", {
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   active: boolean("active").default(false),
-  picksLockAt: timestamp("picks_lock_at").notNull(), // Sunday 1 PM EST
+  picksLockAt: timestamp("picks_lock_at").notNull(), // Sunday 1 PM ET (DST-aware)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => {

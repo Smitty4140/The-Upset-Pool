@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { isAuthenticated } from "../replitAuth";
 import { storage } from "../storage";
-import { sendWelcomeEmail, sendPickReminderEmail } from "../email";
+import { sendPickReminderEmail } from "../email";
 import crypto from "crypto";
 import { eq } from "drizzle-orm";
 import { users } from "@shared/schema";
@@ -36,7 +36,6 @@ router.post("/verify-email", isAuthenticated, async (req: any, res) => {
     const verificationLink = `https://${req.hostname}/verify-email?token=${verificationToken}&userId=${userId}`;
     
     // DISABLED: Welcome email - uncomment to re-enable
-    // const emailSent = await sendWelcomeEmail(user.email, user.username);
     // if (!emailSent) {
     //   return res.status(500).json({ message: "Failed to send verification email" });
     // }
