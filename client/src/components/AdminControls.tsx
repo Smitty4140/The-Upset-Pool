@@ -300,6 +300,12 @@ export default function AdminControls({ leagueId }: AdminControlsProps) {
         `/api/admin/league/${leagueId}/member-emails?status=${scope}`,
         { credentials: "include" },
       );
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(
+          "The server returned a page instead of data — it's likely running an older version of the app. Redeploy or restart it, then try again.",
+        );
+      }
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         throw new Error(body?.message || "Failed to fetch member emails");
