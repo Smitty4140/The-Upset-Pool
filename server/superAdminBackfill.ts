@@ -64,14 +64,22 @@ export async function runSuperAdminBackfill(
       ownersMissing = OWNER_SUPER_ADMIN_EMAILS.filter((email) => !presentEmails.has(email));
     }
 
-    // Seed the bootstrap accounts only when nobody holds the flag. Once a
-    // real super admin exists, membership is managed entirely from the app —
-    // this must never resurrect an account the owners deliberately removed.
+    // Seed the bootstrap accounts when the column is brand new, or when nobody
+    // holds the flag.
+    //
+    // The columnAdded case is the upgrade from the old hardcoded check: on that
+    // boot there are no prior revocations to respect, and whoever was super
+    // user before must not silently lose access. Without it, granting an owner
+    // in this same transaction takes the count above zero and skips the seed,
+    // locking out the account that had been running the site.
+    //
+    // Afterwards the count rule applies, so this can never resurrect an account
+    // the owners deliberately removed.
     const existing = await client.query(`
       SELECT COUNT(*)::int AS count FROM users WHERE is_super_user = true
     `);
     let bootstrapped = 0;
-    if (existing.rows[0].count === 0) {
+    if (columnAdded || existing.rows[0].count === 0) {
       const seeded = await client.query(
         `UPDATE users SET is_super_user = true, updated_at = NOW() WHERE id = ANY($1::varchar[])`,
         [BOOTSTRAP_SUPER_USER_IDS],
