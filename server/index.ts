@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { runLeagueDataBackfills } from "./leagueDataBackfill";
+import { runSuperAdminBackfill } from "./superAdminBackfill";
 import { pool } from "./db";
 
 const app = express();
@@ -44,6 +45,13 @@ app.use((req, res, next) => {
     `League data verified (${leagueBackfillResult.leaguesUpdated} leagues, ` +
       `${leagueBackfillResult.membershipsUpdated} memberships, ` +
       `${leagueBackfillResult.nicknamesUpdated} nicknames updated)`,
+  );
+
+  const superAdminResult = await runSuperAdminBackfill(pool);
+  log(
+    `Super admins verified (${superAdminResult.superAdmins} total` +
+      `${superAdminResult.bootstrapped > 0 ? `, ${superAdminResult.bootstrapped} bootstrapped` : ""}` +
+      `${superAdminResult.columnAdded ? ", is_super_user column added" : ""})`,
   );
 
   const server = await registerRoutes(app);

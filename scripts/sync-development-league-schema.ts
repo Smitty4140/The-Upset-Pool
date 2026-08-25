@@ -31,6 +31,11 @@ async function syncDevelopmentLeagueSchema(
     `);
 
     await client.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS is_super_user boolean DEFAULT false NOT NULL
+    `);
+
+    await client.query(`
       ALTER TABLE league_members
         ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true,
         ADD COLUMN IF NOT EXISTS nickname varchar

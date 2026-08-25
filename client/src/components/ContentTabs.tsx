@@ -1,34 +1,35 @@
-import { Eye, Shield, Trophy, Flag, UserCog, ChevronDown, User } from "lucide-react";
+import { Eye, Shield, Trophy, UserCog, ChevronDown, User } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
-type Tab = "spreads" | "leaderboard" | "weeklypicks" | "results" | "admin" | "profile";
+type Tab = "spreads" | "leaderboard" | "weeklypicks" | "admin" | "profile";
 
 type ContentTabsProps = {
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
   isPicksLocked?: boolean;
   isAdmin?: boolean;
-  isSuperUser?: boolean;
 };
 
 // "Game Spreads" was where you actually make your pick, and "Weekly Picks"
 // was where you read everyone else's — the labels described the data on each
 // tab rather than what you go there to do.
-const TAB_CONFIG: { id: Tab; label: string; icon: React.ReactNode; adminOnly?: boolean; superUserOnly?: boolean }[] = [
+//
+// The Results tab used to live here for super users, but correcting results
+// changes every league's standings — it belongs on the site-wide Site Admin
+// page, not inside one league's tab bar.
+const TAB_CONFIG: { id: Tab; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
   { id: "spreads",     label: "Make Picks",      icon: <Shield className="h-4 w-4" /> },
   { id: "weeklypicks", label: "Everyone's Picks", icon: <Eye className="h-4 w-4" /> },
   { id: "leaderboard", label: "Leaderboard",     icon: <Trophy className="h-4 w-4" /> },
   { id: "profile",     label: "Profile",         icon: <User className="h-4 w-4" /> },
-  { id: "results",     label: "Results",         icon: <Flag className="h-4 w-4" />, superUserOnly: true },
   { id: "admin",       label: "Admin",           icon: <UserCog className="h-4 w-4" />, adminOnly: true },
 ];
 
-export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = false, isAdmin = false, isSuperUser = false }: ContentTabsProps) {
+export default function ContentTabs({ activeTab, onTabChange, isPicksLocked = false, isAdmin = false }: ContentTabsProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const visibleTabs = TAB_CONFIG.filter(tab => {
-    if (tab.superUserOnly && !isSuperUser) return false;
     if (tab.adminOnly && !isAdmin) return false;
     return true;
   }).map(tab =>

@@ -40,6 +40,10 @@ export const users = pgTable("users", {
   totalPoints: decimal("total_points", { precision: 10, scale: 1 }).default("0").notNull(),
   emailVerified: boolean("email_verified").default(false),
   receiveNotifications: boolean("receive_notifications").default(true),
+  // Site-wide super admin: results corrections, API pulls, scheduler, and
+  // granting this flag to others. Distinct from leagueMembers.isAdmin, which
+  // only confers authority inside a single league.
+  isSuperUser: boolean("is_super_user").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

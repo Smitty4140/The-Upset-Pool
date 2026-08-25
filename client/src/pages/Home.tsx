@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useToast } from "@/hooks/use-toast";
 import LeagueHeader from "@/components/LeagueHeader";
 import AdminControls from "@/components/AdminControls";
@@ -12,7 +13,6 @@ import WeekSelector from "@/components/WeekSelector";
 import Leaderboard from "@/components/Leaderboard";
 import WeeklyPicks from "@/components/WeeklyPicks";
 import NFLGamesGrid from "@/components/NFLGamesGrid";
-import GameResults from "@/components/GameResults";
 import CreateLeague from "@/components/CreateLeague";
 import JoinLeague from "@/components/JoinLeague";
 import { NFLWeek, NFLGame, UserPick, User } from "@/lib/types";
@@ -59,18 +59,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Helmet } from "react-helmet";
 import { Link } from "wouter";
 
-type Tab = "spreads" | "leaderboard" | "weeklypicks" | "results" | "admin" | "profile";
+type Tab = "spreads" | "leaderboard" | "weeklypicks" | "admin" | "profile";
 type SortOption = "spread" | "homeUnderdog" | "gameTime";
 
 export default function Home() {
   const { user, isAuthenticated, isLoading: isLoadingAuth } = useAuth();
   const { toast } = useToast();
 
-  // Check if current user is super user
-  const { data: superUserStatus } = useQuery<{ isSuperUser: boolean }>({
-    queryKey: ["/api/auth/super-user-status"],
-    enabled: isAuthenticated,
-  });
+  // Site-wide status — golf tournament administration still distinguishes it
+  // from league admin. Everything else site-wide now lives on /admin.
+  const { isSuperAdmin } = useSuperAdmin();
   const [activeTab, setActiveTab] = useState<Tab>("spreads");
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
@@ -577,7 +575,7 @@ export default function Home() {
         <GolfLeagueView
           leagueId={leagueId}
           league={currentLeagueInfo as any}
-          isSuperUser={Boolean(superUserStatus?.isSuperUser)}
+          isSuperUser={isSuperAdmin}
           isAdmin={Boolean(isAdmin)}
         />
       )}
@@ -601,13 +599,10 @@ export default function Home() {
         onTabChange={(tab) => setActiveTab(tab as Tab)}
         isPicksLocked={arePicksLocked}
         isAdmin={Boolean(isAdmin)}
-        isSuperUser={Boolean(superUserStatus?.isSuperUser)}
       />
 
       {/* Week Selector - positioned above all tab content */}
-      {(activeTab === "spreads" ||
-        activeTab === "weeklypicks" ||
-        activeTab === "results") &&
+      {(activeTab === "spreads" || activeTab === "weeklypicks") &&
         activeWeekId && (
           <div className="mb-6">
             <WeekSelector
@@ -628,11 +623,6 @@ export default function Home() {
             weekNumber={selectedWeekDetails?.weekNumber}
             isPicksLocked={arePicksLocked}
           />
-        )}
-
-        {/* Results Tab - Only visible to super users */}
-        {activeTab === "results" && Boolean(superUserStatus?.isSuperUser) && (
-          <GameResults weekId={selectedWeekId || currentWeek?.id || 0} />
         )}
 
         {/* Admin Tab - Only visible to admins */}
