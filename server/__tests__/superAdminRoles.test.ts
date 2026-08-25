@@ -8,7 +8,12 @@ import { db, pool } from "../db";
 import { users, leagues, leagueMembers } from "@shared/schema";
 import { eq, inArray } from "drizzle-orm";
 import { runSuperAdminBackfill } from "../superAdminBackfill";
-import { OWNER_SUPER_ADMIN_EMAILS, isOwnerSuperAdminEmail, isSuperAdmin } from "../superAdmin";
+import {
+  OWNER_SUPER_ADMIN_EMAILS,
+  isOwnerSuperAdminEmail,
+  isSuperAdmin,
+  BOOTSTRAP_SUPER_USER_IDS,
+} from "../superAdmin";
 
 const RUN_ID = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const PASSWORD = "test-password-123";
@@ -242,6 +247,66 @@ describe("super admin vs league admin separation", () => {
         if (preExisting) {
           await storage.setSuperAdmin(ownerId, wasSuper);
         }
+      }
+    });
+  });
+
+  describe("upgrading from the old hardcoded super user", () => {
+    // Before this change a single hardcoded id was the super user. The boot
+    // that introduces the column must carry that access across, or the account
+    // that had been running the site is quietly locked out by its own upgrade.
+    it("seeds the bootstrap accounts on the boot that adds the column", async () => {
+      const legacyId = BOOTSTRAP_SUPER_USER_IDS[0];
+      const legacy = await storage.getUser(legacyId);
+      const created = !legacy;
+      if (created) {
+        await storage.createUser({
+          id: legacyId,
+          email: `legacy_super_${RUN_ID}@example.com`,
+          username: `legacy_${RUN_ID}`.slice(0, 25),
+          password: null,
+          firstName: null,
+          lastName: null,
+          profileImageUrl: null,
+          totalPoints: "0",
+          emailVerified: false,
+          receiveNotifications: true,
+        } as any);
+        userIds.push(legacyId);
+      }
+      const wasSuper = Boolean((await storage.getUser(legacyId))?.isSuperUser);
+      const previouslySuper = (await storage.getSuperAdmins()).map((u) => u.id);
+
+      try {
+        await storage.setSuperAdmin(legacyId, false);
+
+        // Drop the column to reproduce a pre-upgrade database, then run the
+        // deploy backfill exactly as boot does.
+        const client = await pool.connect();
+        try {
+          await client.query("ALTER TABLE users DROP COLUMN IF EXISTS is_super_user");
+        } finally {
+          client.release();
+        }
+
+        const migration = await runSuperAdminBackfill(pool);
+        expect(migration.columnAdded).toBe(true);
+        expect(migration.bootstrapped).toBeGreaterThan(0);
+        expect(await isSuperAdmin(legacyId)).toBe(true);
+
+        // A later boot must not undo a deliberate removal, though.
+        await storage.setSuperAdmin(legacyId, false);
+        const later = await runSuperAdminBackfill(pool);
+        expect(later.columnAdded).toBe(false);
+        expect(await isSuperAdmin(legacyId)).toBe(false);
+      } finally {
+        // Dropping the column cleared every flag, this suite's own super admin
+        // included — put back what the later tests rely on.
+        for (const id of previouslySuper) {
+          await storage.setSuperAdmin(id, true);
+        }
+        await storage.setSuperAdmin(legacyId, wasSuper);
+        await storage.setSuperAdmin(superUserId, true);
       }
     });
   });
