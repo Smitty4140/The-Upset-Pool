@@ -56,6 +56,14 @@ app.use((req, res, next) => {
     throw err;
   });
 
+  // Any /api path not claimed by a registered route must fail as JSON.
+  // Without this, unknown API paths fall through to the SPA catch-all and
+  // come back as index.html with a 200 — which clients then fail to parse,
+  // hiding the real problem (usually a server running an older build).
+  app.use("/api", (_req: Request, res: Response) => {
+    res.status(404).json({ message: "API endpoint not found" });
+  });
+
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
