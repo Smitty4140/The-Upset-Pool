@@ -7,6 +7,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -16,9 +22,12 @@ import {
 import { Loader2, LogOut, Menu, ShieldCheck, UserRound, X } from "lucide-react";
 import upsetPoolLogo from "@assets/7ce37caf-c21f-4929-a667-365370f1324d_1766504568458.png";
 
+const SNOOD_URL = "https://playminigames.net/game/snood";
+
 export default function Header() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSnoodOpen, setIsSnoodOpen] = useState(false);
   const { user, isLoading, isAuthenticated } = useAuth();
   const { isSuperAdmin } = useSuperAdmin();
 
@@ -62,17 +71,17 @@ export default function Header() {
           {/* Logo and Brand */}
           <div className="flex items-center">
             <div className="flex-shrink-0 flex items-center">
-              {/* Deliberate easter egg: the logo opens Snood rather than
-                  linking home. "My Leagues" is the route to the dashboard. */}
-              <a
-                href="https://playminigames.net/game/snood"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center cursor-pointer"
+              {/* Deliberate easter egg: the logo opens Snood in a dialog on
+                  the site rather than linking home, so the player never leaves
+                  the app. "My Leagues" is the route to the dashboard. */}
+              <button
+                type="button"
+                onClick={() => setIsSnoodOpen(true)}
+                className="flex items-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-white rounded-md"
               >
                 <img src={upsetPoolLogo} alt="Upset Pool" className="h-10 w-10 mr-2" />
                 <h1 className="text-2xl font-bold text-white hover:text-gray-200 transition-colors">Upset Pool</h1>
-              </a>
+              </button>
             </div>
             
             {/* Desktop Navigation */}
@@ -251,6 +260,36 @@ export default function Header() {
           </div>
         )}
       </div>
+
+      {/* Snood easter egg: the game plays inside the site instead of sending
+          the user off to another tab. */}
+      <Dialog open={isSnoodOpen} onOpenChange={setIsSnoodOpen}>
+        <DialogContent className="max-w-5xl" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="text-xl">
+              Congrats! You've found the hidden snood!
+            </DialogTitle>
+          </DialogHeader>
+          <iframe
+            src={SNOOD_URL}
+            title="Snood"
+            className="w-full h-[60vh] rounded-md border border-border bg-black"
+            allowFullScreen
+          />
+          <p className="text-sm text-muted-foreground">
+            Game not loading?{" "}
+            <a
+              href={SNOOD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:no-underline"
+            >
+              Open Snood in a new tab
+            </a>
+            .
+          </p>
+        </DialogContent>
+      </Dialog>
     </header>
   );
 }

@@ -117,16 +117,20 @@ their purpose, and the two were easy to transpose.
 tab becomes "Games & Spreads", since making a pick is no longer possible —
 this also puts the previously-unused `isPicksLocked` prop to work.
 
-### 9. The logo navigates off-site — kept deliberately
+### 9. The logo opens Snood — kept deliberately, now in a dialog
 
-The header logo and wordmark link to `playminigames.net/game/snood`, opening
-an unrelated game in a new tab. Normally the logo is the universal "return
-home" control, so this was raised as a finding.
+The header logo and wordmark used to link out to `playminigames.net/game/snood`,
+opening an unrelated game in a new tab. Normally the logo is the universal
+"return home" control, so this was raised as a finding.
 
-**Confirmed intentional and left as-is** at the owner's direction — the
-misdirection is the joke. The route home is the "My Leagues" nav item, which
-appears on every page in both the desktop and mobile menus, so no page is a
-dead end. The footer carries Rules and Support links only.
+**The easter egg is intentional and stays** at the owner's direction — the
+misdirection is the joke. What changed is where it lands: the logo now opens
+Snood in a dialog on the site, under the heading "Congrats! You've found the
+hidden snood!", so the player is told what happened and closing the dialog
+puts them back where they were instead of stranding them in a new tab. The
+route home is the "My Leagues" nav item, which appears on every page in both
+the desktop and mobile menus, so no page is a dead end. The footer carries
+Rules and Support links only.
 
 Worth noting for future reference: the mobile menu is the only route home on
 small screens, so if that nav item is ever removed or renamed, the logo should
