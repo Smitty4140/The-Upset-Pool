@@ -113,9 +113,6 @@ export const nflWeeks = pgTable("nfl_weeks", {
   endDate: date("end_date").notNull(),
   active: boolean("active").default(false),
   picksLockAt: timestamp("picks_lock_at").notNull(), // Sunday 1 PM ET (DST-aware)
-  // Set once the post-week results email has gone out, so restarts of the
-  // scheduler can never send the league a duplicate results blast.
-  resultsEmailSentAt: timestamp("results_email_sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => {

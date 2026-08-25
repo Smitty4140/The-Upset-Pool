@@ -6,7 +6,6 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { sendWelcomeEmail } from "./email";
 import { User as SelectUser, InsertUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
 
@@ -217,11 +216,6 @@ export function setupAuth(app: Express) {
         emailVerified: false,
         receiveNotifications: true,
       });
-
-      // Welcome email — fire-and-forget so a mail hiccup never blocks signup
-      sendWelcomeEmail(newUser.email!, newUser.username).catch((err) =>
-        console.error("Failed to send welcome email:", err),
-      );
 
       // Auto-login the user
       req.login(newUser, (err) => {
