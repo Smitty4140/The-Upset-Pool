@@ -3,6 +3,7 @@ import { db } from './db.js';
 import {
   nflWeeks, nflGames, users, leagueMembers, leagues, userPicks,
   emailNotifications, EMAIL_KIND_PICKS_UNLOCKED, EMAIL_KIND_PICKS_LOCK_WARNING,
+  EMAIL_SENT, EMAIL_FAILED,
 } from '../shared/schema.js';
 import {
   sendWeeklyPickReminderEmail, sendPicksUnlockedEmail,
@@ -453,22 +454,41 @@ class GameScheduler {
       .from(emailNotifications)
       .where(and(
         eq(emailNotifications.kind, kind),
-        eq(emailNotifications.weekId, weekId)
+        eq(emailNotifications.weekId, weekId),
+        // Deliberately 'sent' only: a member whose send failed is still owed an
+        // email, so the next tick retries them rather than writing them off.
+        eq(emailNotifications.status, EMAIL_SENT)
       ));
     return new Set(rows.map(r => r.userId));
   }
 
-  /** Record a delivered email. Ignores conflicts so a concurrent worker can't double-insert. */
-  private async recordNotification(kind: string, weekId: number, userId: string) {
+  /**
+   * Record the outcome of a send — success or failure, with Brevo's reason.
+   * Upserts so a later retry can flip a 'failed' row to 'sent' rather than
+   * colliding with the (kind, week, user) uniqueness constraint.
+   */
+  private async recordNotification(
+    kind: string,
+    weekId: number,
+    userId: string,
+    outcome: { ok: boolean; reason?: string; code?: string },
+  ) {
+    const status = outcome.ok ? EMAIL_SENT : EMAIL_FAILED;
+    const error = outcome.ok
+      ? null
+      : [outcome.reason, outcome.code ? `[${outcome.code}]` : null].filter(Boolean).join(' ') || 'unknown error';
     try {
       await db
         .insert(emailNotifications)
-        .values({ kind, weekId, userId })
-        .onConflictDoNothing();
-    } catch (error) {
+        .values({ kind, weekId, userId, status, error })
+        .onConflictDoUpdate({
+          target: [emailNotifications.kind, emailNotifications.weekId, emailNotifications.userId],
+          set: { status, error, sentAt: new Date() },
+        });
+    } catch (dbError) {
       // A missing log row only risks a duplicate email later; never let it
       // abort a send run that is otherwise working.
-      console.error(`[Scheduler] Failed to record ${kind} notification for user ${userId}:`, error);
+      console.error(`[Scheduler] Failed to record ${kind} notification for user ${userId}:`, dbError);
     }
   }
 
@@ -597,7 +617,7 @@ class GameScheduler {
         }
 
         try {
-          const success = await sendPicksUnlockedEmail(
+          const result = await sendPicksUnlockedEmail(
             member.email,
             member.username,
             weekNumber,
@@ -605,10 +625,13 @@ class GameScheduler {
             lockDeadline
           );
 
-          if (success) {
-            await this.recordNotification(EMAIL_KIND_PICKS_UNLOCKED, week.id, member.userId);
+          // Logged either way: a failure row is what lets an admin tell a job
+          // that never ran from one Brevo rejected, and it is retried next tick.
+          await this.recordNotification(EMAIL_KIND_PICKS_UNLOCKED, week.id, member.userId, result);
+          if (result.ok) {
             emailsSent++;
           } else {
+            console.error(`[Scheduler] Picks unlocked email to ${member.email} failed: ${result.reason}`);
             emailsFailed++;
           }
         } catch (error) {
@@ -730,7 +753,7 @@ class GameScheduler {
             continue;
           }
 
-          const success = await sendWeeklyPickReminderEmail(
+          const sent = await sendWeeklyPickReminderEmail(
             member.email,
             member.username,
             week.weekNumber,
@@ -738,12 +761,12 @@ class GameScheduler {
             lockTime
           );
 
-          if (success) {
-            await this.recordNotification(EMAIL_KIND_PICKS_LOCK_WARNING, week.id, member.userId);
+          await this.recordNotification(EMAIL_KIND_PICKS_LOCK_WARNING, week.id, member.userId, sent);
+          if (sent.ok) {
             console.log(`[Scheduler] Sent picks-lock warning to ${member.username} (${member.email}) - missing ${missingLeagues.length} picks`);
             result.emailsSent++;
           } else {
-            console.error(`[Scheduler] Failed to send picks-lock warning to ${member.username}`);
+            console.error(`[Scheduler] Picks-lock warning to ${member.username} failed: ${sent.reason}`);
             result.emailsFailed++;
           }
         } catch (error) {

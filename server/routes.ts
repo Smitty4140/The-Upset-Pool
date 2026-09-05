@@ -2873,11 +2873,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return { check: 'email' as const, status: 'fail' as const, summary: "BREVO_FROM_EMAIL is not set — configure a Brevo-verified sender address.", sentTo: null, recipientCount: 0 };
     }
 
-    // Detailed variant so a failure names its cause instead of just going red.
-    const result = await email.sendEmailDetailed({
-      to,
-      ...email.buildPreflightTestEmail(name),
-    });
+    // Returns the detailed result, so a failure names its cause instead of
+    // just going red.
+    const result = await email.sendPreflightTestEmail(to, name);
 
     // A dry-run "success" proves nothing about delivery, which is the entire
     // point of this check — so it is reported as a warning, not a pass.
@@ -3018,6 +3016,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId: emailNotifications.userId,
           username: users.username,
           email: users.email,
+          status: emailNotifications.status,
+          error: emailNotifications.error,
           sentAt: emailNotifications.sentAt,
         })
         .from(emailNotifications)
@@ -3026,10 +3026,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const byKind = (kind: string) => sent
         .filter(r => r.kind === kind)
-        .map(r => ({ username: r.username, email: r.email, sentAt: r.sentAt }));
+        .map(r => ({ username: r.username, email: r.email, status: r.status, error: r.error, sentAt: r.sentAt }));
 
       const picksUnlocked = byKind(EMAIL_KIND_PICKS_UNLOCKED);
       const lockWarnings = byKind(EMAIL_KIND_PICKS_LOCK_WARNING);
+      const tally = (rows: typeof picksUnlocked) => ({
+        count: rows.length,
+        delivered: rows.filter(r => r.status === 'sent').length,
+        failed: rows.filter(r => r.status !== 'sent').length,
+        recipients: rows,
+      });
 
       res.json({
         week: {
@@ -3038,8 +3044,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           picksLockAt: week.picksLockAt,
           picksLocked: new Date(week.picksLockAt).getTime() <= Date.now(),
         },
-        picksUnlocked: { count: picksUnlocked.length, recipients: picksUnlocked },
-        pickLockWarning: { count: lockWarnings.length, recipients: lockWarnings },
+        picksUnlocked: tally(picksUnlocked),
+        pickLockWarning: tally(lockWarnings),
         emailConfigured: Boolean(process.env.BREVO_FROM_EMAIL), // the API credential lives in the managed Replit connection
         dryRunModeEnabled: isDryRun(),
         // Populated only while EMAIL_DRY_RUN is on: what this process would have sent.

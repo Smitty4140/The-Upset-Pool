@@ -447,6 +447,7 @@ export const EMAIL_TEMPLATE_SAMPLES: Record<string, (name: string) => EmailConte
   'manual-reminder': name =>
     buildPickReminderEmail(name, 2, 'Sunday, September 20 at 1:00 PM ET', 1),
   'league-archived': name => buildLeagueArchivedEmail(name, 'NFL Upset Pool'),
+  'preflight-test': name => buildPreflightTestEmail(name),
 };
 
 export const EMAIL_TEMPLATE_KEYS = Object.keys(EMAIL_TEMPLATE_SAMPLES);
@@ -455,9 +456,13 @@ export const EMAIL_TEMPLATE_KEYS = Object.keys(EMAIL_TEMPLATE_SAMPLES);
 // Send functions (signatures unchanged for existing callers)
 // ---------------------------------------------------------------------------
 
-/** Send the preflight test to exactly one address. No fan-out, no recipient list. */
-export async function sendPreflightTestEmail(email: string, username: string): Promise<boolean> {
-  return sendEmail({ to: email, ...buildPreflightTestEmail(username) });
+/**
+ * Send the preflight test to exactly one address. No fan-out, no recipient list.
+ * Returns the detailed result on purpose: this send exists to explain itself,
+ * so a boolean here would throw away the only thing it is for.
+ */
+export async function sendPreflightTestEmail(email: string, username: string): Promise<SendResult> {
+  return sendEmailDetailed({ to: email, ...buildPreflightTestEmail(username) });
 }
 
 export async function sendLeagueArchivedEmail(email: string, username: string, leagueName: string): Promise<boolean> {
@@ -480,8 +485,8 @@ export async function sendWeeklyPickReminderEmail(
   weekNumber: number,
   missingLeagues: Array<{ leagueName: string; leagueId?: number | null }>,
   lockTime?: string
-): Promise<boolean> {
-  return sendEmail({ to: email, ...buildWeeklyPickReminderEmail(username, weekNumber, missingLeagues, lockTime) });
+): Promise<SendResult> {
+  return sendEmailDetailed({ to: email, ...buildWeeklyPickReminderEmail(username, weekNumber, missingLeagues, lockTime) });
 }
 
 export async function sendPicksUnlockedEmail(
@@ -490,6 +495,6 @@ export async function sendPicksUnlockedEmail(
   weekNumber: number,
   memberLeagues: EmailLeagueRef[],
   lockDeadline?: string
-): Promise<boolean> {
-  return sendEmail({ to: email, ...buildPicksUnlockedEmail(username, weekNumber, memberLeagues, lockDeadline) });
+): Promise<SendResult> {
+  return sendEmailDetailed({ to: email, ...buildPicksUnlockedEmail(username, weekNumber, memberLeagues, lockDeadline) });
 }

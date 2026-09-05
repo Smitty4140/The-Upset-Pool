@@ -247,12 +247,21 @@ export const emailNotifications = pgTable("email_notifications", {
   kind: varchar("kind").notNull(),
   weekId: integer("week_id").notNull().references(() => nflWeeks.id),
   userId: varchar("user_id").notNull().references(() => users.id),
+  // 'sent' | 'failed'. Failures are recorded too, so an admin can tell "the job
+  // never ran" from "the job ran and Brevo rejected 12 of them" — and so the
+  // next scheduler tick retries them (only 'sent' rows suppress a resend).
+  status: varchar("status").default('sent').notNull(),
+  /** Brevo's reason, when status is 'failed'. */
+  error: text("error"),
   sentAt: timestamp("sent_at").defaultNow().notNull(),
 }, (table) => ({
   kindWeekUserUnique: unique("email_notifications_kind_week_id_user_id_unique")
     .on(table.kind, table.weekId, table.userId),
   kindWeekIdx: index("idx_email_notifications_kind_week").on(table.kind, table.weekId),
 }));
+
+export const EMAIL_SENT = 'sent' as const;
+export const EMAIL_FAILED = 'failed' as const;
 
 export const EMAIL_KIND_PICKS_UNLOCKED = 'picks_unlocked' as const;
 export const EMAIL_KIND_PICKS_LOCK_WARNING = 'picks_lock_warning' as const;
