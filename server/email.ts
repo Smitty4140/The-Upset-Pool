@@ -1,4 +1,6 @@
-import { ReplitConnectors } from '@replit/connectors-sdk';
+if (!process.env.BREVO_API_KEY) {
+  console.warn("BREVO_API_KEY environment variable is not set. Email functionality will be disabled.");
+}
 if (!process.env.BREVO_FROM_EMAIL) {
   console.warn("BREVO_FROM_EMAIL environment variable is not set. Emails will NOT be sent until it is configured with a Brevo-verified sender address.");
 }
@@ -91,21 +93,28 @@ const TEXT_FOOTER = `\n\n—\nThe Upset Pool · ${SITE_URL}\nManage email notifi
 // ---------------------------------------------------------------------------
 
 /**
- * Send an email through the Replit-managed Brevo connection.
- * Requires BREVO_FROM_EMAIL to identify a Brevo-verified sender.
+ * Send an email through Brevo's transactional REST API.
+ * Requires a protected API key and a Brevo-verified sender address.
  */
 export async function sendEmail(params: EmailParams): Promise<boolean> {
+  if (!process.env.BREVO_API_KEY) {
+    console.error("Cannot send email: BREVO_API_KEY is not set.");
+    return false;
+  }
   if (!process.env.BREVO_FROM_EMAIL) {
     console.error("Cannot send email: BREVO_FROM_EMAIL is not set. Configure a Brevo-verified sender address.");
     return false;
   }
 
   try {
-    // Create this client per request so connector credentials are always fresh.
-    const connectors = new ReplitConnectors();
-    const response = await connectors.proxy("brevo", "/smtp/email", {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
-      body: {
+      headers: {
+        "accept": "application/json",
+        "api-key": process.env.BREVO_API_KEY,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
         sender: {
           name: "The Upset Pool",
           email: process.env.BREVO_FROM_EMAIL,
@@ -114,7 +123,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
         subject: params.subject,
         textContent: params.text || "View this email in HTML format for the full experience.",
         htmlContent: params.html || params.text || "",
-      },
+      }),
     });
 
     const result = await response.json().catch(() => null) as {
@@ -135,7 +144,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     console.log("[Email] Brevo accepted email", { messageId: result?.messageId });
     return true;
   } catch (error) {
-    console.error("[Email] Brevo connector error:", error);
+    console.error("[Email] Brevo API error:", error);
     return false;
   }
 }

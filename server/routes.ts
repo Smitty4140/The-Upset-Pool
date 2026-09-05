@@ -2842,7 +2842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const sent = Object.values(results).filter(Boolean).length;
       res.json({
-        message: `Sent ${sent} of ${samples.length} test emails to ${to}. Failures usually mean the managed Brevo connection needs repair, BREVO_FROM_EMAIL is missing, or the sender isn't verified in Brevo.`,
+        message: `Sent ${sent} of ${samples.length} test emails to ${to}. Failures usually mean the Brevo API key is invalid, BREVO_FROM_EMAIL is missing, or the sender isn't verified in Brevo.`,
         results,
       });
     } catch (error: any) {
