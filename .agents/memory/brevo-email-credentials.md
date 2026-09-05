@@ -3,8 +3,10 @@ name: Brevo email credentials
 description: Durable credential boundary for transactional email delivery.
 ---
 
-Use the Replit-managed Brevo connector for authenticated API requests rather than a direct Brevo API-key environment variable. Keep the verified sender address as ordinary environment configuration.
+Use protected Replit secrets for the Brevo REST API key and verified sender address. Do not depend on the managed Brevo connector for transactional delivery.
 
-**Why:** The managed connection keeps the provider credential out of application code and centralizes credential repair, while Brevo still requires the application to name a verified sender for each transactional message.
+**Why:** The managed Brevo connector repeatedly forwarded an invalid credential even after reconnection. Direct REST authentication with protected secrets is reliable while still keeping credentials out of code and chat.
 
-**How to apply:** Route Brevo account checks and transactional sends through the connector. If Brevo reports a missing or revoked key, repair the existing Replit connection without asking for or exposing the key in chat.
+**How to apply:** Send transactional requests to Brevo's REST API using environment-provided credentials. Request replacements only through the secure secrets flow and never print or expose their values.
+
+Brevo account IP security can reject an otherwise valid key with an “unrecognised IP address” 401. Treat that separately from “Key not found”: the former requires authorizing the app’s outbound IP or adjusting Brevo’s IP-security policy.

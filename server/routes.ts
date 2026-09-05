@@ -2868,6 +2868,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recipientCount: 0,
       };
     }
+    if (!process.env.BREVO_API_KEY) {
+      return { check: 'email' as const, status: 'fail' as const, summary: "BREVO_API_KEY is not set — add it as a protected Replit secret.", sentTo: null, recipientCount: 0 };
+    }
     if (!process.env.BREVO_FROM_EMAIL) {
       return { check: 'email' as const, status: 'fail' as const, summary: "BREVO_FROM_EMAIL is not set — configure a Brevo-verified sender address.", sentTo: null, recipientCount: 0 };
     }
@@ -2898,12 +2901,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     // Brevo's own words, plus what to do about the cases that actually recur.
+    // A 401 has two very different causes and the message distinguishes them:
+    // Brevo's IP security rejects a perfectly valid key from an unrecognised
+    // address, which is easy to misread as a bad key and chase for hours.
+    const reason = result.reason ?? '';
     const hint =
-      result.status === 401
-        ? ' Repair the managed Brevo connection in Replit — the key is missing or revoked.'
-        : result.code === 'invalid_parameter' || /sender/i.test(result.reason ?? '')
-          ? ` Check that ${process.env.BREVO_FROM_EMAIL} is a verified sender in Brevo (Senders → Domains).`
-          : '';
+      result.status === 401 && /ip|address/i.test(reason)
+        ? " The key is valid but Brevo's IP security rejected this server. Authorise the deployment's outbound IP in Brevo (Security → Authorised IPs), or turn that restriction off."
+        : result.status === 401
+          ? ' Check BREVO_API_KEY — Brevo says the key itself is not recognised.'
+          : result.code === 'invalid_parameter' || /sender/i.test(reason)
+            ? ` Check that ${process.env.BREVO_FROM_EMAIL} is a verified sender in Brevo (Senders → Domains).`
+            : '';
     return {
       check: 'email' as const,
       status: 'fail' as const,
@@ -3045,7 +3054,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         picksUnlocked: tally(picksUnlocked),
         pickLockWarning: tally(lockWarnings),
-        emailConfigured: Boolean(process.env.BREVO_FROM_EMAIL), // the API credential lives in the managed Replit connection
+        emailConfigured: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL),
         dryRunModeEnabled: isDryRun(),
         // Populated only while EMAIL_DRY_RUN is on: what this process would have sent.
         dryRunOutbox: isDryRun() ? getDryRunOutbox() : [],
@@ -3131,7 +3140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         evaluatedAt: (at ?? new Date()).toISOString(),
         note: "Nothing was sent and nothing was recorded. Counts show who WOULD be mailed.",
-        emailConfigured: Boolean(process.env.BREVO_FROM_EMAIL), // the API credential lives in the managed Replit connection
+        emailConfigured: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL),
         dryRunModeEnabled: email.isDryRun(),
         week: week ? { weekNumber: week.weekNumber, season: week.season, picksLockAt: week.picksLockAt } : null,
         picksUnlocked,
@@ -3166,7 +3175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         message: email.isDryRun()
           ? `EMAIL_DRY_RUN is on — logged ${sent} of ${keys.length} test emails instead of delivering them.`
-          : `Sent ${sent} of ${keys.length} test emails to ${to}. Failures usually mean the managed Brevo connection needs repair, BREVO_FROM_EMAIL is missing, or the sender isn't verified in Brevo.`,
+          : `Sent ${sent} of ${keys.length} test emails to ${to}. Failures usually mean the Brevo API key is invalid, BREVO_FROM_EMAIL is missing, or the sender isn't verified in Brevo.`,
         dryRun: email.isDryRun(),
         results,
       });

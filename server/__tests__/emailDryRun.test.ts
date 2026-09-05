@@ -12,6 +12,7 @@ import {
 describe("EMAIL_DRY_RUN", () => {
   const original = process.env.EMAIL_DRY_RUN;
   const originalSender = process.env.BREVO_FROM_EMAIL;
+  const originalKey = process.env.BREVO_API_KEY;
 
   beforeEach(() => {
     clearDryRunOutbox();
@@ -25,6 +26,8 @@ describe("EMAIL_DRY_RUN", () => {
     else process.env.EMAIL_DRY_RUN = original;
     if (originalSender === undefined) delete process.env.BREVO_FROM_EMAIL;
     else process.env.BREVO_FROM_EMAIL = originalSender;
+    if (originalKey === undefined) delete process.env.BREVO_API_KEY;
+    else process.env.BREVO_API_KEY = originalKey;
     clearDryRunOutbox();
     vi.restoreAllMocks();
   });
@@ -49,6 +52,7 @@ describe("EMAIL_DRY_RUN", () => {
     process.env.EMAIL_DRY_RUN = "true";
     // Short-circuits before the transport, so no sender config is needed.
     delete process.env.BREVO_FROM_EMAIL;
+    delete process.env.BREVO_API_KEY;
 
     const ok = await sendEmail({ to: "dana@example.com", subject: "Week 3 is open", html: "<p>hi</p>" });
 
@@ -58,9 +62,10 @@ describe("EMAIL_DRY_RUN", () => {
     ]);
   });
 
-  it("still refuses to send for real when the sender is unconfigured", async () => {
+  it("still refuses to send for real when Brevo is unconfigured", async () => {
     delete process.env.EMAIL_DRY_RUN;
     delete process.env.BREVO_FROM_EMAIL;
+    delete process.env.BREVO_API_KEY;
 
     const ok = await sendEmail({ to: "dana@example.com", subject: "Week 3 is open", html: "<p>hi</p>" });
 
@@ -70,12 +75,12 @@ describe("EMAIL_DRY_RUN", () => {
 
   it("names the reason a send failed instead of just returning false", async () => {
     delete process.env.EMAIL_DRY_RUN;
-    delete process.env.BREVO_FROM_EMAIL;
+    delete process.env.BREVO_API_KEY;
 
     const result = await sendEmailDetailed({ to: "dana@example.com", subject: "x", html: "<p>hi</p>" });
 
     expect(result.ok).toBe(false);
-    expect(result.reason).toContain("BREVO_FROM_EMAIL");
+    expect(result.reason).toContain("BREVO_API_KEY");
   });
 });
 

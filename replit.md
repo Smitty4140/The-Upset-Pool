@@ -52,7 +52,7 @@ Preferred communication style: Simple, everyday language.
 
 ## External Dependencies
 - **PostgreSQL Database**: Primary data storage (e.g., Neon).
-- **Brevo**: Email delivery for notifications and weekly reminders, via the Replit-managed Brevo connection. Only `BREVO_FROM_EMAIL` (a Brevo-verified sender) lives in app config; the API credential is held by the connector.
+- **Brevo**: Email delivery for notifications and weekly reminders, via Brevo's transactional REST API. Needs `BREVO_API_KEY` and `BREVO_FROM_EMAIL` (a Brevo-verified sender) as protected Replit secrets. Note that Brevo's IP security can reject a valid key with an "unrecognised IP address" 401 — that is a different problem from a bad key.
 - **Sports Odds API**: External service for NFL game data and spreads.
 - **ESPN API**: Used for pulling NFL game results.
 
@@ -97,7 +97,8 @@ Preferred communication style: Simple, everyday language.
     mapping, game states, and proposed score changes. No game is updated and no pick is recalculated.
   - `preflight/email` sends exactly one clearly-labeled test message to the authenticated super
     admin. No recipient parameter, no league lookup. Reports `warn` (not `pass`) under `EMAIL_DRY_RUN`,
-    since a dry run proves nothing about delivery.
+    since a dry run proves nothing about delivery. On failure it reports Brevo's own status, code and
+    message, and distinguishes a rejected key from an unauthorised-IP 401.
   - All provider logic lives in `server/diagnostics.ts`, which by contract contains no write path.
     `server/__tests__/diagnosticsSafety.test.ts` enforces that structurally.
   - Surfaced as the "Preflight Check" card at the top of Site Admin.
