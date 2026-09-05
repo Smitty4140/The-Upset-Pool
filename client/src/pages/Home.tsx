@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -62,19 +62,6 @@ import { Link } from "wouter";
 type Tab = "spreads" | "leaderboard" | "weeklypicks" | "admin" | "profile";
 type SortOption = "spread" | "homeUnderdog" | "gameTime";
 
-/**
- * Read the league id from a /?league=<id> deep link (weekly emails send these
- * so a member lands on the league the email is about). Returns null for a
- * missing or malformed value; membership is verified separately.
- */
-function readRequestedLeagueId(): number | null {
-  if (typeof window === "undefined") return null;
-  const raw = new URLSearchParams(window.location.search).get("league");
-  if (!raw) return null;
-  const id = Number(raw);
-  return Number.isInteger(id) && id > 0 ? id : null;
-}
-
 export default function Home() {
   const { user, isAuthenticated, isLoading: isLoadingAuth } = useAuth();
   const { toast } = useToast();
@@ -82,17 +69,29 @@ export default function Home() {
   // Site-wide status — golf tournament administration still distinguishes it
   // from league admin. Everything else site-wide now lives on /admin.
   const { isSuperAdmin } = useSuperAdmin();
-  const [activeTab, setActiveTab] = useState<Tab>("spreads");
+  // Email deep links land here as /?league=<id>&tab=spreads, so a member can go
+  // straight from "Week is open" or "picks lock in an hour" to that league's
+  // pick board instead of whichever league the app would have defaulted to.
+  const emailLink = useMemo(() => {
+    if (typeof window === "undefined") return { leagueId: null as number | null, tab: null as Tab | null };
+    const params = new URLSearchParams(window.location.search);
+    const rawLeague = params.get("league");
+    const parsedLeague = rawLeague ? parseInt(rawLeague, 10) : NaN;
+    const rawTab = params.get("tab");
+    const VALID_TABS: Tab[] = ["spreads", "leaderboard", "weeklypicks", "admin", "profile"];
+    return {
+      leagueId: Number.isFinite(parsedLeague) && parsedLeague > 0 ? parsedLeague : null,
+      tab: rawTab && (VALID_TABS as string[]).includes(rawTab) ? (rawTab as Tab) : null,
+    };
+  }, []);
+
+  const [activeTab, setActiveTab] = useState<Tab>(emailLink.tab ?? "spreads");
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>("gameTime");
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
-  const [selectedLeagueId, setSelectedLeagueId] = useState<number>(1);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<number>(emailLink.leagueId ?? 1);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
-  // Emails link to a specific league as /?league=<id>. Applied once, after the
-  // user's memberships load, so a stale or foreign id can't select anything.
-  const requestedLeagueId = useRef<number | null>(readRequestedLeagueId());
-  const hasSelectedInitialLeague = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 30000);
@@ -110,24 +109,32 @@ export default function Home() {
     enabled: isAuthenticated,
   });
 
-  // Pick the league to show on first load. A ?league=<id> deep link from an
-  // email wins when the user actually belongs to that league; otherwise fall
-  // back to the first active (non-archived) league, then to the first league.
+  // Set default league when user leagues load (only on initial load)
+  // Prefer the first active (non-archived) league; fall back to first league if all archived
   useEffect(() => {
-    if (hasSelectedInitialLeague.current) return;
     if (!userLeagues || !Array.isArray(userLeagues) || userLeagues.length === 0) return;
 
-    const linkedLeague = requestedLeagueId.current
-      ? userLeagues.find((m: any) => m.league?.id === requestedLeagueId.current)
-      : undefined;
-    const activeLeague = userLeagues.find((m: any) => !m.league?.isArchived);
-    const defaultLeague = linkedLeague || activeLeague || userLeagues[0];
+    const pickDefault = () => {
+      const activeLeague = userLeagues.find((m: any) => !m.league?.isArchived);
+      const defaultLeague = activeLeague || userLeagues[0];
+      if (defaultLeague?.league?.id) {
+        setSelectedLeagueId(defaultLeague.league.id);
+      }
+    };
 
-    if (defaultLeague?.league?.id) {
-      hasSelectedInitialLeague.current = true;
-      setSelectedLeagueId(defaultLeague.league.id);
+    // An email deep link already named the league. Honor it when the member is
+    // in that league; if they aren't (left it, or a stale link), don't strand
+    // them on a league they can't see — fall back to the normal default.
+    if (emailLink.leagueId !== null && selectedLeagueId === emailLink.leagueId) {
+      const linked = userLeagues.find((m: any) => m.league?.id === emailLink.leagueId);
+      if (!linked) pickDefault();
+      return;
     }
-  }, [userLeagues]); // Remove selectedLeagueId dependency to prevent re-triggering
+
+    if (selectedLeagueId === 1) {
+      pickDefault();
+    }
+  }, [userLeagues, emailLink.leagueId]); // Remove selectedLeagueId dependency to prevent re-triggering
 
   // Get current league info (including archive status, season, and sport type)
   // Placed before week queries so season is available for filtering

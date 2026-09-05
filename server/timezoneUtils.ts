@@ -80,3 +80,35 @@ export function formatDateInEasternTime(date: Date): string {
     hour12: false
   });
 }
+
+/**
+ * Format a picks-lock timestamp the way members read it in email, e.g.
+ * "Sunday, September 7 at 1:00 PM ET".
+ */
+export function formatPicksLockAt(date: Date): string {
+  const formatted = date.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+  // "Sunday, September 7 at 1:00 PM" — en-US puts a comma before the time
+  return `${formatted.replace(/, (\d{1,2}:\d{2})/, ' at $1')} ET`;
+}
+
+/**
+ * Just the clock portion of a picks-lock timestamp, e.g. "1:00 PM ET".
+ * Used inline in email copy where the date is already established.
+ */
+export function formatPicksLockTimeOnly(date: Date): string {
+  const formatted = date.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+  return `${formatted} ET`;
+}

@@ -12,32 +12,13 @@ if (!process.env.BREVO_FROM_EMAIL) {
 const SITE_URL = 'https://upsetpool.com';
 const LOGO_URL = `${SITE_URL}/email-logo.png`;
 
-// Palette pulled from the app's own tokens so email and product match.
+// Pulled from the app's own tokens so email and product read as one thing.
 const NAVY = '#0f2a47';
 const BRAND = '#0056b3';   // --primary
 const INK = '#111827';
 const BODY = '#4b5563';
 const MUTED = '#6b7280';
 const HAIRLINE = '#e5e7eb';
-
-export interface EmailContent {
-  subject: string;
-  html: string;
-  text: string;
-}
-
-/** A league as referenced from an email: enough to name it and link to it. */
-export interface EmailLeague {
-  id: number;
-  name: string;
-}
-
-interface EmailParams {
-  to: string;
-  subject: string;
-  text?: string;
-  html?: string;
-}
 
 /** Escape user-supplied text (usernames, league names) before interpolating. */
 function esc(value: string): string {
@@ -48,9 +29,36 @@ function esc(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** Deep link to a specific league's page; falls back to the home screen. */
-export function leagueUrl(leagueId?: number): string {
-  return leagueId ? `${SITE_URL}/?league=${leagueId}` : SITE_URL;
+/** A league as referenced from an email: the name members read, plus the id the deep link needs. */
+export interface EmailLeagueRef {
+  id?: number | null;
+  name: string;
+}
+
+/**
+ * Deep link to the selection page — the "Make Picks" tab on the home screen.
+ * Passing a league id drops the member straight into that league's board
+ * instead of whichever league the app would have defaulted to.
+ */
+export function pickPageUrl(leagueId?: number | null): string {
+  const params = new URLSearchParams({ tab: 'spreads' });
+  if (leagueId !== undefined && leagueId !== null) {
+    params.set('league', String(leagueId));
+  }
+  return `${SITE_URL}/?${params.toString()}`;
+}
+
+export interface EmailContent {
+  subject: string;
+  html: string;
+  text: string;
+}
+
+interface EmailParams {
+  to: string;
+  subject: string;
+  text?: string;
+  html?: string;
 }
 
 /** Single primary call-to-action. Solid fill, no gradient, no glow. */
@@ -65,16 +73,20 @@ function ctaButton(label: string, href: string = SITE_URL): string {
       </table>`;
 }
 
-/** One row per league, each linking straight to that league's page. */
-function leagueList(leagues: EmailLeague[], action: string): string {
+/**
+ * One row per league, each linking straight to that league's pick board. This
+ * is the call to action for a multi-league member: a single generic button
+ * can't say which league it means, and these can.
+ */
+function leagueList(leagues: EmailLeagueRef[], action: string): string {
   return `
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 18px 0 4px 0; border-top: 1px solid ${HAIRLINE};">
         ${leagues.map(l => `<tr>
           <td style="padding: 12px 0; border-bottom: 1px solid ${HAIRLINE};">
-            <a href="${leagueUrl(l.id)}" style="color: ${INK}; font-size: 15px; font-weight: 600; text-decoration: none;">${esc(l.name)}</a>
+            <a href="${pickPageUrl(l.id)}" style="color: ${INK}; font-size: 15px; font-weight: 600; text-decoration: none;">${esc(l.name)}</a>
           </td>
           <td align="right" style="padding: 12px 0; border-bottom: 1px solid ${HAIRLINE}; white-space: nowrap;">
-            <a href="${leagueUrl(l.id)}" style="color: ${BRAND}; font-size: 14px; font-weight: 600; text-decoration: none;">${action} &rarr;</a>
+            <a href="${pickPageUrl(l.id)}" style="color: ${BRAND}; font-size: 14px; font-weight: 600; text-decoration: none;">${action} &rarr;</a>
           </td>
         </tr>`).join('')}
       </table>`;
@@ -94,8 +106,8 @@ function detailRow(label: string, value: string): string {
 }
 
 /**
- * Shared layout: slim branded bar, white card, plain text footer. Nothing
- * oversized — the message should read before any of the design does.
+ * Shared layout: slim branded bar, white card, plain-text footer. Deliberately
+ * restrained — the message should read before any of the design does.
  */
 function emailLayout(opts: { preheader?: string; eyebrow: string; heading: string; bodyHtml: string }): string {
   return `<!DOCTYPE html>
@@ -151,17 +163,64 @@ const TEXT_FOOTER = `\n\n—\nThe Upset Pool · ${SITE_URL}\nManage email notifi
 // ---------------------------------------------------------------------------
 
 /**
+ * Global dry-run switch. With EMAIL_DRY_RUN set, every send is logged and
+ * reported as delivered but nothing reaches Brevo — the whole pipeline
+ * (targeting, pick checks, dedupe, scheduling) runs for real against a
+ * staging database without mailing the league.
+ */
+export function isDryRun(): boolean {
+  const flag = (process.env.EMAIL_DRY_RUN || '').toLowerCase();
+  return flag === '1' || flag === 'true' || flag === 'yes';
+}
+
+/** Every dry-run send this process has seen, newest last. Read by the admin status endpoint. */
+const dryRunOutbox: Array<{ to: string; subject: string; sentAt: string }> = [];
+const DRY_RUN_OUTBOX_LIMIT = 500;
+
+export function getDryRunOutbox() {
+  return [...dryRunOutbox];
+}
+
+export function clearDryRunOutbox() {
+  dryRunOutbox.length = 0;
+}
+
+/** Why a send failed, in the caller's hands rather than only in the server log. */
+export interface SendResult {
+  ok: boolean;
+  /** HTTP status from Brevo, when the request got that far. */
+  status?: number;
+  /** Brevo's own error code, e.g. "unauthorized", "invalid_parameter". */
+  code?: string;
+  /** Human-readable reason, safe to show a super admin. */
+  reason?: string;
+  messageId?: string;
+}
+
+/**
  * Send an email through Brevo's transactional REST API.
  * Requires a protected API key and a Brevo-verified sender address.
+ *
+ * Returns the failure reason rather than swallowing it: a bare boolean meant
+ * every failure — bad key, unauthorised IP, unverified sender, malformed
+ * payload — looked identical to the admin UI, which is exactly what made
+ * delivery problems so hard to pin down.
  */
-export async function sendEmail(params: EmailParams): Promise<boolean> {
+export async function sendEmailDetailed(params: EmailParams): Promise<SendResult> {
+  if (isDryRun()) {
+    console.log(`[Email][DRY RUN] would send to ${params.to}: ${params.subject}`);
+    dryRunOutbox.push({ to: params.to, subject: params.subject, sentAt: new Date().toISOString() });
+    if (dryRunOutbox.length > DRY_RUN_OUTBOX_LIMIT) dryRunOutbox.shift();
+    return { ok: true, reason: 'dry run — not delivered' };
+  }
+
   if (!process.env.BREVO_API_KEY) {
     console.error("Cannot send email: BREVO_API_KEY is not set.");
-    return false;
+    return { ok: false, reason: 'BREVO_API_KEY is not set.' };
   }
   if (!process.env.BREVO_FROM_EMAIL) {
     console.error("Cannot send email: BREVO_FROM_EMAIL is not set. Configure a Brevo-verified sender address.");
-    return false;
+    return { ok: false, reason: 'BREVO_FROM_EMAIL is not set. Configure a Brevo-verified sender address.' };
   }
 
   try {
@@ -196,104 +255,59 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
         code: result?.code,
         message: result?.message,
       });
-      return false;
+      return {
+        ok: false,
+        status: response.status,
+        code: result?.code,
+        reason: result?.message || `Brevo returned ${response.status} with no message`,
+      };
     }
 
     console.log("[Email] Brevo accepted email", { messageId: result?.messageId });
-    return true;
-  } catch (error) {
+    return { ok: true, status: response.status, messageId: result?.messageId };
+  } catch (error: any) {
+    // Thrown before Brevo answered at all — DNS, TLS, or outbound egress.
     console.error("[Email] Brevo API error:", error);
-    return false;
+    return { ok: false, reason: `Could not reach the Brevo API: ${error?.message || error}` };
   }
+}
+
+/** Boolean wrapper; every existing caller keeps working unchanged. */
+export async function sendEmail(params: EmailParams): Promise<boolean> {
+  return (await sendEmailDetailed(params)).ok;
 }
 
 // ---------------------------------------------------------------------------
 // Templates (exported builders so previews/tests can render without sending)
 // ---------------------------------------------------------------------------
 
-const LOCK_TIME = 'Sunday, 1:00 PM ET';
-
-/** "Sunday Night Crew" / "Sunday Night Crew and 2 others" for subject lines. */
-function subjectLeagues(leagues: EmailLeague[]): string {
-  if (leagues.length === 0) return 'your league';
-  if (leagues.length === 1) return leagues[0].name;
-  if (leagues.length === 2) return `${leagues[0].name} and ${leagues[1].name}`;
-  return `${leagues[0].name} and ${leagues.length - 1} others`;
-}
-
 /** Button label for a single-league CTA; long names go generic. */
-function openLeagueLabel(league: EmailLeague, verb: string): string {
+function openLeagueLabel(league: EmailLeagueRef, verb: string): string {
   return league.name.length <= 22 ? `${verb} in ${league.name}` : `${verb} in your league`;
 }
 
 /**
- * Week is open: spreads posted, picks now available. Sent automatically once
- * the week's lines land.
- */
-export function buildPicksUnlockedEmail(username: string, weekNumber: number, leagues: EmailLeague[]): EmailContent {
-  const single = leagues.length === 1 ? leagues[0] : null;
-  const subject = single
-    ? `Week ${weekNumber} picks are open in ${single.name}`
-    : `Week ${weekNumber} picks are open in ${leagues.length} of your leagues`;
-
-  const leadHtml = single
-    ? `The Week ${weekNumber} spreads are posted in <strong style="color: ${INK};">${esc(single.name)}</strong>, so picks are now open.`
-    : `The Week ${weekNumber} spreads are posted, so picks are now open in these leagues:`;
-  const leadText = single
-    ? `The Week ${weekNumber} spreads are posted in ${single.name}, so picks are now open.`
-    : `The Week ${weekNumber} spreads are posted, so picks are now open in these leagues:`;
-
-  const bodyMiddle = single
-    ? ctaButton(openLeagueLabel(single, 'Make your pick'), leagueUrl(single.id))
-    : leagueList(leagues, 'Make your pick');
-
-  return {
-    subject,
-    html: emailLayout({
-      preheader: `${leadText} Picks lock ${LOCK_TIME.toLowerCase()}.`,
-      eyebrow: `NFL Week ${weekNumber}`,
-      heading: 'Picks are open',
-      bodyHtml: `
-        <p style="margin: 0 0 12px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">Hi ${esc(username)},</p>
-        <p style="margin: 0 0 4px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">${leadHtml}</p>
-        ${bodyMiddle}
-        ${detailRow('Picks lock', `${LOCK_TIME} — or at kickoff for a Thursday or Saturday game`)}`
-    }),
-    text: `${subject}
-
-Hi ${username},
-
-${leadText}
-${single ? `\nMake your pick: ${leagueUrl(single.id)}` : '\n' + leagues.map(l => `- ${l.name}: ${leagueUrl(l.id)}`).join('\n')}
-
-Picks lock ${LOCK_TIME} — or at kickoff for a Thursday or Saturday game.${TEXT_FOOTER}`
-  };
-}
-
-/**
- * Sunday-noon reminder: picks lock in an hour and this user still has none in
- * one or more leagues.
+ * One-hour warning for members with no pick in yet. `lockTime` is the week's
+ * real picksLockAt rendered in ET, so the copy never contradicts the schedule.
  */
 export function buildWeeklyPickReminderEmail(
   username: string,
   weekNumber: number,
-  missingLeagues: EmailLeague[]
+  missingLeagues: Array<{ leagueName: string; leagueId?: number | null }>,
+  lockTime: string = '1:00 PM ET'
 ): EmailContent {
-  const single = missingLeagues.length === 1 ? missingLeagues[0] : null;
+  const leagues: EmailLeagueRef[] = missingLeagues.map(l => ({ id: l.leagueId, name: l.leagueName }));
+  const single = leagues.length === 1 ? leagues[0] : null;
   const subject = single
     ? `Week ${weekNumber} picks lock in 1 hour — no pick yet in ${single.name}`
-    : `Week ${weekNumber} picks lock in 1 hour — no pick yet in ${missingLeagues.length} leagues`;
+    : `Week ${weekNumber} picks lock in 1 hour — no pick yet in ${leagues.length} leagues`;
 
   const leadHtml = single
-    ? `Week ${weekNumber} picks lock at <strong style="color: ${INK};">1:00 PM ET</strong>, about an hour from now. You don't have a pick in yet for <strong style="color: ${INK};">${esc(single.name)}</strong>.`
-    : `Week ${weekNumber} picks lock at <strong style="color: ${INK};">1:00 PM ET</strong>, about an hour from now. You don't have a pick in yet for these leagues:`;
+    ? `Week ${weekNumber} picks lock at <strong style="color: ${INK};">${esc(lockTime)}</strong>, about an hour from now. You don't have a pick in yet for <strong style="color: ${INK};">${esc(single.name)}</strong>.`
+    : `Week ${weekNumber} picks lock at <strong style="color: ${INK};">${esc(lockTime)}</strong>, about an hour from now. You don't have a pick in yet for these leagues:`;
   const leadText = single
-    ? `Week ${weekNumber} picks lock at 1:00 PM ET, about an hour from now. You don't have a pick in yet for ${single.name}.`
-    : `Week ${weekNumber} picks lock at 1:00 PM ET, about an hour from now. You don't have a pick in yet for these leagues:`;
-
-  const bodyMiddle = single
-    ? ctaButton(openLeagueLabel(single, 'Make your pick'), leagueUrl(single.id))
-    : leagueList(missingLeagues, 'Make your pick');
+    ? `Week ${weekNumber} picks lock at ${lockTime}, about an hour from now. You don't have a pick in yet for ${single.name}.`
+    : `Week ${weekNumber} picks lock at ${lockTime}, about an hour from now. You don't have a pick in yet for these leagues:`;
 
   return {
     subject,
@@ -304,7 +318,7 @@ export function buildWeeklyPickReminderEmail(
       bodyHtml: `
         <p style="margin: 0 0 12px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">Hi ${esc(username)},</p>
         <p style="margin: 0 0 4px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">${leadHtml}</p>
-        ${bodyMiddle}
+        ${single ? ctaButton(openLeagueLabel(single, 'Make your pick'), pickPageUrl(single.id)) : leagueList(leagues, 'Make your pick')}
         <p style="margin: 18px 0 0 0; color: ${MUTED}; font-size: 13px; line-height: 1.6;">A missed week scores zero and ends your streak for the pick-every-week drawing.</p>`
     }),
     text: `${subject}
@@ -312,41 +326,63 @@ export function buildWeeklyPickReminderEmail(
 Hi ${username},
 
 ${leadText}
-${single ? `\nMake your pick: ${leagueUrl(single.id)}` : '\n' + missingLeagues.map(l => `- ${l.name}: ${leagueUrl(l.id)}`).join('\n')}
+${single
+  ? `\nMake your pick: ${pickPageUrl(single.id)}`
+  : '\n' + leagues.map(l => `- ${l.name}: ${pickPageUrl(l.id)}`).join('\n')}
 
 A missed week scores zero and ends your streak for the pick-every-week drawing.${TEXT_FOOTER}`
   };
 }
 
-/** Reminder for users who haven't picked yet this week (manual admin trigger). */
-export function buildPickReminderEmail(username: string, weekNumber: number, deadline: string): EmailContent {
-  const subject = `No Week ${weekNumber} pick yet — picks lock ${LOCK_TIME}`;
+/**
+ * Notification that spreads are posted and the week is open to picks.
+ * `lockDeadline` is the week's real picksLockAt rendered in ET.
+ */
+export function buildPicksUnlockedEmail(
+  username: string,
+  weekNumber: number,
+  memberLeagues: EmailLeagueRef[],
+  lockDeadline: string = 'Sunday at 1:00 PM ET'
+): EmailContent {
+  const single = memberLeagues.length === 1 ? memberLeagues[0] : null;
+  const subject = single
+    ? `Week ${weekNumber} picks are open in ${single.name}`
+    : `Week ${weekNumber} picks are open in ${memberLeagues.length} of your leagues`;
+
+  const leadHtml = single
+    ? `The Week ${weekNumber} spreads are posted in <strong style="color: ${INK};">${esc(single.name)}</strong>, so picks are now open.`
+    : `The Week ${weekNumber} spreads are posted, so picks are now open in these leagues:`;
+  const leadText = single
+    ? `The Week ${weekNumber} spreads are posted in ${single.name}, so picks are now open.`
+    : `The Week ${weekNumber} spreads are posted, so picks are now open in these leagues:`;
+
   return {
     subject,
     html: emailLayout({
-      preheader: `You don't have a Week ${weekNumber} pick in yet.`,
+      preheader: `${leadText} Picks lock ${lockDeadline}.`,
       eyebrow: `NFL Week ${weekNumber}`,
-      heading: 'No pick in yet',
+      heading: 'Picks are open',
       bodyHtml: `
         <p style="margin: 0 0 12px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">Hi ${esc(username)},</p>
-        <p style="margin: 0 0 4px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">You don't have a Week ${weekNumber} pick in yet. Every game is still on the board.</p>
-        ${ctaButton('Make your pick')}
-        ${detailRow('Picks lock', esc(deadline))}`
+        <p style="margin: 0 0 4px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">${leadHtml}</p>
+        ${single ? ctaButton(openLeagueLabel(single, 'Make your pick'), pickPageUrl(single.id)) : leagueList(memberLeagues, 'Make your pick')}
+        ${detailRow('Picks lock', `${esc(lockDeadline)} — or at kickoff for a Thursday or Saturday game`)}`
     }),
     text: `${subject}
 
 Hi ${username},
 
-You don't have a Week ${weekNumber} pick in yet. Every game is still on the board.
+${leadText}
+${single
+  ? `\nMake your pick: ${pickPageUrl(single.id)}`
+  : '\n' + memberLeagues.map(l => `- ${l.name}: ${pickPageUrl(l.id)}`).join('\n')}
 
-Picks lock: ${deadline}
-
-Make your pick: ${SITE_URL}${TEXT_FOOTER}`
+Picks lock ${lockDeadline} — or at kickoff for a Thursday or Saturday game.${TEXT_FOOTER}`
   };
 }
 
 /** Notice sent to league members when an admin archives the league. */
-export function buildLeagueArchivedEmail(username: string, leagueName: string, leagueId?: number): EmailContent {
+export function buildLeagueArchivedEmail(username: string, leagueName: string): EmailContent {
   const subject = `${leagueName} moved to Past Seasons`;
   return {
     subject,
@@ -357,7 +393,7 @@ export function buildLeagueArchivedEmail(username: string, leagueName: string, l
       bodyHtml: `
         <p style="margin: 0 0 12px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">Hi ${esc(username)},</p>
         <p style="margin: 0 0 4px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">Your league admin archived <strong style="color: ${INK};">${esc(leagueName)}</strong>. It now shows under "Past Seasons" on your home screen instead of your active leagues. All results and standings are still there — nothing was deleted.</p>
-        ${ctaButton('View past seasons', leagueUrl(leagueId))}
+        ${ctaButton('View past seasons')}
         <p style="margin: 18px 0 0 0; color: ${MUTED}; font-size: 13px; line-height: 1.6;">If an admin restores the league, it moves back to your active list automatically.</p>`
     }),
     text: `${subject}
@@ -366,38 +402,107 @@ Hi ${username},
 
 Your league admin archived ${leagueName}. It now shows under "Past Seasons" on your home screen instead of your active leagues. All results and standings are still there — nothing was deleted.
 
-View past seasons: ${leagueUrl(leagueId)}
+View past seasons: ${SITE_URL}
 
 If an admin restores the league, it moves back to your active list automatically.${TEXT_FOOTER}`
   };
 }
 
-// ---------------------------------------------------------------------------
-// Send functions
-// ---------------------------------------------------------------------------
+/** Preflight delivery check, sent only to the signed-in super admin. */
+export function buildPreflightTestEmail(username: string, sentAt: Date = new Date()): EmailContent {
+  const stamp = sentAt.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+  return {
+    subject: `[TEST] Upset Pool email delivery check — ${stamp} ET`,
+    html: emailLayout({
+      preheader: 'Preflight test. If you can read this, Brevo delivery is working.',
+      eyebrow: 'Preflight check',
+      heading: 'Email Delivery Test',
+      bodyHtml: `
+        <p style="margin: 0 0 12px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">Hi ${esc(username)},</p>
+        <p style="margin: 0 0 4px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">This is a test message sent from the Site Admin preflight check. If it reached your inbox, Brevo is configured correctly and the league's scheduled emails can go out.</p>
+        ${detailRow('Sent to you only', 'No league member received this message. The preflight check has no recipient list — it can only mail the signed-in super admin.')}
+        <p style="margin: 18px 0 0 0; color: ${MUTED}; font-size: 13px; line-height: 1.6;">Requested at ${stamp} ET.</p>`
+    }),
+    text: `[TEST] Upset Pool email delivery check
 
-export async function sendLeagueArchivedEmail(email: string, username: string, leagueName: string, leagueId?: number): Promise<boolean> {
-  return sendEmail({ to: email, ...buildLeagueArchivedEmail(username, leagueName, leagueId) });
+Hi ${username},
+
+This is a test message sent from the Site Admin preflight check. If it reached your inbox, Brevo is configured correctly and the league's scheduled emails can go out.
+
+No league member received this message. The preflight check has no recipient list — it can only mail the signed-in super admin.
+
+Requested at ${stamp} ET.${TEXT_FOOTER}`
+  };
 }
 
-export async function sendPickReminderEmail(email: string, username: string, weekNumber: number, deadline: string): Promise<boolean> {
-  return sendEmail({ to: email, ...buildPickReminderEmail(username, weekNumber, deadline) });
+// ---------------------------------------------------------------------------
+// Sample renders — one place both the preview endpoint and the "mail me one of
+// each" endpoint draw from, so a proof in the browser matches the proof in the
+// inbox.
+// ---------------------------------------------------------------------------
+
+export const EMAIL_TEMPLATE_SAMPLES: Record<string, (name: string) => EmailContent> = {
+  'picks-live': name =>
+    buildPicksUnlockedEmail(name, 2, [{ id: 1, name: 'NFL Upset Pool' }], 'Sunday, September 20 at 1:00 PM ET'),
+  'picks-live-multi': name =>
+    buildPicksUnlockedEmail(
+      name,
+      2,
+      [{ id: 1, name: 'NFL Upset Pool' }, { id: 2, name: 'Office Pool' }],
+      'Sunday, September 20 at 1:00 PM ET'
+    ),
+  'one-hour-warning': name =>
+    buildWeeklyPickReminderEmail(name, 2, [{ leagueName: 'NFL Upset Pool', leagueId: 1 }], '1:00 PM ET'),
+  'one-hour-warning-multi': name =>
+    buildWeeklyPickReminderEmail(
+      name,
+      2,
+      [{ leagueName: 'NFL Upset Pool', leagueId: 1 }, { leagueName: 'Office Pool', leagueId: 2 }],
+      '1:00 PM ET'
+    ),
+  'league-archived': name => buildLeagueArchivedEmail(name, 'NFL Upset Pool'),
+  'preflight-test': name => buildPreflightTestEmail(name),
+};
+
+export const EMAIL_TEMPLATE_KEYS = Object.keys(EMAIL_TEMPLATE_SAMPLES);
+
+// ---------------------------------------------------------------------------
+// Send functions (signatures unchanged for existing callers)
+// ---------------------------------------------------------------------------
+
+/**
+ * Send the preflight test to exactly one address. No fan-out, no recipient list.
+ * Returns the detailed result on purpose: this send exists to explain itself,
+ * so a boolean here would throw away the only thing it is for.
+ */
+export async function sendPreflightTestEmail(email: string, username: string): Promise<SendResult> {
+  return sendEmailDetailed({ to: email, ...buildPreflightTestEmail(username) });
+}
+
+export async function sendLeagueArchivedEmail(email: string, username: string, leagueName: string): Promise<boolean> {
+  return sendEmail({ to: email, ...buildLeagueArchivedEmail(username, leagueName) });
 }
 
 export async function sendWeeklyPickReminderEmail(
   email: string,
   username: string,
   weekNumber: number,
-  missingLeagues: EmailLeague[]
-): Promise<boolean> {
-  return sendEmail({ to: email, ...buildWeeklyPickReminderEmail(username, weekNumber, missingLeagues) });
+  missingLeagues: Array<{ leagueName: string; leagueId?: number | null }>,
+  lockTime?: string
+): Promise<SendResult> {
+  return sendEmailDetailed({ to: email, ...buildWeeklyPickReminderEmail(username, weekNumber, missingLeagues, lockTime) });
 }
 
 export async function sendPicksUnlockedEmail(
   email: string,
   username: string,
   weekNumber: number,
-  leagues: EmailLeague[]
-): Promise<boolean> {
-  return sendEmail({ to: email, ...buildPicksUnlockedEmail(username, weekNumber, leagues) });
+  memberLeagues: EmailLeagueRef[],
+  lockDeadline?: string
+): Promise<SendResult> {
+  return sendEmailDetailed({ to: email, ...buildPicksUnlockedEmail(username, weekNumber, memberLeagues, lockDeadline) });
 }
