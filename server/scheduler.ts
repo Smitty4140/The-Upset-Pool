@@ -4,13 +4,25 @@ import {
   nflWeeks, nflGames, users, leagueMembers, leagues, userPicks,
   emailNotifications, EMAIL_KIND_PICKS_UNLOCKED, EMAIL_KIND_PICKS_LOCK_WARNING,
 } from '../shared/schema.js';
-import { sendWeeklyPickReminderEmail, sendPicksUnlockedEmail } from './email.js';
+import {
+  sendWeeklyPickReminderEmail, sendPicksUnlockedEmail,
+  buildWeeklyPickReminderEmail, buildPicksUnlockedEmail, pickPageUrl, isDryRun,
+} from './email.js';
 import { formatPicksLockAt, formatPicksLockTimeOnly } from './timezoneUtils.js';
 import { pullNFLGamesFromOddsAPI } from './nflDataPuller.js';
 import { pullNFLResultsFromESPN, pullResultsForActiveWeeks } from './espnResultsPuller.js';
 import type { IStorage } from './storage.js';
 import { storage } from './storage.js';
 import { eq, and, gte, lte, lt, asc, desc } from 'drizzle-orm';
+
+/** One member a send run touched — the manifest a dry run reports back. */
+export interface EmailRecipient {
+  username: string;
+  email: string;
+  subject: string;
+  leagues: string[];
+  link: string;
+}
 
 class GameScheduler {
   private scheduledJobs: Map<string, cron.ScheduledTask> = new Map();
@@ -33,6 +45,9 @@ class GameScheduler {
 
     this.isRunning = true;
     console.log('[Scheduler] Starting NFL game data scheduler');
+    if (isDryRun()) {
+      console.warn('[Scheduler] ⚠️  EMAIL_DRY_RUN is set — scheduled emails will be logged, NOT delivered.');
+    }
 
     // Run every hour to check for upcoming games
     cron.schedule('0 * * * *', async () => {
@@ -520,28 +535,29 @@ class GameScheduler {
    */
   async sendPicksUnlockedNotifications(
     weekNumber: number,
-    options: { force?: boolean; season?: number } = {}
+    options: { force?: boolean; season?: number; dryRun?: boolean } = {}
   ) {
     try {
       console.log(`[Scheduler] Sending picks unlocked notifications for Week ${weekNumber}...`);
 
       // Only send for regular season weeks (1-18)
+      const empty = { weekNumber, emailsSent: 0, emailsFailed: 0, skipped: 0, dryRun: Boolean(options.dryRun), recipients: [] as EmailRecipient[] };
       if (weekNumber < 1 || weekNumber > 18) {
         console.log(`[Scheduler] Week ${weekNumber} is not a regular season week (1-18), skipping picks unlocked notifications`);
-        return { weekNumber, emailsSent: 0, emailsFailed: 0, skipped: 0 };
+        return empty;
       }
 
       const week = await this.findWeek(weekNumber, options.season);
       if (!week) {
         console.log(`[Scheduler] No NFL week ${weekNumber} found, skipping picks unlocked notifications`);
-        return { weekNumber, emailsSent: 0, emailsFailed: 0, skipped: 0 };
+        return empty;
       }
 
       // Spreads posted but the week already locked — a "go pick" email would
       // send members to a board they can no longer use.
       if (new Date(week.picksLockAt).getTime() <= Date.now()) {
         console.log(`[Scheduler] Week ${weekNumber} picks already locked, skipping picks unlocked notifications`);
-        return { weekNumber, emailsSent: 0, emailsFailed: 0, skipped: 0 };
+        return empty;
       }
 
       const lockDeadline = formatPicksLockAt(new Date(week.picksLockAt));
@@ -555,18 +571,37 @@ class GameScheduler {
       let emailsSent = 0;
       let emailsFailed = 0;
       let skipped = 0;
+      const recipients: EmailRecipient[] = [];
 
       for (const member of activeMembers) {
         if (alreadySent.has(member.userId)) {
           skipped++;
           continue;
         }
+
+        const memberLeagues = member.leagues.map(l => ({ id: l.id, name: l.name }));
+
+        // A dry run does everything except hand the message to Brevo, and
+        // records nothing — so it can't suppress the real send later.
+        if (options.dryRun) {
+          const preview = buildPicksUnlockedEmail(member.username, weekNumber, memberLeagues, lockDeadline);
+          recipients.push({
+            username: member.username,
+            email: member.email,
+            subject: preview.subject,
+            leagues: memberLeagues.map(l => l.name),
+            link: pickPageUrl(memberLeagues.length === 1 ? memberLeagues[0].id : undefined),
+          });
+          emailsSent++;
+          continue;
+        }
+
         try {
           const success = await sendPicksUnlockedEmail(
             member.email,
             member.username,
             weekNumber,
-            member.leagues.map(l => ({ id: l.id, name: l.name })),
+            memberLeagues,
             lockDeadline
           );
 
@@ -582,11 +617,12 @@ class GameScheduler {
         }
       }
 
-      console.log(`[Scheduler] Picks unlocked notifications completed: ${emailsSent} sent, ${emailsFailed} failed, ${skipped} already notified`);
-      return { weekNumber, emailsSent, emailsFailed, skipped };
+      const label = options.dryRun ? 'DRY RUN — would send' : 'sent';
+      console.log(`[Scheduler] Picks unlocked notifications completed: ${emailsSent} ${label}, ${emailsFailed} failed, ${skipped} already notified`);
+      return { weekNumber, emailsSent, emailsFailed, skipped, dryRun: Boolean(options.dryRun), recipients };
     } catch (error) {
       console.error('[Scheduler] Error sending picks unlocked notifications:', error);
-      return { weekNumber, emailsSent: 0, emailsFailed: 0, skipped: 0 };
+      return { weekNumber, emailsSent: 0, emailsFailed: 0, skipped: 0, dryRun: Boolean(options.dryRun), recipients: [] as EmailRecipient[] };
     }
   }
 
@@ -594,9 +630,13 @@ class GameScheduler {
    * Every five minutes: is any week inside the final hour before its picks
    * lock? If so, warn the members who still have no pick in.
    */
-  private async checkPickLockWarnings() {
+  async checkPickLockWarnings(options: { asOf?: Date; dryRun?: boolean } = {}) {
+    const results: Array<Awaited<ReturnType<GameScheduler['sendPickLockWarnings']>>> = [];
     try {
-      const now = new Date();
+      // `asOf` lets an admin ask "who would this mail if it were Sunday
+      // 12:05?" without waiting for Sunday. Only ever passed by the dry-run
+      // endpoint; the cron always uses the real clock.
+      const now = options.asOf ?? new Date();
       const oneHourOut = new Date(now.getTime() + 60 * 60 * 1000);
 
       // Weeks locking within the next hour (and not yet locked).
@@ -610,19 +650,28 @@ class GameScheduler {
         .orderBy(asc(nflWeeks.picksLockAt));
 
       for (const week of weeks) {
-        await this.sendPickLockWarnings(week);
+        results.push(await this.sendPickLockWarnings(week, { dryRun: options.dryRun }));
       }
     } catch (error) {
       console.error('[Scheduler] Error checking for picks-lock warnings:', error);
     }
+    return results;
   }
 
   /**
    * Warn active members with no pick in for `week` that picks lock in an hour.
    * Idempotent: a member is mailed at most once per week unless `force` is set.
    */
-  async sendPickLockWarnings(week: any, options: { force?: boolean } = {}) {
-    const result = { weekNumber: week.weekNumber, emailsSent: 0, emailsFailed: 0, skipped: 0 };
+  async sendPickLockWarnings(week: any, options: { force?: boolean; dryRun?: boolean } = {}) {
+    const result = {
+      weekNumber: week.weekNumber,
+      picksLockAt: week.picksLockAt,
+      emailsSent: 0,
+      emailsFailed: 0,
+      skipped: 0,
+      dryRun: Boolean(options.dryRun),
+      recipients: [] as EmailRecipient[],
+    };
     try {
       // Only send emails for regular season weeks (1-18)
       if (week.weekNumber < 1 || week.weekNumber > 18) {
@@ -664,11 +713,28 @@ class GameScheduler {
             continue;
           }
 
+          const missing = missingLeagues.map(l => ({ leagueName: l.name, leagueId: l.id }));
+
+          // A dry run does everything except hand the message to Brevo, and
+          // records nothing — so it can't suppress the real send later.
+          if (options.dryRun) {
+            const preview = buildWeeklyPickReminderEmail(member.username, week.weekNumber, missing, lockTime);
+            result.recipients.push({
+              username: member.username,
+              email: member.email,
+              subject: preview.subject,
+              leagues: missing.map(l => l.leagueName),
+              link: pickPageUrl(missing.length === 1 ? missing[0].leagueId : undefined),
+            });
+            result.emailsSent++;
+            continue;
+          }
+
           const success = await sendWeeklyPickReminderEmail(
             member.email,
             member.username,
             week.weekNumber,
-            missingLeagues.map(l => ({ leagueName: l.name, leagueId: l.id })),
+            missing,
             lockTime
           );
 
@@ -686,7 +752,8 @@ class GameScheduler {
         }
       }
 
-      console.log(`[Scheduler] Picks-lock warnings for Week ${week.weekNumber} completed: ${result.emailsSent} sent, ${result.emailsFailed} failed, ${result.skipped} already warned`);
+      const label = options.dryRun ? 'DRY RUN — would send' : 'sent';
+      console.log(`[Scheduler] Picks-lock warnings for Week ${week.weekNumber} completed: ${result.emailsSent} ${label}, ${result.emailsFailed} failed, ${result.skipped} already warned`);
       return result;
     } catch (error) {
       console.error('[Scheduler] Error sending picks-lock warnings:', error);
@@ -716,30 +783,34 @@ class GameScheduler {
    * Defaults to re-sending (force) because an admin pressing the button has
    * asked for delivery, not for the scheduler's once-per-week guard.
    */
-  async sendWeeklyEmailReminders(options: { force?: boolean } = { force: true }) {
+  async sendWeeklyEmailReminders(options: { force?: boolean; dryRun?: boolean } = {}) {
+    const empty = {
+      weekNumber: null as number | null,
+      picksLockAt: null as Date | null,
+      emailsSent: 0,
+      emailsFailed: 0,
+      skipped: 0,
+      dryRun: Boolean(options.dryRun),
+      recipients: [] as EmailRecipient[],
+    };
     try {
       console.log('[Scheduler] Starting weekly email reminder process...');
 
       const week = await this.getWeekForToday();
       if (!week) {
         console.log('[Scheduler] No NFL week found for current date, skipping email reminders');
-        return { weekNumber: null, emailsSent: 0, emailsFailed: 0, skipped: 0 };
+        return empty;
       }
 
       console.log(`[Scheduler] Sending reminders for Week ${week.weekNumber}`);
-      return await this.sendPickLockWarnings(week, { force: options.force ?? true });
+      return await this.sendPickLockWarnings(week, {
+        force: options.force ?? true,
+        dryRun: options.dryRun,
+      });
     } catch (error) {
       console.error('[Scheduler] Error in weekly email reminder process:', error);
-      return { weekNumber: null, emailsSent: 0, emailsFailed: 0, skipped: 0 };
+      return empty;
     }
-  }
-
-  /**
-   * Same as sendWeeklyEmailReminders, kept for the older admin test endpoint.
-   */
-  async sendWeeklyEmailRemindersTest() {
-    console.log('[Scheduler] Starting weekly email reminder test...');
-    return this.sendWeeklyEmailReminders({ force: true });
   }
 
   /**
@@ -774,22 +845,6 @@ class GameScheduler {
     }
   }
 
-  /**
-   * Test the weekly email reminder system (for testing)
-   */
-  async testWeeklyEmails() {
-    try {
-      console.log('[Scheduler] Testing weekly email reminder system...');
-      await this.sendWeeklyEmailReminders();
-      return {
-        success: true,
-        message: "Weekly email test completed successfully"
-      };
-    } catch (error) {
-      console.error('[Scheduler] Weekly email test failed:', error);
-      throw error;
-    }
-  }
 }
 
 // Create singleton instance

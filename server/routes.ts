@@ -8,6 +8,7 @@ import { userPickFormSchema } from "@shared/schema";
 import { eq, and, sql, asc, desc, lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, pool } from "./db";
+import { isDryRun, getDryRunOutbox } from "./email";
 import {
   userPicks, nflGames, nflWeeks, users, nflTeams,
   emailNotifications, EMAIL_KIND_PICKS_UNLOCKED, EMAIL_KIND_PICKS_LOCK_WARNING,
@@ -2877,10 +2878,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
         picksUnlocked: { count: picksUnlocked.length, recipients: picksUnlocked },
         pickLockWarning: { count: lockWarnings.length, recipients: lockWarnings },
         emailConfigured: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL),
+        dryRunModeEnabled: isDryRun(),
+        // Populated only while EMAIL_DRY_RUN is on: what this process would have sent.
+        dryRunOutbox: isDryRun() ? getDryRunOutbox() : [],
       });
     } catch (error: any) {
       console.error("Error reading email status:", error);
       res.status(500).json({ message: error?.message || "Failed to read email status" });
+    }
+  });
+
+  // Render an email template in the browser instead of mailing it. Proofs the
+  // design and the deep links without touching Brevo or anyone's inbox.
+  //   /api/admin/system/email-preview                     -> index of templates
+  //   /api/admin/system/email-preview?template=picks-live -> rendered HTML
+  //   ...&format=text                                     -> the plain-text part
+  app.get('/api/admin/system/email-preview', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const email = await import("./email.js");
+      const template = req.query.template ? String(req.query.template) : null;
+      const name = req.user.username || "Commish";
+
+      if (!template) {
+        return res.json({
+          message: "Pass ?template=<key> to render one. Add &format=text for the plain-text part.",
+          templates: email.EMAIL_TEMPLATE_KEYS,
+        });
+      }
+
+      const build = email.EMAIL_TEMPLATE_SAMPLES[template];
+      if (!build) {
+        return res.status(404).json({
+          message: `Unknown template "${template}"`,
+          templates: email.EMAIL_TEMPLATE_KEYS,
+        });
+      }
+
+      const content = build(name);
+      if (req.query.format === 'text') {
+        res.type('text/plain').send(`Subject: ${content.subject}\n\n${content.text}`);
+        return;
+      }
+      res.type('text/html').send(content.html);
+    } catch (error: any) {
+      console.error("Error rendering email preview:", error);
+      res.status(500).json({ message: error?.message || "Failed to render email preview" });
+    }
+  });
+
+  // Run the real send pipeline against real member data and report exactly who
+  // would be mailed — without sending anything or writing the dedupe log, so a
+  // dry run can never suppress the live send.
+  //   ?week=<n>          which week's "picks are open" mail to evaluate
+  //   ?at=<ISO>          pretend it is this instant, to test the one-hour
+  //                      lock-warning window without waiting for Sunday
+  app.get('/api/admin/system/email-dry-run', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { gameScheduler } = await import("./scheduler.js");
+      const email = await import("./email.js");
+
+      const at = req.query.at ? new Date(String(req.query.at)) : undefined;
+      if (at && Number.isNaN(at.getTime())) {
+        return res.status(400).json({ message: `Could not parse ?at=${req.query.at} as a date` });
+      }
+
+      const week = req.query.week
+        ? (await storage.getNFLWeeks()).find(w => w.weekNumber === parseInt(String(req.query.week), 10))
+        : await storage.getCurrentNFLWeek();
+
+      // "Week is open" for the named week, ignoring the dedupe log so the
+      // manifest shows the full audience rather than only who is left.
+      const picksUnlocked = week
+        ? await gameScheduler.sendPicksUnlockedNotifications(week.weekNumber, {
+            season: week.season,
+            force: true,
+            dryRun: true,
+          })
+        : null;
+
+      // The one-hour warning, evaluated through the same window predicate the
+      // cron uses. An empty list means no week locks within an hour of `at`.
+      const lockWarnings = await gameScheduler.checkPickLockWarnings({ asOf: at, dryRun: true });
+
+      res.json({
+        evaluatedAt: (at ?? new Date()).toISOString(),
+        note: "Nothing was sent and nothing was recorded. Counts show who WOULD be mailed.",
+        emailConfigured: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL),
+        dryRunModeEnabled: email.isDryRun(),
+        week: week ? { weekNumber: week.weekNumber, season: week.season, picksLockAt: week.picksLockAt } : null,
+        picksUnlocked,
+        pickLockWarning: {
+          weeksInWindow: lockWarnings.length,
+          results: lockWarnings,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error running email dry run:", error);
+      res.status(500).json({ message: error?.message || "Failed to run email dry run" });
     }
   });
 
@@ -2894,23 +2988,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const email = await import("./email.js");
       const name = req.user.username || "Commish";
-
-      const samples: Array<[string, () => Promise<boolean>]> = [
-        ["picks-live", () => email.sendPicksUnlockedEmail(to, name, 2, [{ id: 1, name: "NFL Upset Pool" }], "Sunday, September 20 at 1:00 PM ET")],
-        ["one-hour-warning", () => email.sendWeeklyPickReminderEmail(to, name, 2, [
-          { leagueName: "NFL Upset Pool", leagueId: 1 },
-        ], "1:00 PM ET")],
-        ["manual-reminder", () => email.sendPickReminderEmail(to, name, 2, "Sunday, September 20 at 1:00 PM ET")],
-        ["league-archived", () => email.sendLeagueArchivedEmail(to, name, "NFL Upset Pool")],
-      ];
+      const keys = Object.keys(email.EMAIL_TEMPLATE_SAMPLES);
 
       const results: Record<string, boolean> = {};
-      for (const [key, send] of samples) {
-        results[key] = await send();
+      for (const key of keys) {
+        results[key] = await email.sendEmail({ to, ...email.EMAIL_TEMPLATE_SAMPLES[key](name) });
       }
       const sent = Object.values(results).filter(Boolean).length;
       res.json({
-        message: `Sent ${sent} of ${samples.length} test emails to ${to}. Failures usually mean BREVO_API_KEY or BREVO_FROM_EMAIL is missing or the sender isn't verified in Brevo.`,
+        message: email.isDryRun()
+          ? `EMAIL_DRY_RUN is on — logged ${sent} of ${keys.length} test emails instead of delivering them.`
+          : `Sent ${sent} of ${keys.length} test emails to ${to}. Failures usually mean BREVO_API_KEY or BREVO_FROM_EMAIL is missing or the sender isn't verified in Brevo.`,
+        dryRun: email.isDryRun(),
         results,
       });
     } catch (error: any) {
@@ -3027,10 +3116,14 @@ ${!apply && result.weeksNeedingFix > 0
   app.post('/api/admin/scheduler/test-weekly-emails', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const { gameScheduler } = await import("./scheduler.js");
-      await gameScheduler.sendWeeklyEmailRemindersTest();
+      const dryRun = req.body?.dryRun === true;
+      const result = await gameScheduler.sendWeeklyEmailReminders({ force: true, dryRun });
       res.json({ 
         success: true,
-        message: 'Weekly email reminders test sent successfully'
+        message: dryRun
+          ? `DRY RUN — ${result.emailsSent} members would be mailed, nothing was sent`
+          : `Weekly email reminders sent: ${result.emailsSent} sent, ${result.emailsFailed} failed`,
+        result
       });
     } catch (error) {
       console.error('[Admin] Failed to send test weekly emails:', error);
@@ -3048,8 +3141,9 @@ ${!apply && result.weeksNeedingFix > 0
       // Members already mailed for this week are skipped unless the admin
       // explicitly asks to re-send, so pressing this twice can't spam the league.
       const force = req.body.force === true;
+      const dryRun = req.body.dryRun === true;
       const { gameScheduler } = await import("./scheduler.js");
-      const result = await gameScheduler.sendPicksUnlockedNotifications(weekNumber, { force });
+      const result = await gameScheduler.sendPicksUnlockedNotifications(weekNumber, { force, dryRun });
       res.json({ 
         success: true,
         message: `Picks unlocked notifications processed for Week ${weekNumber}: ${result.emailsSent} sent, ${result.emailsFailed} failed, ${result.skipped} already notified`,
@@ -3081,30 +3175,18 @@ ${!apply && result.weeksNeedingFix > 0
   });
 
   // Weekly email reminder endpoints (admin only)
-  app.post('/api/admin/scheduler/test-weekly-emails', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
-    try {
-      // Import scheduler and test the weekly email reminders
-      const { gameScheduler } = await import("./scheduler.js");
-      const result = await gameScheduler.testWeeklyEmails();
-      
-      res.json({
-        message: "Weekly email reminder test completed",
-        result
-      });
-    } catch (error) {
-      console.error("Error testing weekly email reminders:", error);
-      res.status(500).json({ message: "Failed to test weekly email reminders" });
-    }
-  });
-
   app.post('/api/admin/scheduler/send-weekly-emails', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       // Import scheduler and manually trigger weekly email reminders
       const { gameScheduler } = await import("./scheduler.js");
-      await gameScheduler.sendWeeklyEmailReminders();
-      
+      const dryRun = req.body?.dryRun === true;
+      const result = await gameScheduler.sendWeeklyEmailReminders({ force: true, dryRun });
+
       res.json({
-        message: "Weekly email reminders sent successfully"
+        message: dryRun
+          ? `DRY RUN — ${result.emailsSent} members would be mailed, nothing was sent`
+          : `Weekly email reminders sent: ${result.emailsSent} sent, ${result.emailsFailed} failed`,
+        result
       });
     } catch (error) {
       console.error("Error sending weekly email reminders:", error);

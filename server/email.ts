@@ -117,10 +117,40 @@ const TEXT_FOOTER = `\n\n—\nThe Upset Pool · ${SITE_URL}\nManage email notifi
 // ---------------------------------------------------------------------------
 
 /**
+ * Global dry-run switch. With EMAIL_DRY_RUN set, every send is logged and
+ * reported as delivered but nothing reaches Brevo — the whole pipeline
+ * (targeting, pick checks, dedupe, scheduling) runs for real against a
+ * staging database without mailing the league.
+ */
+export function isDryRun(): boolean {
+  const flag = (process.env.EMAIL_DRY_RUN || '').toLowerCase();
+  return flag === '1' || flag === 'true' || flag === 'yes';
+}
+
+/** Every dry-run send this process has seen, newest last. Read by the admin status endpoint. */
+const dryRunOutbox: Array<{ to: string; subject: string; sentAt: string }> = [];
+const DRY_RUN_OUTBOX_LIMIT = 500;
+
+export function getDryRunOutbox() {
+  return [...dryRunOutbox];
+}
+
+export function clearDryRunOutbox() {
+  dryRunOutbox.length = 0;
+}
+
+/**
  * Send an email using Brevo (Sendinblue).
  * Requires both BREVO_API_KEY and BREVO_FROM_EMAIL (a Brevo-verified sender).
  */
 export async function sendEmail(params: EmailParams): Promise<boolean> {
+  if (isDryRun()) {
+    console.log(`[Email][DRY RUN] would send to ${params.to}: ${params.subject}`);
+    dryRunOutbox.push({ to: params.to, subject: params.subject, sentAt: new Date().toISOString() });
+    if (dryRunOutbox.length > DRY_RUN_OUTBOX_LIMIT) dryRunOutbox.shift();
+    return true;
+  }
+
   if (!process.env.BREVO_API_KEY) {
     console.warn("Cannot send email: BREVO_API_KEY is not set");
     return false;
@@ -319,6 +349,38 @@ If the league is restored by an admin, it will move back to your active list aut
 View past seasons: ${SITE_URL}${TEXT_FOOTER}`
   };
 }
+
+// ---------------------------------------------------------------------------
+// Sample renders — one place both the preview endpoint and the "mail me one of
+// each" endpoint draw from, so a proof in the browser matches the proof in the
+// inbox.
+// ---------------------------------------------------------------------------
+
+export const EMAIL_TEMPLATE_SAMPLES: Record<string, (name: string) => EmailContent> = {
+  'picks-live': name =>
+    buildPicksUnlockedEmail(name, 2, [{ id: 1, name: 'NFL Upset Pool' }], 'Sunday, September 20 at 1:00 PM ET'),
+  'picks-live-multi': name =>
+    buildPicksUnlockedEmail(
+      name,
+      2,
+      [{ id: 1, name: 'NFL Upset Pool' }, { id: 2, name: 'Office Pool' }],
+      'Sunday, September 20 at 1:00 PM ET'
+    ),
+  'one-hour-warning': name =>
+    buildWeeklyPickReminderEmail(name, 2, [{ leagueName: 'NFL Upset Pool', leagueId: 1 }], '1:00 PM ET'),
+  'one-hour-warning-multi': name =>
+    buildWeeklyPickReminderEmail(
+      name,
+      2,
+      [{ leagueName: 'NFL Upset Pool', leagueId: 1 }, { leagueName: 'Office Pool', leagueId: 2 }],
+      '1:00 PM ET'
+    ),
+  'manual-reminder': name =>
+    buildPickReminderEmail(name, 2, 'Sunday, September 20 at 1:00 PM ET', 1),
+  'league-archived': name => buildLeagueArchivedEmail(name, 'NFL Upset Pool'),
+};
+
+export const EMAIL_TEMPLATE_KEYS = Object.keys(EMAIL_TEMPLATE_SAMPLES);
 
 // ---------------------------------------------------------------------------
 // Send functions (signatures unchanged for existing callers)

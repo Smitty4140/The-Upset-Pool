@@ -80,6 +80,18 @@ Preferred communication style: Simple, everyday language.
   - Recorded in `email_notifications` so a re-pull or a restart doesn't mail the league twice
 - **Email Status**: `GET /api/admin/system/email-status` (super admin) reports, for the current week or
   `?week=<n>`, who received each scheduled email and whether Brevo is configured.
+- **Testing email without sending** (all super admin):
+  - `GET /api/admin/system/email-preview` lists templates; `?template=<key>` renders one in the browser,
+    `&format=text` shows the plain-text part. Nothing is mailed.
+  - `GET /api/admin/system/email-dry-run` runs the real pipeline against real member data and reports
+    exactly who would be mailed, without sending or writing to `email_notifications`.
+    `?week=<n>` picks the week; `?at=<ISO>` pretends it is that instant, so the one-hour lock window
+    can be exercised without waiting for Sunday.
+  - `EMAIL_DRY_RUN=true` turns the transport itself into a no-op process-wide: every send is logged and
+    reported as delivered but nothing reaches Brevo. Intended for staging. The scheduler logs a loud
+    warning at startup when it is on, and `email-status` reports `dryRunModeEnabled` plus the outbox.
+  - The admin POST endpoints (`test-picks-unlocked`, `test-weekly-emails`, `send-weekly-emails`) accept
+    `{"dryRun": true}` to return the recipient manifest instead of sending.
 - **Email Service Migration**: Switched from SendGrid to Brevo (Sendinblue) for improved email delivery reliability
 - **League Navigation Fix**: Resolved TypeScript errors causing league switching issues
   - Fixed automatic league switching behavior that was reverting user selections
