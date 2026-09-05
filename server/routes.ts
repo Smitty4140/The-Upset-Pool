@@ -8,7 +8,10 @@ import { userPickFormSchema } from "@shared/schema";
 import { eq, and, sql, asc, desc, lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, pool } from "./db";
-import { userPicks, nflGames, nflWeeks, users, nflTeams } from "@shared/schema";
+import {
+  userPicks, nflGames, nflWeeks, users, nflTeams,
+  emailNotifications, EMAIL_KIND_PICKS_UNLOCKED, EMAIL_KIND_PICKS_LOCK_WARNING,
+} from "@shared/schema";
 import emailRoutes from "./routes/email";
 import { sendLeagueArchivedEmail } from "./email";
 import { pullNFLGamesFromOddsAPI } from "./nflDataPuller";
@@ -2507,10 +2510,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Use the shared function to pull game data
       const result = await pullNFLGamesFromOddsAPI(storage);
-      
+
+      // Spreads are now live, so the week is open to picks. The scheduled pull
+      // announces itself; a manual pull has to do the same or the league never
+      // hears that the board is up. Members already mailed for this week are
+      // skipped, so this is safe to run more than once.
+      let notifications: { weekNumber: number; emailsSent: number; emailsFailed: number; skipped: number } | null = null;
+      const currentWeek = await storage.getCurrentNFLWeek();
+      if (currentWeek) {
+        const { gameScheduler } = await import("./scheduler.js");
+        notifications = await gameScheduler.sendPicksUnlockedNotifications(
+          currentWeek.weekNumber,
+          { season: currentWeek.season }
+        );
+      }
+
       return res.json({
         message: "NFL games sync completed",
-        results: result.results
+        results: result.results,
+        notifications
       });
     } catch (error: any) {
       console.error("Error syncing NFL games:", error);
@@ -2816,6 +2834,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // What scheduled member email has actually gone out for a week, and who is
+  // still outstanding. This is the answer to "did the league get the email?"
+  // without digging through server logs.
+  app.get('/api/admin/system/email-status', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const weekNumber = req.query.week ? parseInt(String(req.query.week), 10) : undefined;
+      const week = weekNumber
+        ? (await storage.getNFLWeeks()).find(w => w.weekNumber === weekNumber)
+        : await storage.getCurrentNFLWeek();
+
+      if (!week) {
+        return res.status(404).json({ message: "No NFL week found" });
+      }
+
+      const sent = await db
+        .select({
+          kind: emailNotifications.kind,
+          userId: emailNotifications.userId,
+          username: users.username,
+          email: users.email,
+          sentAt: emailNotifications.sentAt,
+        })
+        .from(emailNotifications)
+        .innerJoin(users, eq(emailNotifications.userId, users.id))
+        .where(eq(emailNotifications.weekId, week.id));
+
+      const byKind = (kind: string) => sent
+        .filter(r => r.kind === kind)
+        .map(r => ({ username: r.username, email: r.email, sentAt: r.sentAt }));
+
+      const picksUnlocked = byKind(EMAIL_KIND_PICKS_UNLOCKED);
+      const lockWarnings = byKind(EMAIL_KIND_PICKS_LOCK_WARNING);
+
+      res.json({
+        week: {
+          weekNumber: week.weekNumber,
+          season: week.season,
+          picksLockAt: week.picksLockAt,
+          picksLocked: new Date(week.picksLockAt).getTime() <= Date.now(),
+        },
+        picksUnlocked: { count: picksUnlocked.length, recipients: picksUnlocked },
+        pickLockWarning: { count: lockWarnings.length, recipients: lockWarnings },
+        emailConfigured: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL),
+      });
+    } catch (error: any) {
+      console.error("Error reading email status:", error);
+      res.status(500).json({ message: error?.message || "Failed to read email status" });
+    }
+  });
+
   // Send one of every email template to the super admin's own inbox, so each
   // design can be proofed in real mail clients before the league sees it.
   app.get('/api/admin/system/test-emails', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
@@ -2828,10 +2896,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const name = req.user.username || "Commish";
 
       const samples: Array<[string, () => Promise<boolean>]> = [
-        ["picks-live", () => email.sendPicksUnlockedEmail(to, name, 2, ["NFL Upset Pool"])],
+        ["picks-live", () => email.sendPicksUnlockedEmail(to, name, 2, [{ id: 1, name: "NFL Upset Pool" }], "Sunday, September 20 at 1:00 PM ET")],
         ["one-hour-warning", () => email.sendWeeklyPickReminderEmail(to, name, 2, [
-          { leagueName: "NFL Upset Pool" },
-        ])],
+          { leagueName: "NFL Upset Pool", leagueId: 1 },
+        ], "1:00 PM ET")],
         ["manual-reminder", () => email.sendPickReminderEmail(to, name, 2, "Sunday, September 20 at 1:00 PM ET")],
         ["league-archived", () => email.sendLeagueArchivedEmail(to, name, "NFL Upset Pool")],
       ];
@@ -2977,11 +3045,15 @@ ${!apply && result.weeksNeedingFix > 0
   app.post('/api/admin/scheduler/test-picks-unlocked', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const weekNumber = req.body.weekNumber || 1; // Default to week 1 for testing
+      // Members already mailed for this week are skipped unless the admin
+      // explicitly asks to re-send, so pressing this twice can't spam the league.
+      const force = req.body.force === true;
       const { gameScheduler } = await import("./scheduler.js");
-      await gameScheduler.sendPicksUnlockedNotifications(weekNumber);
+      const result = await gameScheduler.sendPicksUnlockedNotifications(weekNumber, { force });
       res.json({ 
         success: true,
-        message: `Picks unlocked notifications sent successfully for Week ${weekNumber}`
+        message: `Picks unlocked notifications processed for Week ${weekNumber}: ${result.emailsSent} sent, ${result.emailsFailed} failed, ${result.skipped} already notified`,
+        result
       });
     } catch (error) {
       console.error('[Admin] Failed to send picks unlocked notifications:', error);

@@ -104,7 +104,8 @@ router.post("/send-reminders", isAuthenticated, async (req: any, res) => {
           user.email, 
           user.username, 
           currentWeek.weekNumber,
-          deadline
+          deadline,
+          1 // this endpoint only checks the first league; link there too
         );
         
         results.push({

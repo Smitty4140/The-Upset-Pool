@@ -1,12 +1,16 @@
 import * as cron from 'node-cron';
 import { db } from './db.js';
-import { nflWeeks, nflGames, users, leagueMembers, leagues, userPicks, nflTeams } from '../shared/schema.js';
+import {
+  nflWeeks, nflGames, users, leagueMembers, leagues, userPicks,
+  emailNotifications, EMAIL_KIND_PICKS_UNLOCKED, EMAIL_KIND_PICKS_LOCK_WARNING,
+} from '../shared/schema.js';
 import { sendWeeklyPickReminderEmail, sendPicksUnlockedEmail } from './email.js';
+import { formatPicksLockAt, formatPicksLockTimeOnly } from './timezoneUtils.js';
 import { pullNFLGamesFromOddsAPI } from './nflDataPuller.js';
 import { pullNFLResultsFromESPN, pullResultsForActiveWeeks } from './espnResultsPuller.js';
 import type { IStorage } from './storage.js';
 import { storage } from './storage.js';
-import { eq, and, gte, lte, asc } from 'drizzle-orm';
+import { eq, and, gte, lte, lt, asc, desc } from 'drizzle-orm';
 
 class GameScheduler {
   private scheduledJobs: Map<string, cron.ScheduledTask> = new Map();
@@ -35,12 +39,14 @@ class GameScheduler {
       await this.checkAndScheduleDataPulls();
     });
 
-    // Schedule weekly email reminders - every Sunday at noon (12:00 PM EST)
-    cron.schedule('0 12 * * 0', async () => {
-      console.log('[Scheduler] Executing weekly email reminders...');
-      await this.sendWeeklyEmailReminders();
-    }, {
-      timezone: 'America/New_York'
+    // Picks-lock warnings are driven off each week's own picksLockAt rather
+    // than a hardcoded Sunday noon, so a week that locks at a non-standard
+    // time still gets its reminder exactly one hour out. Checking every five
+    // minutes (instead of firing one job at T-60) means a restart or a brief
+    // outage inside the window still delivers — the send log keeps it to one
+    // email per member per week.
+    cron.schedule('*/5 * * * *', async () => {
+      await this.checkPickLockWarnings();
     });
 
     // Schedule hourly results pulls during game windows:
@@ -289,7 +295,7 @@ class GameScheduler {
       console.log(`[Scheduler] ✅ Successfully completed scheduled data pull for week ${week.weekNumber}:`, result.results);
       
       // Tell the league picks are open (active, notification-enabled members)
-      await this.sendPicksUnlockedNotifications(week.weekNumber);
+      await this.sendPicksUnlockedNotifications(week.weekNumber, { season: week.season });
       
     } catch (error) {
       console.error(`[Scheduler] ❌ Error executing data pull for week ${week.weekNumber}:`, error);
@@ -415,63 +421,157 @@ class GameScheduler {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Scheduled member email
+  // -------------------------------------------------------------------------
+
   /**
-   * Send picks unlocked notifications to active league members
+   * Members already mailed this kind of notice for this week.
+   *
+   * The lock-warning check runs every five minutes and the app restarts often,
+   * so this has to be read from the database — an in-memory guard would mail
+   * the whole league again after any restart inside the send window.
    */
-  async sendPicksUnlockedNotifications(weekNumber: number) {
+  private async alreadyNotified(kind: string, weekId: number): Promise<Set<string>> {
+    const rows = await db
+      .select({ userId: emailNotifications.userId })
+      .from(emailNotifications)
+      .where(and(
+        eq(emailNotifications.kind, kind),
+        eq(emailNotifications.weekId, weekId)
+      ));
+    return new Set(rows.map(r => r.userId));
+  }
+
+  /** Record a delivered email. Ignores conflicts so a concurrent worker can't double-insert. */
+  private async recordNotification(kind: string, weekId: number, userId: string) {
+    try {
+      await db
+        .insert(emailNotifications)
+        .values({ kind, weekId, userId })
+        .onConflictDoNothing();
+    } catch (error) {
+      // A missing log row only risks a duplicate email later; never let it
+      // abort a send run that is otherwise working.
+      console.error(`[Scheduler] Failed to record ${kind} notification for user ${userId}:`, error);
+    }
+  }
+
+  /**
+   * Active, notification-enabled members of live NFL leagues, one entry per
+   * person with every league they belong to. A member of several leagues gets
+   * one email listing all of them rather than one email per league.
+   */
+  private async getNotifiableMembers() {
+    const memberRows = await db
+      .select({
+        userId: users.id,
+        username: users.username,
+        email: users.email,
+        leagueId: leagues.id,
+        leagueName: leagues.name,
+      })
+      .from(users)
+      .innerJoin(leagueMembers, eq(users.id, leagueMembers.userId))
+      .innerJoin(leagues, eq(leagueMembers.leagueId, leagues.id))
+      .where(and(
+        eq(leagueMembers.isActive, true),
+        eq(users.receiveNotifications, true),
+        eq(leagues.isArchived, false),
+        eq(leagues.sportType, 'nfl')
+      ));
+
+    const byUser = new Map<string, {
+      userId: string;
+      username: string;
+      email: string;
+      leagues: Array<{ id: number; name: string }>;
+    }>();
+    for (const m of memberRows) {
+      if (!m.email) continue;
+      if (!byUser.has(m.userId)) {
+        // username is nullable (OAuth signups land here before setup), and
+        // "Hi null," is worse than the local part of their address.
+        const displayName = m.username || m.email.split('@')[0];
+        byUser.set(m.userId, { userId: m.userId, username: displayName, email: m.email, leagues: [] });
+      }
+      byUser.get(m.userId)!.leagues.push({ id: m.leagueId, name: m.leagueName });
+    }
+    return Array.from(byUser.values());
+  }
+
+  /** Resolve a week number to its row, preferring the most recent season. */
+  private async findWeek(weekNumber: number, season?: number) {
+    const rows = await db
+      .select()
+      .from(nflWeeks)
+      .where(season !== undefined
+        ? and(eq(nflWeeks.weekNumber, weekNumber), eq(nflWeeks.season, season))
+        : eq(nflWeeks.weekNumber, weekNumber))
+      .orderBy(desc(nflWeeks.season))
+      .limit(1);
+    return rows[0];
+  }
+
+  /**
+   * Tell every active member the week's spreads are posted and picks are open.
+   * Called right after a successful odds pull; safe to call again, since
+   * members already mailed for this week are skipped unless `force` is set.
+   */
+  async sendPicksUnlockedNotifications(
+    weekNumber: number,
+    options: { force?: boolean; season?: number } = {}
+  ) {
     try {
       console.log(`[Scheduler] Sending picks unlocked notifications for Week ${weekNumber}...`);
-      
+
       // Only send for regular season weeks (1-18)
       if (weekNumber < 1 || weekNumber > 18) {
         console.log(`[Scheduler] Week ${weekNumber} is not a regular season week (1-18), skipping picks unlocked notifications`);
-        return;
+        return { weekNumber, emailsSent: 0, emailsFailed: 0, skipped: 0 };
       }
-      
-      // Active NFL-league members with notifications on, one email per person
-      // (a member of several leagues would otherwise get duplicates)
-      const memberRows = await db
-        .select({
-          userId: users.id,
-          username: users.username,
-          email: users.email,
-          leagueName: leagues.name,
-        })
-        .from(users)
-        .innerJoin(leagueMembers, eq(users.id, leagueMembers.userId))
-        .innerJoin(leagues, eq(leagueMembers.leagueId, leagues.id))
-        .where(and(
-          eq(leagueMembers.isActive, true),
-          eq(users.receiveNotifications, true),
-          eq(leagues.isArchived, false),
-          eq(leagues.sportType, 'nfl')
-        ));
-      const byEmail = new Map<string, { username: string; email: string; leagueNames: string[] }>();
-      for (const m of memberRows) {
-        if (!m.email) continue;
-        if (!byEmail.has(m.email)) {
-          byEmail.set(m.email, { username: m.username, email: m.email, leagueNames: [] });
-        }
-        byEmail.get(m.email)!.leagueNames.push(m.leagueName);
-      }
-      const activeMembers = Array.from(byEmail.values());
 
-      console.log(`[Scheduler] Found ${activeMembers.length} active members to notify about picks being live`);
+      const week = await this.findWeek(weekNumber, options.season);
+      if (!week) {
+        console.log(`[Scheduler] No NFL week ${weekNumber} found, skipping picks unlocked notifications`);
+        return { weekNumber, emailsSent: 0, emailsFailed: 0, skipped: 0 };
+      }
+
+      // Spreads posted but the week already locked — a "go pick" email would
+      // send members to a board they can no longer use.
+      if (new Date(week.picksLockAt).getTime() <= Date.now()) {
+        console.log(`[Scheduler] Week ${weekNumber} picks already locked, skipping picks unlocked notifications`);
+        return { weekNumber, emailsSent: 0, emailsFailed: 0, skipped: 0 };
+      }
+
+      const lockDeadline = formatPicksLockAt(new Date(week.picksLockAt));
+      const activeMembers = await this.getNotifiableMembers();
+      const alreadySent = options.force
+        ? new Set<string>()
+        : await this.alreadyNotified(EMAIL_KIND_PICKS_UNLOCKED, week.id);
+
+      console.log(`[Scheduler] Found ${activeMembers.length} active members to notify about picks being live (${alreadySent.size} already notified)`);
 
       let emailsSent = 0;
       let emailsFailed = 0;
+      let skipped = 0;
 
-      // Send picks unlocked email to each active member
       for (const member of activeMembers) {
+        if (alreadySent.has(member.userId)) {
+          skipped++;
+          continue;
+        }
         try {
           const success = await sendPicksUnlockedEmail(
             member.email,
             member.username,
             weekNumber,
-            member.leagueNames
+            member.leagues.map(l => ({ id: l.id, name: l.name })),
+            lockDeadline
           );
-          
+
           if (success) {
+            await this.recordNotification(EMAIL_KIND_PICKS_UNLOCKED, week.id, member.userId);
             emailsSent++;
           } else {
             emailsFailed++;
@@ -482,252 +582,164 @@ class GameScheduler {
         }
       }
 
-      console.log(`[Scheduler] Picks unlocked notifications completed: ${emailsSent} sent, ${emailsFailed} failed`);
+      console.log(`[Scheduler] Picks unlocked notifications completed: ${emailsSent} sent, ${emailsFailed} failed, ${skipped} already notified`);
+      return { weekNumber, emailsSent, emailsFailed, skipped };
     } catch (error) {
       console.error('[Scheduler] Error sending picks unlocked notifications:', error);
+      return { weekNumber, emailsSent: 0, emailsFailed: 0, skipped: 0 };
     }
   }
 
   /**
-   * Send weekly email reminders to all league members (test version - bypasses week restrictions)
+   * Every five minutes: is any week inside the final hour before its picks
+   * lock? If so, warn the members who still have no pick in.
    */
-  async sendWeeklyEmailRemindersTest() {
+  private async checkPickLockWarnings() {
     try {
-      console.log('[Scheduler] Starting weekly email reminder test (bypassing week restrictions)...');
-      
-      // Get the current NFL week based on today's date (not the active flag)
-      const today = new Date().toISOString().split('T')[0];
-      const currentWeek = await db
+      const now = new Date();
+      const oneHourOut = new Date(now.getTime() + 60 * 60 * 1000);
+
+      // Weeks locking within the next hour (and not yet locked).
+      const weeks = await db
         .select()
         .from(nflWeeks)
         .where(and(
-          lte(nflWeeks.startDate, today),
-          gte(nflWeeks.endDate, today)
+          gte(nflWeeks.picksLockAt, now),
+          lt(nflWeeks.picksLockAt, oneHourOut)
         ))
-        .limit(1);
+        .orderBy(asc(nflWeeks.picksLockAt));
 
-      if (currentWeek.length === 0) {
-        console.log('[Scheduler] No NFL week found for current date, skipping email reminders');
-        return;
+      for (const week of weeks) {
+        await this.sendPickLockWarnings(week);
       }
-
-      const week = currentWeek[0];
-      console.log(`[Scheduler] Testing reminders for Week ${week.weekNumber} (test mode - ignoring week restrictions)`);
-
-      // Get all users with their league memberships (only active members who want notifications)
-      // For testing, only send to admins
-      const usersWithLeagues = await db
-        .select({
-          userId: users.id,
-          username: users.username,
-          email: users.email,
-          receiveNotifications: users.receiveNotifications,
-          leagueId: leagueMembers.leagueId,
-          leagueName: leagues.name,
-          isActive: leagueMembers.isActive
-        })
-        .from(users)
-        .innerJoin(leagueMembers, eq(users.id, leagueMembers.userId))
-        .innerJoin(leagues, eq(leagueMembers.leagueId, leagues.id))
-        .where(and(
-          eq(leagueMembers.isActive, true), // Only active league members
-          eq(users.receiveNotifications, true), // Only users who want notifications
-          eq(leagueMembers.isAdmin, true) // Only send to admins for testing
-        ));
-
-      console.log(`[Scheduler] Found ${usersWithLeagues.length} active admin members for testing`);
-
-      // Group users by their ID to process each user's leagues together
-      const userMap = new Map<string, { user: { id: string, username: string, email: string }, leagues: Array<{ id: number, name: string }> }>();
-      
-      for (const row of usersWithLeagues) {
-        if (!userMap.has(row.userId)) {
-          userMap.set(row.userId, {
-            user: { id: row.userId, username: row.username, email: row.email },
-            leagues: []
-          });
-        }
-        // Only add leagues where the user is an active member
-        if (row.isActive) {
-          userMap.get(row.userId)!.leagues.push({ id: row.leagueId, name: row.leagueName });
-        }
-      }
-
-      let emailsSent = 0;
-      let emailsFailed = 0;
-
-      // Process each user and send appropriate email
-      for (const [userId, userData] of userMap) {
-        try {
-          console.log(`[Scheduler] Processing user ${userData.user.username} with ${userData.leagues.length} leagues`);
-
-          // For testing, send the reminder template
-          const success = await sendWeeklyPickReminderEmail(
-            userData.user.email,
-            userData.user.username,
-            week.weekNumber,
-            userData.leagues.map(league => ({ leagueName: league.name }))
-          );
-
-          if (success) {
-            emailsSent++;
-            console.log(`[Scheduler] Test email sent successfully to ${userData.user.email}`);
-          } else {
-            emailsFailed++;
-            console.log(`[Scheduler] Failed to send test email to ${userData.user.email}`);
-          }
-        } catch (error) {
-          console.error(`[Scheduler] Error processing user ${userData.user.username}:`, error);
-          emailsFailed++;
-        }
-      }
-
-      console.log(`[Scheduler] Test email reminders completed: ${emailsSent} sent, ${emailsFailed} failed`);
     } catch (error) {
-      console.error('[Scheduler] Error in test email reminders:', error);
+      console.error('[Scheduler] Error checking for picks-lock warnings:', error);
     }
   }
 
   /**
-   * Send weekly email reminders to all league members
+   * Warn active members with no pick in for `week` that picks lock in an hour.
+   * Idempotent: a member is mailed at most once per week unless `force` is set.
    */
-  async sendWeeklyEmailReminders() {
+  async sendPickLockWarnings(week: any, options: { force?: boolean } = {}) {
+    const result = { weekNumber: week.weekNumber, emailsSent: 0, emailsFailed: 0, skipped: 0 };
     try {
-      console.log('[Scheduler] Starting weekly email reminder process...');
-      
-      // Get the current NFL week based on today's date (not the active flag)
-      const today = new Date().toISOString().split('T')[0];
-      const currentWeek = await db
-        .select()
-        .from(nflWeeks)
-        .where(and(
-          lte(nflWeeks.startDate, today),
-          gte(nflWeeks.endDate, today)
-        ))
-        .limit(1);
-
-      if (currentWeek.length === 0) {
-        console.log('[Scheduler] No NFL week found for current date, skipping email reminders');
-        return;
-      }
-
-      const week = currentWeek[0];
-      
       // Only send emails for regular season weeks (1-18)
       if (week.weekNumber < 1 || week.weekNumber > 18) {
-        console.log(`[Scheduler] Week ${week.weekNumber} is not a regular season week (1-18), skipping email reminders`);
-        return;
+        console.log(`[Scheduler] Week ${week.weekNumber} is not a regular season week (1-18), skipping picks-lock warnings`);
+        return result;
       }
 
-      console.log(`[Scheduler] Sending reminders for Week ${week.weekNumber}`);
+      const lockTime = formatPicksLockTimeOnly(new Date(week.picksLockAt));
+      const members = await this.getNotifiableMembers();
+      const alreadySent = options.force
+        ? new Set<string>()
+        : await this.alreadyNotified(EMAIL_KIND_PICKS_LOCK_WARNING, week.id);
 
-      // Get all users with their league memberships (only active members who want notifications)
-      const usersWithLeagues = await db
-        .select({
-          userId: users.id,
-          username: users.username,
-          email: users.email,
-          receiveNotifications: users.receiveNotifications,
-          leagueId: leagueMembers.leagueId,
-          leagueName: leagues.name,
-          isActive: leagueMembers.isActive
-        })
-        .from(users)
-        .innerJoin(leagueMembers, eq(users.id, leagueMembers.userId))
-        .innerJoin(leagues, eq(leagueMembers.leagueId, leagues.id))
-        .where(and(
-          eq(leagueMembers.isActive, true), // Only active league members
-          eq(users.receiveNotifications, true), // Only users who want notifications
-          eq(leagues.isArchived, false), // Archived leagues get no email
-          eq(leagues.sportType, 'nfl') // Golf leagues run their own schedule
-        ));
+      console.log(`[Scheduler] Week ${week.weekNumber} locks at ${lockTime}; checking ${members.length} active members (${alreadySent.size} already warned)`);
 
-      console.log(`[Scheduler] Found ${usersWithLeagues.length} active league members with notifications enabled`);
-
-      // Group users by their ID to process each user's leagues together
-      const userMap = new Map<string, {
-        user: { id: string; username: string; email: string };
-        leagues: Array<{ id: number; name: string }>;
-      }>();
-
-      for (const row of usersWithLeagues) {
-        if (!userMap.has(row.userId)) {
-          userMap.set(row.userId, {
-            user: { id: row.userId, username: row.username, email: row.email },
-            leagues: []
-          });
-        }
-        // Only add leagues where the user is an active member
-        if (row.isActive) {
-          userMap.get(row.userId)!.leagues.push({ id: row.leagueId, name: row.leagueName });
-        }
+      // Every pick already in for this week, in one query rather than one per member.
+      const picksThisWeek = await db
+        .select({ userId: userPicks.userId, leagueId: userPicks.leagueId })
+        .from(userPicks)
+        .where(eq(userPicks.weekId, week.id));
+      const pickedByUser = new Map<string, Set<number>>();
+      for (const pick of picksThisWeek) {
+        if (!pickedByUser.has(pick.userId)) pickedByUser.set(pick.userId, new Set());
+        pickedByUser.get(pick.userId)!.add(pick.leagueId);
       }
 
-      let emailsSent = 0;
-      let emailsFailed = 0;
-
-      // Process each user
-      for (const [userId, userData] of Array.from(userMap.entries())) {
+      for (const member of members) {
         try {
-          const { user, leagues: userLeagues } = userData;
-          
-          // Check which leagues the user has made picks for this week
-          const userPicksForWeek = await db
-            .select({
-              leagueId: userPicks.leagueId,
-              pickedTeamId: userPicks.pickedTeamId,
-              teamName: nflTeams.name,
-              teamAbbreviation: nflTeams.abbreviation,
-              leagueName: leagues.name,
-              spread: nflGames.spread
-            })
-            .from(userPicks)
-            .innerJoin(nflTeams, eq(userPicks.pickedTeamId, nflTeams.id))
-            .innerJoin(leagues, eq(userPicks.leagueId, leagues.id))
-            .innerJoin(nflGames, eq(userPicks.gameId, nflGames.id))
-            .where(and(
-              eq(userPicks.userId, userId),
-              eq(userPicks.weekId, week.id)
-            ));
+          if (alreadySent.has(member.userId)) {
+            result.skipped++;
+            continue;
+          }
 
-          const pickedLeagues = new Set(userPicksForWeek.map(pick => pick.leagueId));
-          const missingLeagues = userLeagues.filter((league: { id: number; name: string }) => !pickedLeagues.has(league.id));
+          const picked = pickedByUser.get(member.userId) ?? new Set<number>();
+          const missingLeagues = member.leagues.filter(l => !picked.has(l.id));
 
           if (missingLeagues.length === 0) {
             // Picks are in — keep it light, no email
             continue;
+          }
+
+          const success = await sendWeeklyPickReminderEmail(
+            member.email,
+            member.username,
+            week.weekNumber,
+            missingLeagues.map(l => ({ leagueName: l.name, leagueId: l.id })),
+            lockTime
+          );
+
+          if (success) {
+            await this.recordNotification(EMAIL_KIND_PICKS_LOCK_WARNING, week.id, member.userId);
+            console.log(`[Scheduler] Sent picks-lock warning to ${member.username} (${member.email}) - missing ${missingLeagues.length} picks`);
+            result.emailsSent++;
           } else {
-            // User is missing picks - send reminder email
-            const missingLeaguesList = missingLeagues.map((league: { id: number; name: string }) => ({
-              leagueName: league.name
-            }));
-
-            const success = await sendWeeklyPickReminderEmail(
-              user.email,
-              user.username,
-              week.weekNumber,
-              missingLeaguesList
-            );
-
-            if (success) {
-              console.log(`[Scheduler] Sent reminder email to ${user.username} (${user.email}) - missing ${missingLeagues.length} picks`);
-              emailsSent++;
-            } else {
-              console.error(`[Scheduler] Failed to send reminder email to ${user.username}`);
-              emailsFailed++;
-            }
+            console.error(`[Scheduler] Failed to send picks-lock warning to ${member.username}`);
+            result.emailsFailed++;
           }
         } catch (error) {
-          console.error(`[Scheduler] Error processing email for user ${userId}:`, error);
-          emailsFailed++;
+          console.error(`[Scheduler] Error processing picks-lock warning for user ${member.userId}:`, error);
+          result.emailsFailed++;
         }
       }
 
-      console.log(`[Scheduler] Weekly email reminder process completed: ${emailsSent} sent, ${emailsFailed} failed`);
-      
+      console.log(`[Scheduler] Picks-lock warnings for Week ${week.weekNumber} completed: ${result.emailsSent} sent, ${result.emailsFailed} failed, ${result.skipped} already warned`);
+      return result;
+    } catch (error) {
+      console.error('[Scheduler] Error sending picks-lock warnings:', error);
+      return result;
+    }
+  }
+
+  /**
+   * Resolve the NFL week covering today's date.
+   * Uses the date range rather than the `active` flag, which lags behind.
+   */
+  private async getWeekForToday() {
+    const today = new Date().toISOString().split('T')[0];
+    const rows = await db
+      .select()
+      .from(nflWeeks)
+      .where(and(
+        lte(nflWeeks.startDate, today),
+        gte(nflWeeks.endDate, today)
+      ))
+      .limit(1);
+    return rows[0];
+  }
+
+  /**
+   * Admin "send the picks-lock warnings now" path for the current week.
+   * Defaults to re-sending (force) because an admin pressing the button has
+   * asked for delivery, not for the scheduler's once-per-week guard.
+   */
+  async sendWeeklyEmailReminders(options: { force?: boolean } = { force: true }) {
+    try {
+      console.log('[Scheduler] Starting weekly email reminder process...');
+
+      const week = await this.getWeekForToday();
+      if (!week) {
+        console.log('[Scheduler] No NFL week found for current date, skipping email reminders');
+        return { weekNumber: null, emailsSent: 0, emailsFailed: 0, skipped: 0 };
+      }
+
+      console.log(`[Scheduler] Sending reminders for Week ${week.weekNumber}`);
+      return await this.sendPickLockWarnings(week, { force: options.force ?? true });
     } catch (error) {
       console.error('[Scheduler] Error in weekly email reminder process:', error);
+      return { weekNumber: null, emailsSent: 0, emailsFailed: 0, skipped: 0 };
     }
+  }
+
+  /**
+   * Same as sendWeeklyEmailReminders, kept for the older admin test endpoint.
+   */
+  async sendWeeklyEmailRemindersTest() {
+    console.log('[Scheduler] Starting weekly email reminder test...');
+    return this.sendWeeklyEmailReminders({ force: true });
   }
 
   /**

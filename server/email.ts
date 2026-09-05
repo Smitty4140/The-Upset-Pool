@@ -17,6 +17,25 @@ apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.
 const SITE_URL = 'https://upsetpool.com';
 const LOGO_URL = `${SITE_URL}/email-logo.png`;
 
+/** A league as referenced from an email: the name members read, plus the id the deep link needs. */
+export interface EmailLeagueRef {
+  id?: number | null;
+  name: string;
+}
+
+/**
+ * Deep link to the selection page — the "Make Picks" tab on the home screen.
+ * Passing a league id drops the member straight into that league's board
+ * instead of whichever league the app would have defaulted to.
+ */
+export function pickPageUrl(leagueId?: number | null): string {
+  const params = new URLSearchParams({ tab: 'spreads' });
+  if (leagueId !== undefined && leagueId !== null) {
+    params.set('league', String(leagueId));
+  }
+  return `${SITE_URL}/?${params.toString()}`;
+}
+
 export interface EmailContent {
   subject: string;
   html: string;
@@ -141,9 +160,14 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 /** Reminder for users who haven't picked yet this week (manual admin trigger). */
-export function buildPickReminderEmail(username: string, weekNumber: number, deadline: string): EmailContent {
+export function buildPickReminderEmail(
+  username: string,
+  weekNumber: number,
+  deadline: string,
+  leagueId?: number | null
+): EmailContent {
   return {
-    subject: `No Week ${weekNumber} pick yet — locks Sunday 1:00 PM ET`,
+    subject: `No Week ${weekNumber} pick yet — locks ${deadline}`,
     html: emailLayout({
       preheader: `Friendly nudge from the Commish: you have no Week ${weekNumber} pick in.`,
       heading: 'No Pick Yet',
@@ -152,7 +176,7 @@ export function buildPickReminderEmail(username: string, weekNumber: number, dea
         <p style="margin: 0 0 16px 0; font-size: 16px; color: #1f2937;">Hi ${username},</p>
         <p style="margin: 0 0 12px 0; color: #4b5563; line-height: 1.6;">Friendly nudge from the Commish: you don't have a Week ${weekNumber} pick in. Every game is still on the board.</p>
         ${calloutBox('⏰ Picks lock', deadline)}
-        ${ctaButton('Make Your Pick')}
+        ${ctaButton('Make Your Pick', pickPageUrl(leagueId))}
         <p style="margin: 0; font-size: 13px; color: #6b7280; text-align: center;">Zero points and a dead drawing ticket is a bad Sunday. Fix it in 20 seconds.</p>`
     }),
     text: `No Week ${weekNumber} pick yet — The Upset Pool
@@ -163,76 +187,94 @@ Friendly nudge from the Commish: you don't have a Week ${weekNumber} pick in. Ev
 
 Picks lock: ${deadline}
 
-Make your pick: ${SITE_URL}
+Make your pick: ${pickPageUrl(leagueId)}
 
 Zero points and a dead drawing ticket is a bad Sunday. Fix it in 20 seconds.${TEXT_FOOTER}`
   };
 }
 
-/** Sunday-noon reminder for users still missing picks in one or more leagues. */
+/**
+ * One-hour warning for members with no pick in yet. `lockTime` is the week's
+ * real picksLockAt rendered in ET, so the copy never contradicts the schedule.
+ */
 export function buildWeeklyPickReminderEmail(
   username: string,
   weekNumber: number,
-  missingLeagues: Array<{ leagueName: string }>
+  missingLeagues: Array<{ leagueName: string; leagueId?: number | null }>,
+  lockTime: string = '1:00 PM ET'
 ): EmailContent {
-  const leaguesHtml = missingLeagues.map(l =>
-    `<div style="background-color: #fef2f2; padding: 10px 16px; margin: 6px 0; border-radius: 6px; color: #991b1b; font-weight: 500;">${l.leagueName}</div>`
-  ).join('');
-  const leaguesPlain = missingLeagues.map(l => `- ${l.leagueName}`).join('\n');
+  const leaguesHtml = missingLeagues.map(l => {
+    const href = pickPageUrl(l.leagueId);
+    return `<div style="background-color: #fef2f2; padding: 10px 16px; margin: 6px 0; border-radius: 6px;"><a href="${href}" style="color: #991b1b; font-weight: 500; text-decoration: none;">${l.leagueName} &rsaquo;</a></div>`;
+  }).join('');
+  const leaguesPlain = missingLeagues.map(l => `- ${l.leagueName}: ${pickPageUrl(l.leagueId)}`).join('\n');
   const leagueCountNote = missingLeagues.length === 1
     ? 'You still need a pick in this league:'
     : `You still need picks in ${missingLeagues.length} leagues:`;
+  // One league → send them straight to its board. Several → the app picks a
+  // default and the per-league links above cover the rest.
+  const ctaHref = pickPageUrl(missingLeagues.length === 1 ? missingLeagues[0].leagueId : undefined);
 
   return {
     subject: `⏳ 1 hour left — you have no Week ${weekNumber} pick`,
     html: emailLayout({
-      preheader: `Picks lock at 1:00 PM ET and you're not in. One missed week ends your drawing run.`,
+      preheader: `Picks lock at ${lockTime} and you're not in. One missed week ends your drawing run.`,
       heading: 'Picks Lock in 1 Hour',
       subheading: `NFL Week ${weekNumber}`,
       bodyHtml: `
         <p style="margin: 0 0 16px 0; font-size: 16px; color: #1f2937;">Hi ${username},</p>
-        <p style="margin: 0 0 16px 0; color: #4b5563; line-height: 1.6;">Picks lock at <strong style="color: #dc2626;">1:00 PM ET</strong>. Right now you're getting zero points this week — and one missed week ends your run at the pick-every-week drawing. For the whole season. ${leagueCountNote}</p>
+        <p style="margin: 0 0 16px 0; color: #4b5563; line-height: 1.6;">Picks lock at <strong style="color: #dc2626;">${lockTime}</strong>. Right now you're getting zero points this week — and one missed week ends your run at the pick-every-week drawing. For the whole season. ${leagueCountNote}</p>
         ${leaguesHtml}
-        ${ctaButton('Pick Now')}
+        ${ctaButton('Pick Now', ctaHref)}
         <p style="margin: 0; font-size: 13px; color: #6b7280; text-align: center;">Takes about 20 seconds. Any dog will do.</p>`
     }),
     text: `1 hour left — you have no Week ${weekNumber} pick
 
 Hi ${username},
 
-Picks lock at 1:00 PM ET. Right now you're getting zero points this week — and one missed week ends your run at the pick-every-week drawing. For the whole season. ${leagueCountNote}
+Picks lock at ${lockTime}. Right now you're getting zero points this week — and one missed week ends your run at the pick-every-week drawing. For the whole season. ${leagueCountNote}
 ${leaguesPlain}
 
-Pick now: ${SITE_URL}
+Pick now: ${ctaHref}
 
 Takes about 20 seconds. Any dog will do.${TEXT_FOOTER}`
   };
 }
 
-/** Notification that spreads are posted and picks are open for the week. */
-export function buildPicksUnlockedEmail(username: string, weekNumber: number, leagueNames: string[]): EmailContent {
-  const singleLeague = leagueNames.length === 1 ? leagueNames[0] : null;
+/**
+ * Notification that spreads are posted and the week is open to picks.
+ * `lockDeadline` is the week's real picksLockAt rendered in ET.
+ */
+export function buildPicksUnlockedEmail(
+  username: string,
+  weekNumber: number,
+  memberLeagues: EmailLeagueRef[],
+  lockDeadline: string = 'Sunday at 1:00 PM ET'
+): EmailContent {
+  const singleLeague = memberLeagues.length === 1 ? memberLeagues[0] : null;
+  const leagueNames = memberLeagues.map(l => l.name);
   const subject = singleLeague
-    ? `🏈 ${singleLeague}: Week ${weekNumber} is open — pick your underdog`
+    ? `🏈 ${singleLeague.name}: Week ${weekNumber} is open — pick your underdog`
     : `🏈 Week ${weekNumber} is open — pick your underdog`;
   const leagueLine = singleLeague
-    ? `The Week ${weekNumber} spreads just posted in <strong>${singleLeague}</strong>.`
+    ? `The Week ${weekNumber} spreads just posted in <strong>${singleLeague.name}</strong>.`
     : `The Week ${weekNumber} spreads just posted in your leagues: <strong>${leagueNames.join('</strong>, <strong>')}</strong>.`;
   const leagueLinePlain = singleLeague
-    ? `The Week ${weekNumber} spreads just posted in ${singleLeague}.`
+    ? `The Week ${weekNumber} spreads just posted in ${singleLeague.name}.`
     : `The Week ${weekNumber} spreads just posted in your leagues: ${leagueNames.join(', ')}.`;
+  const ctaHref = pickPageUrl(singleLeague?.id);
 
   return {
     subject,
     html: emailLayout({
       preheader: `${leagueLinePlain} Find the dog that wins outright.`,
       heading: 'Week Is Open',
-      subheading: singleLeague ? `${singleLeague} · NFL Week ${weekNumber}` : `NFL Week ${weekNumber} spreads are posted`,
+      subheading: singleLeague ? `${singleLeague.name} · NFL Week ${weekNumber}` : `NFL Week ${weekNumber} spreads are posted`,
       bodyHtml: `
         <p style="margin: 0 0 16px 0; font-size: 16px; color: #1f2937;">Hi ${username},</p>
         <p style="margin: 0 0 16px 0; color: #4b5563; line-height: 1.6;">${leagueLine} Sixteen games, one pick — find the dog that's going to win outright.</p>
-        ${calloutBox('⏰ Picks lock Sunday at 1:00 PM ET', 'Or at kickoff if you take a Thursday or Saturday game.')}
-        ${ctaButton('Pick Your Underdog')}
+        ${calloutBox(`⏰ Picks lock ${lockDeadline}`, 'Or at kickoff if you take a Thursday or Saturday game.')}
+        ${ctaButton('Pick Your Underdog', ctaHref)}
         <p style="margin: 0; font-size: 13px; color: #6b7280; text-align: center;">Win outright and you earn the spread. Covering doesn't count.</p>`
     }),
     text: `${subject}
@@ -241,9 +283,9 @@ Hi ${username},
 
 ${leagueLinePlain} Sixteen games, one pick — find the dog that's going to win outright.
 
-Picks lock Sunday at 1:00 PM ET, or at kickoff if you take a Thursday or Saturday game.
+Picks lock ${lockDeadline}, or at kickoff if you take a Thursday or Saturday game.
 
-Pick your underdog: ${SITE_URL}
+Pick your underdog: ${ctaHref}
 
 Win outright and you earn the spread. Covering doesn't count.${TEXT_FOOTER}`
   };
@@ -286,24 +328,32 @@ export async function sendLeagueArchivedEmail(email: string, username: string, l
   return sendEmail({ to: email, ...buildLeagueArchivedEmail(username, leagueName) });
 }
 
-export async function sendPickReminderEmail(email: string, username: string, weekNumber: number, deadline: string): Promise<boolean> {
-  return sendEmail({ to: email, ...buildPickReminderEmail(username, weekNumber, deadline) });
+export async function sendPickReminderEmail(
+  email: string,
+  username: string,
+  weekNumber: number,
+  deadline: string,
+  leagueId?: number | null
+): Promise<boolean> {
+  return sendEmail({ to: email, ...buildPickReminderEmail(username, weekNumber, deadline, leagueId) });
 }
 
 export async function sendWeeklyPickReminderEmail(
   email: string,
   username: string,
   weekNumber: number,
-  missingLeagues: Array<{ leagueName: string }>
+  missingLeagues: Array<{ leagueName: string; leagueId?: number | null }>,
+  lockTime?: string
 ): Promise<boolean> {
-  return sendEmail({ to: email, ...buildWeeklyPickReminderEmail(username, weekNumber, missingLeagues) });
+  return sendEmail({ to: email, ...buildWeeklyPickReminderEmail(username, weekNumber, missingLeagues, lockTime) });
 }
 
 export async function sendPicksUnlockedEmail(
   email: string,
   username: string,
   weekNumber: number,
-  leagueNames: string[]
+  memberLeagues: EmailLeagueRef[],
+  lockDeadline?: string
 ): Promise<boolean> {
-  return sendEmail({ to: email, ...buildPicksUnlockedEmail(username, weekNumber, leagueNames) });
+  return sendEmail({ to: email, ...buildPicksUnlockedEmail(username, weekNumber, memberLeagues, lockDeadline) });
 }

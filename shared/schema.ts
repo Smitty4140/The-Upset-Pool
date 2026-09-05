@@ -233,6 +233,30 @@ export const golfResults = pgTable("golf_results", {
     .on(table.tournamentId, table.playerId),
 }));
 
+// Log of scheduled member emails that have already been sent.
+//
+// The scheduler runs on a short interval and the app restarts often, so
+// "did we already tell this member?" cannot live in memory — a restart inside
+// the send window would mail the whole league twice. One row per
+// (kind, week, member) makes every send idempotent and doubles as the record
+// an admin reads to confirm a week's mail actually went out.
+export const emailNotifications = pgTable("email_notifications", {
+  id: serial("id").primaryKey(),
+  // 'picks_unlocked' = spreads are posted and the week is open to picks
+  // 'picks_lock_warning' = one hour before picks lock, member still has no pick
+  kind: varchar("kind").notNull(),
+  weekId: integer("week_id").notNull().references(() => nflWeeks.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+}, (table) => ({
+  kindWeekUserUnique: unique("email_notifications_kind_week_id_user_id_unique")
+    .on(table.kind, table.weekId, table.userId),
+  kindWeekIdx: index("idx_email_notifications_kind_week").on(table.kind, table.weekId),
+}));
+
+export const EMAIL_KIND_PICKS_UNLOCKED = 'picks_unlocked' as const;
+export const EMAIL_KIND_PICKS_LOCK_WARNING = 'picks_lock_warning' as const;
+
 // Relationships
 export const nflTeamsRelations = relations(nflTeams, ({ many }) => ({
   homeGames: many(nflGames, { relationName: "homeTeam" }),
@@ -413,6 +437,9 @@ export type InsertGolfPickSelection = typeof golfPickSelections.$inferInsert;
 
 export type GolfResult = typeof golfResults.$inferSelect;
 export type InsertGolfResult = typeof golfResults.$inferInsert;
+
+export type EmailNotification = typeof emailNotifications.$inferSelect;
+export type InsertEmailNotification = typeof emailNotifications.$inferInsert;
 
 // Golf leaderboard entry (computed for display)
 export type GolfLeaderboardEntry = {

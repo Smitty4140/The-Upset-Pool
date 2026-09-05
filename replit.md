@@ -39,8 +39,8 @@ Preferred communication style: Simple, everyday language.
     - Fixed logout functionality to properly terminate sessions using correct POST method.
     - Fixed game time display inconsistencies to show all times correctly in Eastern Time (EDT/EST).
     - Updated picks lock time calculation to properly handle daylight saving time transitions (EST/EDT).
-    - Weekly email reminder system: automated stylized emails sent every Sunday at noon during NFL weeks 1-18.
-    - Smart email differentiation: confirmation emails for users who made all picks, reminder emails for those missing picks.
+    - Scheduled member email: "week is open" when spreads post, and a picks-lock warning one hour before each week's `picks_lock_at`.
+    - Sends are logged per member per week in `email_notifications`, making every scheduled send idempotent across restarts.
     - Comprehensive email templates with responsive design, league-specific information, and clear CTAs.
 
 ### Database
@@ -52,7 +52,7 @@ Preferred communication style: Simple, everyday language.
 
 ## External Dependencies
 - **PostgreSQL Database**: Primary data storage (e.g., Neon).
-- **SendGrid**: Email delivery service for notifications and weekly reminders.
+- **Brevo (Sendinblue)**: Email delivery service for notifications and weekly reminders (`BREVO_API_KEY`, `BREVO_FROM_EMAIL`).
 - **Sports Odds API**: External service for NFL game data and spreads.
 - **ESPN API**: Used for pulling NFL game results.
 
@@ -64,20 +64,22 @@ Preferred communication style: Simple, everyday language.
   - Beautiful login/registration pages with Google sign-in integration
   - Automatic user assignment to default league for new Google users and existing users without leagues
   - Fixed league assignment for linked Google accounts to ensure all users join the default pool
-- **Weekly Email Reminders**: Implemented automated email system that runs every Sunday at noon (Eastern Time) during NFL weeks 1-18.
-  - Only sends emails to active league members who have notifications enabled
-  - Sends stylized confirmation emails to users who completed all picks across their leagues
-  - Sends urgent reminder emails to users missing picks in any of their leagues
-  - Includes league-specific information, team details, and spreads in confirmation emails
-  - Features responsive HTML templates with modern design and clear call-to-action buttons
-  - Admin endpoints for testing and manually triggering email campaigns
+- **Picks-Lock Warning (one hour out)**: The scheduler checks every five minutes for a week whose
+  `nfl_weeks.picks_lock_at` falls inside the next hour, and warns active members who still have no pick.
+  - Driven by the week's own lock timestamp, not a fixed Sunday-noon cron, so a week that locks at a
+    non-standard time still gets its warning exactly one hour out — and the copy quotes the real time
+  - Only active league members of live NFL leagues, with notifications enabled
+  - Every CTA deep links to that league's pick board (`/?tab=spreads&league=<id>`)
+  - Recorded in `email_notifications`, so a restart or a second check inside the window can't re-send
   - Automatically skips preseason and other non-regular season weeks
-- **Picks Unlocked Notifications**: Automated email system that triggers when game data is pulled (picks become available).
-  - Sends "Upset Pool Picks Are Live!" emails to active league members with notifications enabled
-  - Only sends during NFL regular season weeks (1-18)
-  - Features engaging email template with clear call-to-action to make picks
-  - Automatically triggered when weekly game data pull completes successfully
-  - Admin test endpoint available for manual testing
+  - Admin endpoints for testing and manually triggering email campaigns (manual sends force a re-send)
+- **Picks Unlocked Notifications**: Sent when the week's spreads are pulled and the board opens.
+  - Fires from both the scheduled 8-hours-before-kickoff pull and the admin's manual `/api/admin/pull-games`
+  - Only sends during NFL regular season weeks (1-18), and never after the week has already locked
+  - Quotes the week's real `picks_lock_at` as the deadline and deep links to the pick board
+  - Recorded in `email_notifications` so a re-pull or a restart doesn't mail the league twice
+- **Email Status**: `GET /api/admin/system/email-status` (super admin) reports, for the current week or
+  `?week=<n>`, who received each scheduled email and whether Brevo is configured.
 - **Email Service Migration**: Switched from SendGrid to Brevo (Sendinblue) for improved email delivery reliability
 - **League Navigation Fix**: Resolved TypeScript errors causing league switching issues
   - Fixed automatic league switching behavior that was reverting user selections
