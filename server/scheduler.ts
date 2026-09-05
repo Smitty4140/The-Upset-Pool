@@ -8,6 +8,11 @@ import type { IStorage } from './storage.js';
 import { storage } from './storage.js';
 import { eq, and, gte, lte, asc } from 'drizzle-orm';
 
+// The reminder cron runs at noon ET and picks lock at 1 PM ET. The window is
+// wider than that hour so a delayed run still sends, but narrow enough that a
+// Sunday belonging to a different game week never does.
+const REMINDER_LOCK_WINDOW_MINUTES = 180;
+
 class GameScheduler {
   private scheduledJobs: Map<string, cron.ScheduledTask> = new Map();
   private isRunning = false;
@@ -617,6 +622,16 @@ class GameScheduler {
       // Only send emails for regular season weeks (1-18)
       if (week.weekNumber < 1 || week.weekNumber > 18) {
         console.log(`[Scheduler] Week ${week.weekNumber} is not a regular season week (1-18), skipping email reminders`);
+        return;
+      }
+
+      // This email tells people picks lock in an hour, so only send it on the
+      // week's actual lock day. A week's date window can cover a Sunday that
+      // isn't its game Sunday — the 2026 week 1 window opens Sun Sep 6 while
+      // its games are played Sun Sep 13 — and the noon cron fires on both.
+      const minutesUntilLock = (new Date(week.picksLockAt).getTime() - Date.now()) / 60000;
+      if (minutesUntilLock <= 0 || minutesUntilLock > REMINDER_LOCK_WINDOW_MINUTES) {
+        console.log(`[Scheduler] Week ${week.weekNumber} picks lock at ${new Date(week.picksLockAt).toISOString()} (${Math.round(minutesUntilLock)} min away), not within the reminder window, skipping email reminders`);
         return;
       }
 
