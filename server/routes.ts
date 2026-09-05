@@ -1940,7 +1940,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 sendLeagueArchivedEmail(
                   m.user.email!,
                   m.nickname || m.user.username || "there",
-                  league.name
+                  league.name,
+                  leagueId
                 )
               )
             );
@@ -2828,12 +2829,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const name = req.user.username || "Commish";
 
       const samples: Array<[string, () => Promise<boolean>]> = [
-        ["picks-live", () => email.sendPicksUnlockedEmail(to, name, 2, ["NFL Upset Pool"])],
+        ["picks-live", () => email.sendPicksUnlockedEmail(to, name, 2, [
+          { id: 1, name: "NFL Upset Pool" },
+        ])],
+        ["picks-live-multi-league", () => email.sendPicksUnlockedEmail(to, name, 2, [
+          { id: 1, name: "NFL Upset Pool" },
+          { id: 2, name: "Office Pool" },
+        ])],
         ["one-hour-warning", () => email.sendWeeklyPickReminderEmail(to, name, 2, [
-          { leagueName: "NFL Upset Pool" },
+          { id: 1, name: "NFL Upset Pool" },
+        ])],
+        ["one-hour-warning-multi-league", () => email.sendWeeklyPickReminderEmail(to, name, 2, [
+          { id: 1, name: "NFL Upset Pool" },
+          { id: 2, name: "Office Pool" },
         ])],
         ["manual-reminder", () => email.sendPickReminderEmail(to, name, 2, "Sunday, September 20 at 1:00 PM ET")],
-        ["league-archived", () => email.sendLeagueArchivedEmail(to, name, "NFL Upset Pool")],
+        ["league-archived", () => email.sendLeagueArchivedEmail(to, name, "NFL Upset Pool", 1)],
       ];
 
       const results: Record<string, boolean> = {};

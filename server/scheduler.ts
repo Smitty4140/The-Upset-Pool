@@ -1,7 +1,7 @@
 import * as cron from 'node-cron';
 import { db } from './db.js';
 import { nflWeeks, nflGames, users, leagueMembers, leagues, userPicks, nflTeams } from '../shared/schema.js';
-import { sendWeeklyPickReminderEmail, sendPicksUnlockedEmail } from './email.js';
+import { sendWeeklyPickReminderEmail, sendPicksUnlockedEmail, type EmailLeague } from './email.js';
 import { pullNFLGamesFromOddsAPI } from './nflDataPuller.js';
 import { pullNFLResultsFromESPN, pullResultsForActiveWeeks } from './espnResultsPuller.js';
 import type { IStorage } from './storage.js';
@@ -435,6 +435,7 @@ class GameScheduler {
           userId: users.id,
           username: users.username,
           email: users.email,
+          leagueId: leagues.id,
           leagueName: leagues.name,
         })
         .from(users)
@@ -446,13 +447,13 @@ class GameScheduler {
           eq(leagues.isArchived, false),
           eq(leagues.sportType, 'nfl')
         ));
-      const byEmail = new Map<string, { username: string; email: string; leagueNames: string[] }>();
+      const byEmail = new Map<string, { username: string; email: string; leagues: EmailLeague[] }>();
       for (const m of memberRows) {
         if (!m.email) continue;
         if (!byEmail.has(m.email)) {
-          byEmail.set(m.email, { username: m.username, email: m.email, leagueNames: [] });
+          byEmail.set(m.email, { username: m.username, email: m.email, leagues: [] });
         }
-        byEmail.get(m.email)!.leagueNames.push(m.leagueName);
+        byEmail.get(m.email)!.leagues.push({ id: m.leagueId, name: m.leagueName });
       }
       const activeMembers = Array.from(byEmail.values());
 
@@ -468,7 +469,7 @@ class GameScheduler {
             member.email,
             member.username,
             weekNumber,
-            member.leagueNames
+            member.leagues
           );
           
           if (success) {
@@ -566,7 +567,7 @@ class GameScheduler {
             userData.user.email,
             userData.user.username,
             week.weekNumber,
-            userData.leagues.map(league => ({ leagueName: league.name }))
+            userData.leagues.map(league => ({ id: league.id, name: league.name }))
           );
 
           if (success) {
@@ -699,7 +700,8 @@ class GameScheduler {
           } else {
             // User is missing picks - send reminder email
             const missingLeaguesList = missingLeagues.map((league: { id: number; name: string }) => ({
-              leagueName: league.name
+              id: league.id,
+              name: league.name
             }));
 
             const success = await sendWeeklyPickReminderEmail(

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -62,6 +62,19 @@ import { Link } from "wouter";
 type Tab = "spreads" | "leaderboard" | "weeklypicks" | "admin" | "profile";
 type SortOption = "spread" | "homeUnderdog" | "gameTime";
 
+/**
+ * Read the league id from a /?league=<id> deep link (weekly emails send these
+ * so a member lands on the league the email is about). Returns null for a
+ * missing or malformed value; membership is verified separately.
+ */
+function readRequestedLeagueId(): number | null {
+  if (typeof window === "undefined") return null;
+  const raw = new URLSearchParams(window.location.search).get("league");
+  if (!raw) return null;
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
 export default function Home() {
   const { user, isAuthenticated, isLoading: isLoadingAuth } = useAuth();
   const { toast } = useToast();
@@ -76,6 +89,10 @@ export default function Home() {
   const [selectedWeekId, setSelectedWeekId] = useState<number | null>(null);
   const [selectedLeagueId, setSelectedLeagueId] = useState<number>(1);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  // Emails link to a specific league as /?league=<id>. Applied once, after the
+  // user's memberships load, so a stale or foreign id can't select anything.
+  const requestedLeagueId = useRef<number | null>(readRequestedLeagueId());
+  const hasSelectedInitialLeague = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 30000);
@@ -93,17 +110,22 @@ export default function Home() {
     enabled: isAuthenticated,
   });
 
-  // Set default league when user leagues load (only on initial load)
-  // Prefer the first active (non-archived) league; fall back to first league if all archived
+  // Pick the league to show on first load. A ?league=<id> deep link from an
+  // email wins when the user actually belongs to that league; otherwise fall
+  // back to the first active (non-archived) league, then to the first league.
   useEffect(() => {
-    if (userLeagues && Array.isArray(userLeagues) && userLeagues.length > 0) {
-      if (selectedLeagueId === 1) {
-        const activeLeague = userLeagues.find((m: any) => !m.league?.isArchived);
-        const defaultLeague = activeLeague || userLeagues[0];
-        if (defaultLeague?.league?.id) {
-          setSelectedLeagueId(defaultLeague.league.id);
-        }
-      }
+    if (hasSelectedInitialLeague.current) return;
+    if (!userLeagues || !Array.isArray(userLeagues) || userLeagues.length === 0) return;
+
+    const linkedLeague = requestedLeagueId.current
+      ? userLeagues.find((m: any) => m.league?.id === requestedLeagueId.current)
+      : undefined;
+    const activeLeague = userLeagues.find((m: any) => !m.league?.isArchived);
+    const defaultLeague = linkedLeague || activeLeague || userLeagues[0];
+
+    if (defaultLeague?.league?.id) {
+      hasSelectedInitialLeague.current = true;
+      setSelectedLeagueId(defaultLeague.league.id);
     }
   }, [userLeagues]); // Remove selectedLeagueId dependency to prevent re-triggering
 
