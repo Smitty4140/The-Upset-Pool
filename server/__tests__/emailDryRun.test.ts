@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   sendEmail,
+  sendEmailDetailed,
   isDryRun,
   getDryRunOutbox,
   clearDryRunOutbox,
@@ -10,6 +11,7 @@ import {
 
 describe("EMAIL_DRY_RUN", () => {
   const original = process.env.EMAIL_DRY_RUN;
+  const originalSender = process.env.BREVO_FROM_EMAIL;
 
   beforeEach(() => {
     clearDryRunOutbox();
@@ -21,6 +23,8 @@ describe("EMAIL_DRY_RUN", () => {
   afterEach(() => {
     if (original === undefined) delete process.env.EMAIL_DRY_RUN;
     else process.env.EMAIL_DRY_RUN = original;
+    if (originalSender === undefined) delete process.env.BREVO_FROM_EMAIL;
+    else process.env.BREVO_FROM_EMAIL = originalSender;
     clearDryRunOutbox();
     vi.restoreAllMocks();
   });
@@ -43,8 +47,8 @@ describe("EMAIL_DRY_RUN", () => {
 
   it("reports success and records the message instead of calling Brevo", async () => {
     process.env.EMAIL_DRY_RUN = "true";
-    // No BREVO_API_KEY needed — the dry run short-circuits before the transport.
-    delete process.env.BREVO_API_KEY;
+    // Short-circuits before the transport, so no sender config is needed.
+    delete process.env.BREVO_FROM_EMAIL;
 
     const ok = await sendEmail({ to: "dana@example.com", subject: "Week 3 is open", html: "<p>hi</p>" });
 
@@ -54,14 +58,24 @@ describe("EMAIL_DRY_RUN", () => {
     ]);
   });
 
-  it("still refuses to send for real when Brevo is unconfigured", async () => {
+  it("still refuses to send for real when the sender is unconfigured", async () => {
     delete process.env.EMAIL_DRY_RUN;
-    delete process.env.BREVO_API_KEY;
+    delete process.env.BREVO_FROM_EMAIL;
 
     const ok = await sendEmail({ to: "dana@example.com", subject: "Week 3 is open", html: "<p>hi</p>" });
 
     expect(ok).toBe(false);
     expect(getDryRunOutbox()).toHaveLength(0);
+  });
+
+  it("names the reason a send failed instead of just returning false", async () => {
+    delete process.env.EMAIL_DRY_RUN;
+    delete process.env.BREVO_FROM_EMAIL;
+
+    const result = await sendEmailDetailed({ to: "dana@example.com", subject: "x", html: "<p>hi</p>" });
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain("BREVO_FROM_EMAIL");
   });
 });
 

@@ -52,7 +52,7 @@ Preferred communication style: Simple, everyday language.
 
 ## External Dependencies
 - **PostgreSQL Database**: Primary data storage (e.g., Neon).
-- **Brevo (Sendinblue)**: Email delivery service for notifications and weekly reminders (`BREVO_API_KEY`, `BREVO_FROM_EMAIL`).
+- **Brevo**: Email delivery for notifications and weekly reminders, via the Replit-managed Brevo connection. Only `BREVO_FROM_EMAIL` (a Brevo-verified sender) lives in app config; the API credential is held by the connector.
 - **Sports Odds API**: External service for NFL game data and spreads.
 - **ESPN API**: Used for pulling NFL game results.
 

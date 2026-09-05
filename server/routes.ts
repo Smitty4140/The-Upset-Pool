@@ -2869,14 +2869,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recipientCount: 0,
       };
     }
-    if (!process.env.BREVO_API_KEY) {
-      return { check: 'email' as const, status: 'fail' as const, summary: "BREVO_API_KEY is not set — no email can be sent.", sentTo: null, recipientCount: 0 };
-    }
     if (!process.env.BREVO_FROM_EMAIL) {
       return { check: 'email' as const, status: 'fail' as const, summary: "BREVO_FROM_EMAIL is not set — configure a Brevo-verified sender address.", sentTo: null, recipientCount: 0 };
     }
 
-    const delivered = await email.sendPreflightTestEmail(to, name);
+    // Detailed variant so a failure names its cause instead of just going red.
+    const result = await email.sendEmailDetailed({
+      to,
+      ...email.buildPreflightTestEmail(name),
+    });
 
     // A dry-run "success" proves nothing about delivery, which is the entire
     // point of this check — so it is reported as a warning, not a pass.
@@ -2889,14 +2890,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recipientCount: 1,
       };
     }
+    if (result.ok) {
+      return {
+        check: 'email' as const,
+        status: 'pass' as const,
+        summary: `One test email sent to ${to} (Brevo message ${result.messageId ?? 'accepted'}). Check that inbox — no league member received it.`,
+        sentTo: to,
+        recipientCount: 1,
+      };
+    }
+
+    // Brevo's own words, plus what to do about the cases that actually recur.
+    const hint =
+      result.status === 401
+        ? ' Repair the managed Brevo connection in Replit — the key is missing or revoked.'
+        : result.code === 'invalid_parameter' || /sender/i.test(result.reason ?? '')
+          ? ` Check that ${process.env.BREVO_FROM_EMAIL} is a verified sender in Brevo (Senders → Domains).`
+          : '';
     return {
       check: 'email' as const,
-      status: delivered ? ('pass' as const) : ('fail' as const),
-      summary: delivered
-        ? `One test email sent to ${to}. Check that inbox — no league member received it.`
-        : `Brevo rejected the send. The usual cause is that ${process.env.BREVO_FROM_EMAIL} is not a verified sender in Brevo.`,
-      sentTo: to,
-      recipientCount: 1,
+      status: 'fail' as const,
+      summary: `Brevo rejected the send: ${result.reason}${result.code ? ` [${result.code}]` : ''}.${hint}`,
+      sentTo: null,
+      recipientCount: 0,
+      brevoStatus: result.status ?? null,
+      brevoCode: result.code ?? null,
     };
   }
 
@@ -3022,7 +3040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         picksUnlocked: { count: picksUnlocked.length, recipients: picksUnlocked },
         pickLockWarning: { count: lockWarnings.length, recipients: lockWarnings },
-        emailConfigured: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL),
+        emailConfigured: Boolean(process.env.BREVO_FROM_EMAIL), // the API credential lives in the managed Replit connection
         dryRunModeEnabled: isDryRun(),
         // Populated only while EMAIL_DRY_RUN is on: what this process would have sent.
         dryRunOutbox: isDryRun() ? getDryRunOutbox() : [],
@@ -3108,7 +3126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         evaluatedAt: (at ?? new Date()).toISOString(),
         note: "Nothing was sent and nothing was recorded. Counts show who WOULD be mailed.",
-        emailConfigured: Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL),
+        emailConfigured: Boolean(process.env.BREVO_FROM_EMAIL), // the API credential lives in the managed Replit connection
         dryRunModeEnabled: email.isDryRun(),
         week: week ? { weekNumber: week.weekNumber, season: week.season, picksLockAt: week.picksLockAt } : null,
         picksUnlocked,
@@ -3143,7 +3161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         message: email.isDryRun()
           ? `EMAIL_DRY_RUN is on — logged ${sent} of ${keys.length} test emails instead of delivering them.`
-          : `Sent ${sent} of ${keys.length} test emails to ${to}. Failures usually mean BREVO_API_KEY or BREVO_FROM_EMAIL is missing or the sender isn't verified in Brevo.`,
+          : `Sent ${sent} of ${keys.length} test emails to ${to}. Failures usually mean the managed Brevo connection needs repair, BREVO_FROM_EMAIL is missing, or the sender isn't verified in Brevo.`,
         dryRun: email.isDryRun(),
         results,
       });
