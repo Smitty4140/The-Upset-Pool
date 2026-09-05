@@ -64,7 +64,7 @@ describe("picks unlocked email (spreads posted, week is open)", () => {
     expect(mail.html).not.toContain("Picks lock Sunday at 1:00 PM ET");
   });
 
-  it("lists every league for a multi-league member and drops the league-specific link", () => {
+  it("gives a multi-league member a link per league rather than one generic CTA", () => {
     const mail = buildPicksUnlockedEmail(
       "dana",
       3,
@@ -73,8 +73,12 @@ describe("picks unlocked email (spreads posted, week is open)", () => {
     );
     expect(mail.html).toContain("Sunday Dogs");
     expect(mail.html).toContain("Office Pool");
-    // No single league to favor, so the CTA goes to the pick board generally.
-    expect(mail.html).toContain(`href="${pickPageUrl()}"`);
+    // No single league to favor, so every league gets its own deep link — a
+    // generic button couldn't say which league it meant.
+    expect(mail.html).toContain(`href="${pickPageUrl(7)}"`);
+    expect(mail.html).toContain(`href="${pickPageUrl(9)}"`);
+    expect(mail.text).toContain(pickPageUrl(7));
+    expect(mail.text).toContain(pickPageUrl(9));
   });
 });
 
@@ -83,8 +87,8 @@ describe("one-hour warning email (no pick in yet)", () => {
 
   it("says picks lock in one hour and links to the selection page", () => {
     const mail = buildWeeklyPickReminderEmail("dana", 3, [{ leagueName: "Sunday Dogs", leagueId: 7 }], lockTime);
-    expect(mail.subject).toContain("1 hour left");
-    expect(mail.html).toContain("Picks Lock in 1 Hour");
+    expect(mail.subject).toContain("lock in 1 hour");
+    expect(mail.html).toContain("Picks lock in 1 hour");
     expect(mail.html).toContain(`href="${pickPageUrl(7)}"`);
     expect(mail.text).toContain(pickPageUrl(7));
   });
@@ -92,7 +96,7 @@ describe("one-hour warning email (no pick in yet)", () => {
   it("quotes the week's actual lock time", () => {
     const mail = buildWeeklyPickReminderEmail("dana", 18, [{ leagueName: "Sunday Dogs", leagueId: 7 }], "4:30 PM ET");
     expect(mail.html).toContain("4:30 PM ET");
-    expect(mail.text).toContain("Picks lock at 4:30 PM ET");
+    expect(mail.text).toContain("picks lock at 4:30 PM ET");
     expect(mail.text).not.toContain("1:00 PM ET");
   });
 
@@ -103,7 +107,7 @@ describe("one-hour warning email (no pick in yet)", () => {
       [{ leagueName: "Sunday Dogs", leagueId: 7 }, { leagueName: "Office Pool", leagueId: 9 }],
       lockTime
     );
-    expect(mail.html).toContain("You still need picks in 2 leagues");
+    expect(mail.html).toContain("You don't have a pick in yet for these leagues");
     expect(mail.html).toContain(`href="${pickPageUrl(7)}"`);
     expect(mail.html).toContain(`href="${pickPageUrl(9)}"`);
     expect(mail.text).toContain(pickPageUrl(7));
@@ -113,6 +117,6 @@ describe("one-hour warning email (no pick in yet)", () => {
   it("never points a member at the bare homepage", () => {
     const mail = buildWeeklyPickReminderEmail("dana", 3, [{ leagueName: "Sunday Dogs", leagueId: 7 }], lockTime);
     // The footer links to the site; the calls to action must not.
-    expect(mail.text).toContain("Pick now: https://upsetpool.com/?tab=spreads&league=7");
+    expect(mail.text).toContain("Make your pick: https://upsetpool.com/?tab=spreads&league=7");
   });
 });
