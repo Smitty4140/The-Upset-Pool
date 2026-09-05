@@ -1,14 +1,7 @@
-import * as SibApiV3Sdk from '@sendinblue/client';
-
-if (!process.env.BREVO_API_KEY) {
-  console.warn("BREVO_API_KEY environment variable is not set. Email functionality will be disabled.");
-}
+import { ReplitConnectors } from '@replit/connectors-sdk';
 if (!process.env.BREVO_FROM_EMAIL) {
   console.warn("BREVO_FROM_EMAIL environment variable is not set. Emails will NOT be sent until it is configured with a Brevo-verified sender address.");
 }
-
-const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY || '');
 
 // ---------------------------------------------------------------------------
 // Shared branding
@@ -98,40 +91,51 @@ const TEXT_FOOTER = `\n\n—\nThe Upset Pool · ${SITE_URL}\nManage email notifi
 // ---------------------------------------------------------------------------
 
 /**
- * Send an email using Brevo (Sendinblue).
- * Requires both BREVO_API_KEY and BREVO_FROM_EMAIL (a Brevo-verified sender).
+ * Send an email through the Replit-managed Brevo connection.
+ * Requires BREVO_FROM_EMAIL to identify a Brevo-verified sender.
  */
 export async function sendEmail(params: EmailParams): Promise<boolean> {
-  if (!process.env.BREVO_API_KEY) {
-    console.warn("Cannot send email: BREVO_API_KEY is not set");
-    return false;
-  }
   if (!process.env.BREVO_FROM_EMAIL) {
     console.error("Cannot send email: BREVO_FROM_EMAIL is not set. Configure a Brevo-verified sender address.");
     return false;
   }
 
   try {
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    // Create this client per request so connector credentials are always fresh.
+    const connectors = new ReplitConnectors();
+    const response = await connectors.proxy("brevo", "/smtp/email", {
+      method: "POST",
+      body: {
+        sender: {
+          name: "The Upset Pool",
+          email: process.env.BREVO_FROM_EMAIL,
+        },
+        to: [{ email: params.to }],
+        subject: params.subject,
+        textContent: params.text || "View this email in HTML format for the full experience.",
+        htmlContent: params.html || params.text || "",
+      },
+    });
 
-    sendSmtpEmail.sender = {
-      name: 'The Upset Pool',
-      email: process.env.BREVO_FROM_EMAIL
-    };
+    const result = await response.json().catch(() => null) as {
+      messageId?: string;
+      code?: string;
+      message?: string;
+    } | null;
 
-    sendSmtpEmail.to = [{
-      email: params.to
-    }];
+    if (!response.ok) {
+      console.error("[Email] Brevo send failed", {
+        status: response.status,
+        code: result?.code,
+        message: result?.message,
+      });
+      return false;
+    }
 
-    sendSmtpEmail.subject = params.subject;
-    sendSmtpEmail.textContent = params.text || 'View this email in HTML format for the full experience.';
-    sendSmtpEmail.htmlContent = params.html || params.text || '';
-
-    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
-    console.log(`[Email] Brevo response:`, result.body);
+    console.log("[Email] Brevo accepted email", { messageId: result?.messageId });
     return true;
   } catch (error) {
-    console.error('Brevo email error:', error);
+    console.error("[Email] Brevo connector error:", error);
     return false;
   }
 }

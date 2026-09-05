@@ -1,1 +1,2 @@
 - [League database release sync](league-database-release-sync.md) — schema setup must cover both the app’s custom dev database and Replit’s managed dev database used for production diffs.
+- [Brevo email credentials](brevo-email-credentials.md) — send through the managed Replit connector; keep only the verified sender address in app environment configuration.
