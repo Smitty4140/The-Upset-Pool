@@ -80,6 +80,19 @@ Preferred communication style: Simple, everyday language.
   - Recorded in `email_notifications` so a re-pull or a restart doesn't mail the league twice
 - **Email Status**: `GET /api/admin/system/email-status` (super admin) reports, for the current week or
   `?week=<n>`, who received each scheduled email and whether Brevo is configured.
+- **Week 1 Preflight** (`GET /api/admin/system/preflight?weekId=<id>`, super admin): answers the three
+  go-live questions in one call — are spreads pulling, are results pulling, does email send.
+  - `preflight/spreads` calls The Odds API and reports matched games with **ET** kickoffs, the
+    `x-requests-remaining` / `x-requests-used` quota headers, exclusions split into out-of-week vs
+    unmatched-team vs no-spreads-market, and what a real pull *would* create/update. Writes nothing.
+  - `preflight/results` calls ESPN using the week's stored season + week number and reports team
+    mapping, game states, and proposed score changes. No game is updated and no pick is recalculated.
+  - `preflight/email` sends exactly one clearly-labeled test message to the authenticated super
+    admin. No recipient parameter, no league lookup. Reports `warn` (not `pass`) under `EMAIL_DRY_RUN`,
+    since a dry run proves nothing about delivery.
+  - All provider logic lives in `server/diagnostics.ts`, which by contract contains no write path.
+    `server/__tests__/diagnosticsSafety.test.ts` enforces that structurally.
+  - Surfaced as the "Preflight Check" card at the top of Site Admin.
 - **Testing email without sending** (all super admin):
   - `GET /api/admin/system/email-preview` lists templates; `?template=<key>` renders one in the browser,
     `&format=text` shows the plain-text part. Nothing is mailed.

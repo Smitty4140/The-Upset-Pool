@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Trash2,
   Unlock,
+  XCircle,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,16 @@ interface SchedulerStatus {
   jobCount: number;
 }
 
+type PreflightStatus = "pass" | "warn" | "fail";
+
+interface PreflightResponse {
+  overall: PreflightStatus;
+  week: { id: number; weekNumber: number; season: number };
+  emailsSent: number;
+  summary: { spreads: string; results: string; email: string };
+  detail: Record<string, unknown>;
+}
+
 interface SuperAdminUser {
   id: string;
   username: string | null;
@@ -47,6 +58,38 @@ interface SuperAdminUser {
   // Owner accounts are configured server-side and always hold super admin.
   isOwner?: boolean;
   createdAt: string | null;
+}
+
+// One line of preflight output. The server prefixes each summary with
+// PASS/WARN/FAIL, which decides the icon.
+function PreflightRow({ label, line }: { label: string; line: string }) {
+  const status: PreflightStatus = line.startsWith("PASS")
+    ? "pass"
+    : line.startsWith("WARN")
+      ? "warn"
+      : "fail";
+  const message = line.replace(/^(PASS|WARN|FAIL)\s+—\s*/, "");
+
+  const icon = {
+    pass: <CheckCircle className="h-4 w-4 text-green-600" />,
+    warn: <AlertTriangle className="h-4 w-4 text-amber-600" />,
+    fail: <XCircle className="h-4 w-4 text-red-600" />,
+  }[status];
+
+  const tone = {
+    pass: "bg-green-50 border-green-200",
+    warn: "bg-amber-50 border-amber-200",
+    fail: "bg-red-50 border-red-200",
+  }[status];
+
+  return (
+    <div className={`${tone} border rounded-md p-3 flex items-start`}>
+      <span className="mt-0.5 mr-2 flex-shrink-0">{icon}</span>
+      <div className="text-sm">
+        <span className="font-medium">{label}:</span> {message}
+      </div>
+    </div>
+  );
 }
 
 // A labelled block of related site-wide controls.
@@ -107,6 +150,8 @@ export default function SuperAdminPage() {
     queryKey: ["/api/admin/super-admins"],
     enabled: isSuperAdmin,
   });
+
+  const [preflight, setPreflight] = useState<PreflightResponse | null>(null);
 
   const weekId = selectedWeekId ?? currentWeek?.id ?? null;
   const arePicksLocked = currentWeek ? new Date() > new Date(currentWeek.picksLockAt) : false;
@@ -222,6 +267,83 @@ export default function SuperAdminPage() {
           member status, and league defaults — live on that league's Admin tab.
         </p>
       </div>
+
+      {/* ── Preflight ── */}
+      <Card className="mb-8 border-primary/40">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center">
+            <Activity className="h-5 w-5 mr-2 text-primary" />
+            Preflight Check
+          </CardTitle>
+          <CardDescription>
+            Confirms the spreads API, the results API, and email delivery are all working — before a
+            week goes live.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <Section
+            title="Run All Three Checks"
+            tone="green"
+            icon={<CheckCircle className="h-5 w-5 text-green-500" />}
+            blurb={
+              <>
+                <strong>No game data is changed.</strong> The spreads and results checks only read
+                from the APIs and report what a real pull <em>would</em> do — nothing is created,
+                updated, or recalculated. The email check sends exactly one test message, to your
+                own address. No league member is emailed.
+              </>
+            }
+          >
+            <div className="mb-4">
+              <WeekSelector
+                currentWeekId={weekId}
+                onWeekChange={(id) => setSelectedWeekId(id)}
+                season={currentWeek?.season}
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                disabled={anyBusy || !weekId}
+                onClick={() => {
+                  // runAction reports failures via toast; clearing here keeps a
+                  // stale result from looking like the outcome of this run.
+                  setPreflight(null);
+                  runAction("preflight", `/api/admin/system/preflight?weekId=${weekId}`, {
+                    method: "GET",
+                    successTitle: "Preflight complete",
+                    onSuccess: (data) => setPreflight(data as PreflightResponse),
+                  });
+                }}
+              >
+                {busy("preflight") ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Checking...</>
+                ) : (
+                  <><Activity className="h-4 w-4 mr-2" /> Run Preflight</>
+                )}
+              </Button>
+            </div>
+
+            {preflight && (
+              <div className="mt-4 space-y-2">
+                <PreflightRow label="Spreads API" line={preflight.summary.spreads} />
+                <PreflightRow label="Results API" line={preflight.summary.results} />
+                <PreflightRow label="Email delivery" line={preflight.summary.email} />
+                <details className="mt-3">
+                  <summary className="text-sm text-muted-foreground cursor-pointer">
+                    Full detail (games matched, excluded games, quota, proposed changes)
+                  </summary>
+                  <pre className="mt-2 text-xs bg-muted p-3 rounded-md overflow-x-auto max-h-96">
+                    {JSON.stringify(preflight.detail, null, 2)}
+                  </pre>
+                </details>
+              </div>
+            )}
+          </Section>
+        </CardContent>
+      </Card>
 
       {/* ── NFL data ── */}
       <Card className="mb-8">

@@ -2835,6 +2835,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Week 1 preflight ──────────────────────────────────────────────────────
+  // Three questions, answered without changing production data: are spreads
+  // pulling, are results pulling, does email send. The two sports checks are
+  // strictly read-only (see server/diagnostics.ts); the email check sends
+  // exactly one message, to the signed-in super admin.
+
+  /** Resolve ?weekId= or ?week=, falling back to the current week. */
+  async function resolvePreflightWeek(req: any) {
+    if (req.query.weekId) {
+      const id = parseInt(String(req.query.weekId), 10);
+      return Number.isFinite(id) ? await storage.getNFLWeek(id) : undefined;
+    }
+    if (req.query.week) {
+      const n = parseInt(String(req.query.week), 10);
+      return (await storage.getNFLWeeks()).find(w => w.weekNumber === n);
+    }
+    return await storage.getCurrentNFLWeek();
+  }
+
+  /** Send one preflight email to the authenticated super admin and describe the outcome. */
+  async function runEmailPreflight(req: any) {
+    const email = await import("./email.js");
+    const to = req.user?.email;
+    const name = req.user?.username || "Commish";
+
+    if (!to) {
+      return {
+        check: 'email' as const,
+        status: 'fail' as const,
+        summary: "Your account has no email address, so there is nowhere to send the test.",
+        sentTo: null,
+        recipientCount: 0,
+      };
+    }
+    if (!process.env.BREVO_API_KEY) {
+      return { check: 'email' as const, status: 'fail' as const, summary: "BREVO_API_KEY is not set — no email can be sent.", sentTo: null, recipientCount: 0 };
+    }
+    if (!process.env.BREVO_FROM_EMAIL) {
+      return { check: 'email' as const, status: 'fail' as const, summary: "BREVO_FROM_EMAIL is not set — configure a Brevo-verified sender address.", sentTo: null, recipientCount: 0 };
+    }
+
+    const delivered = await email.sendPreflightTestEmail(to, name);
+
+    // A dry-run "success" proves nothing about delivery, which is the entire
+    // point of this check — so it is reported as a warning, not a pass.
+    if (email.isDryRun()) {
+      return {
+        check: 'email' as const,
+        status: 'warn' as const,
+        summary: `EMAIL_DRY_RUN is on — the message was logged, NOT delivered. Unset EMAIL_DRY_RUN to prove real delivery.`,
+        sentTo: to,
+        recipientCount: 1,
+      };
+    }
+    return {
+      check: 'email' as const,
+      status: delivered ? ('pass' as const) : ('fail' as const),
+      summary: delivered
+        ? `One test email sent to ${to}. Check that inbox — no league member received it.`
+        : `Brevo rejected the send. The usual cause is that ${process.env.BREVO_FROM_EMAIL} is not a verified sender in Brevo.`,
+      sentTo: to,
+      recipientCount: 1,
+    };
+  }
+
+  // Are spreads pulling? Read-only: no game is created or updated.
+  app.get('/api/admin/system/preflight/spreads', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const week = await resolvePreflightWeek(req);
+      if (!week) {
+        return res.status(404).json({ message: "No NFL week found. Pass ?weekId=<id> or ?week=<number>." });
+      }
+      const { diagnoseSpreads } = await import("./diagnostics.js");
+      const result = await diagnoseSpreads(storage, week.id);
+      res.json({ noGameDataChanged: true, ...result });
+    } catch (error: any) {
+      console.error("Error running spreads preflight:", error);
+      res.status(500).json({ message: error?.message || "Failed to run spreads preflight" });
+    }
+  });
+
+  // Are results pulling? Read-only: no score is written and no pick is recalculated.
+  app.get('/api/admin/system/preflight/results', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const week = await resolvePreflightWeek(req);
+      if (!week) {
+        return res.status(404).json({ message: "No NFL week found. Pass ?weekId=<id> or ?week=<number>." });
+      }
+      const { diagnoseResults } = await import("./diagnostics.js");
+      const result = await diagnoseResults(storage, week.id);
+      res.json({ noGameDataChanged: true, ...result });
+    } catch (error: any) {
+      console.error("Error running results preflight:", error);
+      res.status(500).json({ message: error?.message || "Failed to run results preflight" });
+    }
+  });
+
+  // Does email send? Sends exactly one message, to the caller's own address.
+  app.get('/api/admin/system/preflight/email', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      res.json(await runEmailPreflight(req));
+    } catch (error: any) {
+      console.error("Error running email preflight:", error);
+      res.status(500).json({ message: error?.message || "Failed to run email preflight" });
+    }
+  });
+
+  // All three at once — the URL to hit before Week 1. Sends the one email.
+  app.get('/api/admin/system/preflight', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const week = await resolvePreflightWeek(req);
+      if (!week) {
+        return res.status(404).json({ message: "No NFL week found. Pass ?weekId=<id> or ?week=<number>." });
+      }
+      const { diagnoseSpreads, diagnoseResults } = await import("./diagnostics.js");
+      const [spreads, results, email] = await Promise.all([
+        diagnoseSpreads(storage, week.id),
+        diagnoseResults(storage, week.id),
+        runEmailPreflight(req),
+      ]);
+
+      const worst = [spreads.status, results.status, email.status].includes('fail')
+        ? 'fail'
+        : [spreads.status, results.status, email.status].includes('warn')
+          ? 'warn'
+          : 'pass';
+
+      res.json({
+        overall: worst,
+        week: { id: week.id, weekNumber: week.weekNumber, season: week.season, picksLockAt: week.picksLockAt },
+        noGameDataChanged: true,
+        emailsSent: email.recipientCount,
+        summary: {
+          spreads: `${spreads.status.toUpperCase()} — ${spreads.summary}`,
+          results: `${results.status.toUpperCase()} — ${results.summary}`,
+          email: `${email.status.toUpperCase()} — ${email.summary}`,
+        },
+        detail: { spreads, results, email },
+      });
+    } catch (error: any) {
+      console.error("Error running preflight:", error);
+      res.status(500).json({ message: error?.message || "Failed to run preflight" });
+    }
+  });
+
   // What scheduled member email has actually gone out for a week, and who is
   // still outstanding. This is the answer to "did the league get the email?"
   // without digging through server logs.

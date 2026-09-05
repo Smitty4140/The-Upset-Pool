@@ -350,6 +350,41 @@ View past seasons: ${SITE_URL}${TEXT_FOOTER}`
   };
 }
 
+/**
+ * Preflight connectivity test. Goes to exactly one person — the super admin who
+ * pressed the button — and says so in the body, so if it ever escapes to a
+ * member it is obvious what it is.
+ */
+export function buildPreflightTestEmail(username: string, sentAt: Date = new Date()): EmailContent {
+  const stamp = sentAt.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+  return {
+    subject: `[TEST] Upset Pool email delivery check — ${stamp} ET`,
+    html: emailLayout({
+      preheader: 'Preflight test. If you can read this, Brevo delivery is working.',
+      heading: 'Email Delivery Test',
+      subheading: 'Preflight check',
+      bodyHtml: `
+        <p style="margin: 0 0 16px 0; font-size: 16px; color: #1f2937;">Hi ${username},</p>
+        <p style="margin: 0 0 12px 0; color: #4b5563; line-height: 1.6;">This is a test message sent from the Site Admin preflight check. If it reached your inbox, Brevo is configured correctly and the league's scheduled emails can go out.</p>
+        ${calloutBox('Sent to you only', 'No league member received this message. The preflight check has no recipient list — it can only mail the signed-in super admin.')}
+        <p style="margin: 0; font-size: 13px; color: #6b7280;">Requested at ${stamp} ET.</p>`
+    }),
+    text: `[TEST] Upset Pool email delivery check
+
+Hi ${username},
+
+This is a test message sent from the Site Admin preflight check. If it reached your inbox, Brevo is configured correctly and the league's scheduled emails can go out.
+
+No league member received this message. The preflight check has no recipient list — it can only mail the signed-in super admin.
+
+Requested at ${stamp} ET.${TEXT_FOOTER}`
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Sample renders — one place both the preview endpoint and the "mail me one of
 // each" endpoint draw from, so a proof in the browser matches the proof in the
@@ -385,6 +420,11 @@ export const EMAIL_TEMPLATE_KEYS = Object.keys(EMAIL_TEMPLATE_SAMPLES);
 // ---------------------------------------------------------------------------
 // Send functions (signatures unchanged for existing callers)
 // ---------------------------------------------------------------------------
+
+/** Send the preflight test to exactly one address. No fan-out, no recipient list. */
+export async function sendPreflightTestEmail(email: string, username: string): Promise<boolean> {
+  return sendEmail({ to: email, ...buildPreflightTestEmail(username) });
+}
 
 export async function sendLeagueArchivedEmail(email: string, username: string, leagueName: string): Promise<boolean> {
   return sendEmail({ to: email, ...buildLeagueArchivedEmail(username, leagueName) });
