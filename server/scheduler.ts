@@ -30,6 +30,16 @@ class GameScheduler {
   private isRunning = false;
   private storage: IStorage;
 
+  /** False once a notifications-table read has failed; surfaced by the admin endpoints. */
+  private notificationLogAvailable = true;
+  /** `kind:weekId:userId` of sends made while the table was unreachable. */
+  private memoryNotified = new Set<string>();
+
+  /** Whether the durable send log is usable, for the admin status endpoints. */
+  isNotificationLogAvailable() {
+    return this.notificationLogAvailable;
+  }
+
   constructor(storage: IStorage) {
     this.storage = storage;
     console.log('[Scheduler] Initializing NFL Game Data Scheduler');
@@ -449,17 +459,43 @@ class GameScheduler {
    * the whole league again after any restart inside the send window.
    */
   private async alreadyNotified(kind: string, weekId: number): Promise<Set<string>> {
-    const rows = await db
-      .select({ userId: emailNotifications.userId })
-      .from(emailNotifications)
-      .where(and(
-        eq(emailNotifications.kind, kind),
-        eq(emailNotifications.weekId, weekId),
-        // Deliberately 'sent' only: a member whose send failed is still owed an
-        // email, so the next tick retries them rather than writing them off.
-        eq(emailNotifications.status, EMAIL_SENT)
-      ));
-    return new Set(rows.map(r => r.userId));
+    try {
+      const rows = await db
+        .select({ userId: emailNotifications.userId })
+        .from(emailNotifications)
+        .where(and(
+          eq(emailNotifications.kind, kind),
+          eq(emailNotifications.weekId, weekId),
+          // Deliberately 'sent' only: a member whose send failed is still owed an
+          // email, so the next tick retries them rather than writing them off.
+          eq(emailNotifications.status, EMAIL_SENT)
+        ));
+      this.notificationLogAvailable = true;
+      return new Set(rows.map(r => r.userId));
+    } catch (error) {
+      // Almost always "relation email_notifications does not exist" — the
+      // migration has not been run on this database yet.
+      //
+      // Letting this propagate would be the worst outcome available: the outer
+      // catch in both send paths would swallow it and the week would go out
+      // with no email at all and no obvious reason. So degrade instead of
+      // failing. In-memory dedupe still stops the five-minute lock check from
+      // mailing the same member twelve times in the hour; the cost is that a
+      // restart mid-window could repeat one email, which is far better than
+      // sending none.
+      this.notificationLogAvailable = false;
+      console.error(
+        `[Scheduler] ⚠️  Cannot read email_notifications (run "npm run db:push"). ` +
+        `Falling back to in-memory dedupe for this process — emails WILL still send, ` +
+        `but a restart could repeat one. Error:`, error
+      );
+      const prefix = `${kind}:${weekId}:`;
+      return new Set(
+        Array.from(this.memoryNotified)
+          .filter(key => key.startsWith(prefix))
+          .map(key => key.slice(prefix.length))
+      );
+    }
   }
 
   /**
@@ -474,6 +510,8 @@ class GameScheduler {
     outcome: { ok: boolean; reason?: string; code?: string },
   ) {
     const status = outcome.ok ? EMAIL_SENT : EMAIL_FAILED;
+    // Mirror successes in memory so dedupe still holds if the table is missing.
+    if (outcome.ok) this.memoryNotified.add(`${kind}:${weekId}:${userId}`);
     const error = outcome.ok
       ? null
       : [outcome.reason, outcome.code ? `[${outcome.code}]` : null].filter(Boolean).join(' ') || 'unknown error';
@@ -488,6 +526,7 @@ class GameScheduler {
     } catch (dbError) {
       // A missing log row only risks a duplicate email later; never let it
       // abort a send run that is otherwise working.
+      this.notificationLogAvailable = false;
       console.error(`[Scheduler] Failed to record ${kind} notification for user ${userId}:`, dbError);
     }
   }
