@@ -80,6 +80,14 @@ Preferred communication style: Simple, everyday language.
   - Recorded in `email_notifications` so a re-pull or a restart doesn't mail the league twice
 - **Email Status**: `GET /api/admin/system/email-status` (super admin) reports, for the current week or
   `?week=<n>`, who received each scheduled email and whether Brevo is configured.
+- **Every email that reaches a member** (there are three, and only three):
+  1. *Week is open* — automatic, when the scheduled odds pull posts a week's spreads.
+  2. *Picks lock in 1 hour* — automatic, from the five-minute check, to members with no pick in.
+  3. *League archived* — automatic, when an admin archives a league; goes to that league's active
+     members except the admin who archived it.
+  Everything else is super-admin-only and either goes to the admin alone (preflight, template
+  proofs) or is an explicit on-demand resend of #1 or #2 to the whole league from Site Admin.
+  Those resend buttons are labelled as sending to the league, because they do.
 - **Week 1 Preflight** (`GET /api/admin/system/preflight?weekId=<id>`, super admin): answers the three
   go-live questions in one call — are spreads pulling, are results pulling, does email send.
   - `preflight/spreads` calls The Odds API and reports matched games with **ET** kickoffs, the

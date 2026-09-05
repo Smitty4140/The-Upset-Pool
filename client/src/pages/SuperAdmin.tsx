@@ -582,7 +582,14 @@ export default function SuperAdminPage() {
             title="Email System Testing"
             tone="green"
             icon={<Mail className="h-5 w-5 text-green-600" />}
-            blurb="Send the notification emails on demand. For safety, test emails go only to league admins."
+            blurb={
+              <>
+                <strong>These send to the whole league</strong> — every active member with
+                notifications on, in every non-archived NFL league. They are not tests. To
+                check the emails safely, use <strong>Run Preflight</strong> above (one message,
+                to you) or <strong>Proof Templates</strong> below.
+              </>
+            }
           >
             <div className="flex flex-wrap gap-2">
               <Button
@@ -591,14 +598,14 @@ export default function SuperAdminPage() {
                 disabled={anyBusy}
                 onClick={() =>
                   runAction("test-weekly-emails", "/api/admin/scheduler/test-weekly-emails", {
-                    successTitle: "Weekly reminders sent",
+                    successTitle: "Weekly reminders sent to the league",
                   })
                 }
               >
                 {busy("test-weekly-emails") ? (
                   <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
                 ) : (
-                  "Test Weekly Reminders"
+                  "Send Lock Reminders to League"
                 )}
               </Button>
               <Button
@@ -607,14 +614,14 @@ export default function SuperAdminPage() {
                 disabled={anyBusy}
                 onClick={() =>
                   runAction("test-picks-unlocked", "/api/admin/scheduler/test-picks-unlocked", {
-                    successTitle: "Picks unlocked emails sent",
+                    successTitle: "Picks-open emails sent to the league",
                   })
                 }
               >
                 {busy("test-picks-unlocked") ? (
                   <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
                 ) : (
-                  "Test Picks Unlocked"
+                  "Send Picks-Open to League"
                 )}
               </Button>
               <Button

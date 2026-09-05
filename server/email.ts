@@ -223,40 +223,6 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
 // Templates (exported builders so previews/tests can render without sending)
 // ---------------------------------------------------------------------------
 
-/** Reminder for users who haven't picked yet this week (manual admin trigger). */
-export function buildPickReminderEmail(
-  username: string,
-  weekNumber: number,
-  deadline: string,
-  leagueId?: number | null
-): EmailContent {
-  return {
-    subject: `No Week ${weekNumber} pick yet — locks ${deadline}`,
-    html: emailLayout({
-      preheader: `Friendly nudge from the Commish: you have no Week ${weekNumber} pick in.`,
-      heading: 'No Pick Yet',
-      subheading: `NFL Week ${weekNumber}`,
-      bodyHtml: `
-        <p style="margin: 0 0 16px 0; font-size: 16px; color: #1f2937;">Hi ${username},</p>
-        <p style="margin: 0 0 12px 0; color: #4b5563; line-height: 1.6;">Friendly nudge from the Commish: you don't have a Week ${weekNumber} pick in. Every game is still on the board.</p>
-        ${calloutBox('⏰ Picks lock', deadline)}
-        ${ctaButton('Make Your Pick', pickPageUrl(leagueId))}
-        <p style="margin: 0; font-size: 13px; color: #6b7280; text-align: center;">Zero points and a dead drawing ticket is a bad Sunday. Fix it in 20 seconds.</p>`
-    }),
-    text: `No Week ${weekNumber} pick yet — The Upset Pool
-
-Hi ${username},
-
-Friendly nudge from the Commish: you don't have a Week ${weekNumber} pick in. Every game is still on the board.
-
-Picks lock: ${deadline}
-
-Make your pick: ${pickPageUrl(leagueId)}
-
-Zero points and a dead drawing ticket is a bad Sunday. Fix it in 20 seconds.${TEXT_FOOTER}`
-  };
-}
-
 /**
  * One-hour warning for members with no pick in yet. `lockTime` is the week's
  * real picksLockAt rendered in ET, so the copy never contradicts the schedule.
@@ -444,8 +410,6 @@ export const EMAIL_TEMPLATE_SAMPLES: Record<string, (name: string) => EmailConte
       [{ leagueName: 'NFL Upset Pool', leagueId: 1 }, { leagueName: 'Office Pool', leagueId: 2 }],
       '1:00 PM ET'
     ),
-  'manual-reminder': name =>
-    buildPickReminderEmail(name, 2, 'Sunday, September 20 at 1:00 PM ET', 1),
   'league-archived': name => buildLeagueArchivedEmail(name, 'NFL Upset Pool'),
   'preflight-test': name => buildPreflightTestEmail(name),
 };
@@ -467,16 +431,6 @@ export async function sendPreflightTestEmail(email: string, username: string): P
 
 export async function sendLeagueArchivedEmail(email: string, username: string, leagueName: string): Promise<boolean> {
   return sendEmail({ to: email, ...buildLeagueArchivedEmail(username, leagueName) });
-}
-
-export async function sendPickReminderEmail(
-  email: string,
-  username: string,
-  weekNumber: number,
-  deadline: string,
-  leagueId?: number | null
-): Promise<boolean> {
-  return sendEmail({ to: email, ...buildPickReminderEmail(username, weekNumber, deadline, leagueId) });
 }
 
 export async function sendWeeklyPickReminderEmail(

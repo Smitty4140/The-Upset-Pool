@@ -13,7 +13,6 @@ import {
   userPicks, nflGames, nflWeeks, users, nflTeams,
   emailNotifications, EMAIL_KIND_PICKS_UNLOCKED, EMAIL_KIND_PICKS_LOCK_WARNING,
 } from "@shared/schema";
-import emailRoutes from "./routes/email";
 import { sendLeagueArchivedEmail } from "./email";
 import { pullNFLGamesFromOddsAPI } from "./nflDataPuller";
 import { pullNFLResultsFromESPN } from "./espnResultsPuller";
