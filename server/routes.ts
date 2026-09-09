@@ -2413,7 +2413,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-
   // Get leaderboard for a league
   app.get('/api/league/:id/leaderboard', async (req, res) => {
     try {
@@ -2841,24 +2840,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // strictly read-only (see server/diagnostics.ts); the email check sends
   // exactly one message, to the signed-in super admin.
 
-  /** Resolve ?weekId= or ?week=, falling back to the current week. */
+  /** Diagnostics must name one exact database week; never guess from season state. */
   async function resolvePreflightWeek(req: any) {
-    if (req.query.weekId) {
-      const id = parseInt(String(req.query.weekId), 10);
-      return Number.isFinite(id) ? await storage.getNFLWeek(id) : undefined;
+    const rawWeekId = req.query.weekId;
+    if (rawWeekId === undefined || rawWeekId === null || String(rawWeekId).trim() === '') {
+      return { error: "An explicit numeric weekId is required.", week: undefined };
     }
-    if (req.query.week) {
-      const n = parseInt(String(req.query.week), 10);
-      return (await storage.getNFLWeeks()).find(w => w.weekNumber === n);
+    if (!/^\d+$/.test(String(rawWeekId))) {
+      return { error: "weekId must be a positive integer.", week: undefined };
     }
-    return await storage.getCurrentNFLWeek();
+    const id = Number(rawWeekId);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return { error: "weekId must be a positive integer.", week: undefined };
+    }
+    return { error: null, week: await storage.getNFLWeek(id) };
   }
 
   /** Send one preflight email to the authenticated super admin and describe the outcome. */
   async function runEmailPreflight(req: any) {
     const email = await import("./email.js");
-    const to = req.user?.email;
-    const name = req.user?.username || "Commish";
+    const authenticatedUserId = req.user?.id;
+    const effectiveUser = authenticatedUserId ? await storage.getUser(authenticatedUserId) : undefined;
+    const to = effectiveUser?.email;
+    const name = effectiveUser?.username || "Commish";
 
     if (!to) {
       return {
@@ -2928,9 +2932,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Are spreads pulling? Read-only: no game is created or updated.
   app.get('/api/admin/system/preflight/spreads', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      const week = await resolvePreflightWeek(req);
+      const { week, error } = await resolvePreflightWeek(req);
+      if (error) return res.status(400).json({ message: error, noGameDataChanged: true });
       if (!week) {
-        return res.status(404).json({ message: "No NFL week found. Pass ?weekId=<id> or ?week=<number>." });
+        return res.status(404).json({ message: "NFL week not found for that weekId.", noGameDataChanged: true });
       }
       const { diagnoseSpreads } = await import("./diagnostics.js");
       const result = await diagnoseSpreads(storage, week.id);
@@ -2944,9 +2949,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Are results pulling? Read-only: no score is written and no pick is recalculated.
   app.get('/api/admin/system/preflight/results', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      const week = await resolvePreflightWeek(req);
+      const { week, error } = await resolvePreflightWeek(req);
+      if (error) return res.status(400).json({ message: error, noGameDataChanged: true });
       if (!week) {
-        return res.status(404).json({ message: "No NFL week found. Pass ?weekId=<id> or ?week=<number>." });
+        return res.status(404).json({ message: "NFL week not found for that weekId.", noGameDataChanged: true });
       }
       const { diagnoseResults } = await import("./diagnostics.js");
       const result = await diagnoseResults(storage, week.id);
@@ -2970,9 +2976,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // All three at once — the URL to hit before Week 1. Sends the one email.
   app.get('/api/admin/system/preflight', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      const week = await resolvePreflightWeek(req);
+      const { week, error } = await resolvePreflightWeek(req);
+      if (error) return res.status(400).json({ message: error, noGameDataChanged: true, emailsSent: 0 });
       if (!week) {
-        return res.status(404).json({ message: "No NFL week found. Pass ?weekId=<id> or ?week=<number>." });
+        return res.status(404).json({ message: "NFL week not found for that weekId.", noGameDataChanged: true, emailsSent: 0 });
       }
       const { diagnoseSpreads, diagnoseResults } = await import("./diagnostics.js");
       const [spreads, results, email] = await Promise.all([
