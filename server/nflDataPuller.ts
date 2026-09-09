@@ -2,6 +2,7 @@ import { db } from './db.js';
 import { nflGames } from '../shared/schema.js';
 import { eq, and } from 'drizzle-orm';
 import type { IStorage } from './storage.js';
+import { getOddsApiKey } from './oddsApiKey.js';
 
 /**
  * Pull NFL game data and spreads from The Odds API
@@ -24,12 +25,12 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
     
     console.log(`[NFLDataPuller] Pulling data for all upcoming games...`);
     
-    if (!process.env.THE_ODDS_API_KEY) {
+    const apiKey = getOddsApiKey();
+    if (!apiKey) {
       throw new Error('The Odds API key is not configured');
     }
     
     // Fetch games from The Odds API
-    const apiKey = process.env.THE_ODDS_API_KEY;
     const response = await fetch(
       `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?regions=us&markets=spreads&apiKey=${apiKey}&bookmakers=draftkings`
     );

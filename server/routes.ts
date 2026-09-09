@@ -16,6 +16,7 @@ import {
 import { sendLeagueArchivedEmail } from "./email";
 import { pullNFLGamesFromOddsAPI } from "./nflDataPuller";
 import { pullNFLResultsFromESPN } from "./espnResultsPuller";
+import { getOddsApiKey } from "./oddsApiKey";
 import {
   isSuperAdmin,
   requireSuperAdmin,
@@ -163,7 +164,7 @@ async function findTeamIdByName(teamName: string): Promise<number> {
 async function getOddsGamesData() {
   // Try to get real NFL data from The Odds API
   try {
-    const apiKey = process.env.THE_ODDS_API_KEY;
+    const apiKey = getOddsApiKey();
     const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?regions=us&markets=spreads&apiKey=${apiKey}&bookmakers=draftkings`);
     
     if (response.ok) {
@@ -1290,7 +1291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Fetch from API route called", { weekId, user: req.user?.id });
       
       // Check for API key
-      const apiKey = process.env.THE_ODDS_API_KEY;
+      const apiKey = getOddsApiKey();
       if (!apiKey) {
         return res.status(500).json({ message: "The Odds API key not configured" });
       }
@@ -1434,7 +1435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Testing endpoint: Pull preseason games using Sports Odds API
   app.post('/api/admin/testing/fetch-preseason-games', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      const apiKey = process.env.THE_ODDS_API_KEY || process.env.ODDS_API_KEY;
+      const apiKey = getOddsApiKey();
       if (!apiKey) {
         return res.status(500).json({ message: "Sports Odds API key not configured" });
       }
@@ -2057,9 +2058,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Current week: ${currentWeek.weekNumber} (ID: ${currentWeek.id})`);
       
       // Get the odds data from the API
-      const apiKey = process.env.THE_ODDS_API_KEY;
+      const apiKey = getOddsApiKey();
       if (!apiKey) {
-        return res.status(400).json({ message: "THE_ODDS_API_KEY not found in environment" });
+        return res.status(400).json({ message: "The Odds API key is not configured" });
       }
       
       console.log("Fetching data from The Odds API...");
@@ -2622,7 +2623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         // Try to get real NFL data from The Odds API
-        const apiKey = process.env.THE_ODDS_API_KEY;
+        const apiKey = getOddsApiKey();
         const response = await fetch(`https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?regions=us&markets=spreads&apiKey=${apiKey}&bookmakers=draftkings`);
         
         if (response.ok) {

@@ -1,2 +1,3 @@
 - [League database release sync](league-database-release-sync.md) — schema setup must cover both the app’s custom dev database and Replit’s managed dev database used for production diffs.
 - [Brevo email credentials](brevo-email-credentials.md) — use protected Replit secrets for Brevo REST email; the managed connector repeatedly forwarded an invalid credential.
+- [Autoscale scheduler reliability](autoscale-scheduler-reliability.md) — time-critical in-process cron jobs can disappear when autoscale instances sleep; use a durable trigger.

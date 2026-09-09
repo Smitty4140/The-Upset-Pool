@@ -47,7 +47,8 @@ function mockFetch(body: any, init: { ok?: boolean; status?: number; headers?: R
 
 beforeEach(() => {
   selectResult.length = 0;
-  process.env.THE_ODDS_API_KEY = "test-key";
+  delete process.env.THE_ODDS_API_KEY;
+  process.env.ODDS_API_KEY = "test-key";
 });
 
 describe("diagnoseSpreads", () => {
@@ -108,12 +109,24 @@ describe("diagnoseSpreads", () => {
   });
 
   it("says so when the key is missing, without calling out", async () => {
+    delete process.env.ODDS_API_KEY;
     delete process.env.THE_ODDS_API_KEY;
     global.fetch = vi.fn() as any;
     const r = await diagnoseSpreads(storage, 1);
 
-    expect(r.summary).toContain("THE_ODDS_API_KEY");
+    expect(r.summary).toContain("ODDS_API_KEY");
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps the legacy THE_ODDS_API_KEY name working", async () => {
+    delete process.env.ODDS_API_KEY;
+    process.env.THE_ODDS_API_KEY = "legacy-test-key";
+    mockFetch([inWeekGame]);
+
+    const r = await diagnoseSpreads(storage, 1);
+
+    expect(r.status).toBe("pass");
+    expect(global.fetch).toHaveBeenCalled();
   });
 });
 
