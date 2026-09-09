@@ -103,3 +103,39 @@ describe("the picks-unlocked email fires once, when the board goes up", () => {
     expect(fn).not.toMatch(/would pull game data in production/);
   });
 });
+
+/**
+ * The suppression covers exactly one email. The Sunday lock warning — "an hour
+ * to pick" for members with nothing in — is a different notice on a different
+ * schedule, and holding it back would cost people their week.
+ */
+describe("the picks-lock warning is untouched by any of this", () => {
+  const lockWarning = () =>
+    bodyBetween(SCHEDULER, "async sendPickLockWarnings", "private async getWeekForToday");
+
+  it("still runs on its own five-minute check", () => {
+    const start = bodyBetween(SCHEDULER, "start() {", "stop() {");
+    expect(start).toMatch(/cron\.schedule\('\*\/5 \* \* \* \*'[\s\S]*?checkPickLockWarnings/);
+  });
+
+  it("is driven by each week's own picksLockAt, not by the spreads sweep", () => {
+    const check = bodyBetween(SCHEDULER, "async checkPickLockWarnings", "async sendPickLockWarnings");
+    expect(check).toMatch(/gte\(nflWeeks\.picksLockAt, now\)/);
+    expect(check).toMatch(/sendPickLockWarnings/);
+    expect(check).not.toMatch(/announcedOutOfBand|announcedWeeks|spreadPull/);
+  });
+
+  it("never consults the out-of-band list or the announced-weeks marker", () => {
+    expect(lockWarning()).not.toMatch(/announcedOutOfBand|announcedWeeks/);
+  });
+
+  it("dedupes on its own kind, so a missing picks-unlocked row cannot silence it", () => {
+    const fn = lockWarning();
+    expect(fn).toMatch(/alreadyNotified\(EMAIL_KIND_PICKS_LOCK_WARNING, week\.id\)/);
+    expect(fn).not.toMatch(/EMAIL_KIND_PICKS_UNLOCKED/);
+  });
+
+  it("still only mails members who have no pick in", () => {
+    expect(lockWarning()).toMatch(/missingLeagues\.length === 0/);
+  });
+});
