@@ -37,7 +37,31 @@ export const MAX_SPREAD_PULL_ATTEMPTS = 12;
 export interface SpreadPullWeek {
   id: number;
   weekNumber: number;
+  season?: number;
   picksLockAt: Date | string;
+}
+
+/**
+ * Weeks whose "picks are open" notice went out by hand — composed in Brevo
+ * directly rather than sent through the app — so `email_notifications` has no
+ * rows for them and the usual per-member dedupe has nothing to catch. Without
+ * this the automatic announcement would mail the league a second time the
+ * moment the week's trigger passed.
+ *
+ * Only the automatic path honours it. An admin who deliberately asks for the
+ * email (POST /api/admin/scheduler/test-picks-unlocked) still gets it.
+ *
+ * Safe to delete an entry once its week has locked — it is a record of a
+ * specific week that was handled out of band, not a permanent setting.
+ */
+export const ANNOUNCED_OUT_OF_BAND: ReadonlyArray<{ season: number; weekNumber: number }> = [
+  { season: 2026, weekNumber: 1 },
+];
+
+export function announcedOutOfBand(week: { season?: number; weekNumber: number }): boolean {
+  return ANNOUNCED_OUT_OF_BAND.some(
+    entry => entry.season === week.season && entry.weekNumber === week.weekNumber
+  );
 }
 
 export interface SpreadPullGame {

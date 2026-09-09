@@ -77,6 +77,13 @@ describe("the picks-unlocked email fires once, when the board goes up", () => {
     expect(fn).toMatch(/if \(!this\.notificationLogAvailable && !opts\.pulledFromEmpty\)/);
   });
 
+  it("a week announced by hand is held, before any other check", () => {
+    const fn = announce();
+    expect(fn).toMatch(/if \(announcedOutOfBand\(week\)\)/);
+    // Ahead of the send-log read, which has no rows for such a week.
+    expect(fn.indexOf("announcedOutOfBand")).toBeLessThan(fn.indexOf("alreadyNotified"));
+  });
+
   it("a failed send is retried rather than marked done", () => {
     expect(announce()).toMatch(/if \(outcome\.emailsFailed === 0\) this\.announcedWeeks\.add\(week\.id\)/);
   });

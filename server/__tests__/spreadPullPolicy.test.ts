@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  ANNOUNCED_OUT_OF_BAND,
+  announcedOutOfBand,
   announcementDue,
   decideSpreadPull,
   spreadPullTime,
@@ -179,5 +181,31 @@ describe("announcementDue", () => {
     // The hole this closes: the email used to be a side effect of the pull,
     // so a week that needed no pull got no email.
     expect(announcementDue(WEEK, posted(), DUE_AT + 6 * 60 * 60 * 1000)).toBe(true);
+  });
+});
+
+describe("announcedOutOfBand", () => {
+  it("names the weeks whose notice was sent by hand", () => {
+    // 2026 week 1's "picks are open" email was composed in Brevo directly, so
+    // email_notifications has no rows for it and the per-member dedupe has
+    // nothing to catch.
+    expect(announcedOutOfBand({ season: 2026, weekNumber: 1 })).toBe(true);
+  });
+
+  it("does not spill onto the same week number in another season", () => {
+    expect(announcedOutOfBand({ season: 2027, weekNumber: 1 })).toBe(false);
+  });
+
+  it("does not spill onto the rest of the season", () => {
+    expect(announcedOutOfBand({ season: 2026, weekNumber: 2 })).toBe(false);
+    expect(announcedOutOfBand({ season: 2026, weekNumber: 3 })).toBe(false);
+  });
+
+  it("matches nothing when the season is unknown", () => {
+    expect(announcedOutOfBand({ weekNumber: 1 })).toBe(false);
+  });
+
+  it("is the only entry, so no other week is silenced", () => {
+    expect(ANNOUNCED_OUT_OF_BAND).toEqual([{ season: 2026, weekNumber: 1 }]);
   });
 });

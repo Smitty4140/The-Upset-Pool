@@ -12,7 +12,7 @@ import {
 import { formatPicksLockAt, formatPicksLockTimeOnly, easternDateString, formatDateInEasternTime } from './timezoneUtils.js';
 import { pullNFLGamesFromOddsAPI } from './nflDataPuller.js';
 import {
-  decideSpreadPull, announcementDue, hasSpread, MAX_SPREAD_PULL_ATTEMPTS,
+  decideSpreadPull, announcementDue, announcedOutOfBand, hasSpread, MAX_SPREAD_PULL_ATTEMPTS,
 } from './spreadPullPolicy.js';
 import { pullNFLResultsFromESPN, pullResultsForActiveWeeks } from './espnResultsPuller.js';
 import type { IStorage } from './storage.js';
@@ -404,6 +404,18 @@ class GameScheduler {
    */
   async announcePicksUnlockedIfDue(week: any, opts: { pulledFromEmpty: boolean }) {
     if (this.announcedWeeks.has(week.id)) return null;
+
+    // A week already announced by hand has no send-log rows to dedupe
+    // against, so nothing else here would stop a second email.
+    if (announcedOutOfBand(week)) {
+      this.announcedWeeks.add(week.id);
+      console.log(
+        `[Scheduler] Week ${week.weekNumber} (${week.season}) was announced out of band — ` +
+        `holding "picks are open". Remove it from ANNOUNCED_OUT_OF_BAND in spreadPullPolicy.ts ` +
+        `to let the automation mail this week.`
+      );
+      return null;
+    }
 
     const now = Date.now();
     const games = await db
