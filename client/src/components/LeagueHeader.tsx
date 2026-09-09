@@ -3,6 +3,7 @@ import { useCountdown } from "@/hooks/useCountdown";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NFLWeek, League, NFLGame } from "@/lib/types";
+import { hasPostedSpread, spreadsPostAt } from "@shared/spreads";
 import { formatWeeklyDate } from "@/lib/formatDate";
 import { Clock, Trophy, Calendar, AlertTriangle, CheckCircle2, Database } from "lucide-react";
 import SubmittedPickDisplay from "@/components/SubmittedPickDisplay";
@@ -35,25 +36,36 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick, sel
   const displayWeek = allWeeks?.find(week => week.id === displayWeekId) || currentWeek;
 
   // Get games for the display week to check if spreads are available
-  const { data: weekGames, isLoading: isLoadingGames } = useQuery<NFLGame[]>({
+  const { data: weekGames, isLoading: isLoadingGames, isError: gamesFailed } = useQuery<NFLGame[]>({
     queryKey: [`/api/nfl-games/week/${displayWeekId}`],
     enabled: !!displayWeekId,
+    // Queries are cached with staleTime: Infinity, so without this a tab that
+    // was open when the spreads posted keeps showing the pre-pull state until
+    // someone reloads. Polls only around the trigger, and stops the moment a
+    // line is up.
+    refetchInterval: (query) => {
+      const games = query.state.data;
+      if (!games) return false;
+      if (games.some(hasPostedSpread)) return false;
+      const postAt = spreadsPostAt(games);
+      // No games on the board yet: the pull creates them, so keep looking.
+      if (!postAt) return 5 * 60 * 1000;
+      return Date.now() >= postAt.getTime() - 15 * 60 * 1000 ? 60 * 1000 : false;
+    },
   });
 
-  // Check if spreads are available (any game has non-zero spread)
-  const spreadsAvailable = useMemo(() => {
-    if (!weekGames || weekGames.length === 0) return false;
-    return weekGames.some(game => parseFloat(game.spread || '0') !== 0);
-  }, [weekGames]);
+  // Check if spreads are available (any game has a posted line)
+  const spreadsAvailable = useMemo(
+    () => Boolean(weekGames?.some(hasPostedSpread)),
+    [weekGames]
+  );
 
-  // Calculate data pull time (8 hours before first game)
-  const dataPullTime = useMemo(() => {
-    if (!weekGames || weekGames.length === 0) return null;
-    const firstGame = weekGames.sort((a, b) => new Date(a.gameTime).getTime() - new Date(b.gameTime).getTime())[0];
-    if (!firstGame) return null;
-    const firstGameTime = new Date(firstGame.gameTime);
-    return new Date(firstGameTime.getTime() - (8 * 60 * 60 * 1000)); // 8 hours before
-  }, [weekGames]);
+  // When this week's spreads are due — null when the week has no games yet,
+  // which is a different thing from "the pull time has passed".
+  const dataPullTime = useMemo(
+    () => (weekGames ? spreadsPostAt(weekGames) : null),
+    [weekGames]
+  );
 
   // Countdown to picks lock for the display week
   const lockDate = useMemo(() => 
@@ -77,7 +89,19 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick, sel
   const countdownTarget = spreadsAvailable ? lockDate : dataPullTime;
   const { days, hours, minutes, isExpired } = useCountdown(countdownTarget);
 
-  if (isLoadingWeek || isLoadingLeague) {
+  // useCountdown reports a null target as expired, so "Any moment now" used to
+  // be what a week with no games — or a games request that failed — rendered
+  // as, indefinitely. Say what is actually true in each case instead.
+  const spreadsLabel = dataPullTime && !gamesFailed ? "Spreads post in" : "Spreads";
+  const spreadsValue = gamesFailed
+    ? "Status unavailable"
+    : !dataPullTime
+      ? "Waiting on the schedule"
+      : isExpired
+        ? "Any moment now"
+        : `${days}d ${hours}h ${minutes}m`;
+
+  if (isLoadingWeek || isLoadingLeague || (!!displayWeekId && isLoadingGames)) {
     return (
       <div className="mb-8">
         <div className="flex flex-col md:flex-row md:justify-between md:items-center">
@@ -179,16 +203,10 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick, sel
                   </>
                 ) : (
                   <>
-                    <div className="text-sm font-medium text-gray-700">Spreads post in</div>
-                    {isExpired ? (
-                      <div className="countdown-timer font-bold text-amber-800 text-lg">
-                        Any moment now
-                      </div>
-                    ) : (
-                      <div className="countdown-timer font-bold text-amber-800 text-lg">
-                        {days}d {hours}h {minutes}m
-                      </div>
-                    )}
+                    <div className="text-sm font-medium text-gray-700">{spreadsLabel}</div>
+                    <div className="countdown-timer font-bold text-amber-800 text-lg">
+                      {spreadsValue}
+                    </div>
                   </>
                 )}
               </div>

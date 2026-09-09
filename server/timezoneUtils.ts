@@ -112,3 +112,53 @@ export function formatPicksLockTimeOnly(date: Date): string {
   });
   return `${formatted} ET`;
 }
+
+/**
+ * The calendar date a timestamp falls on in Eastern Time, as YYYY-MM-DD.
+ *
+ * NFL weeks are bucketed by ET date, not UTC date. A Sunday night kickoff at
+ * 8:20 PM ET is already Monday in UTC, and a Monday night one is Tuesday — so
+ * bucketing on `toISOString()` pushes those games into the next week's window
+ * or out of the schedule entirely.
+ */
+export function easternDateString(date: Date): string {
+  // en-CA renders as YYYY-MM-DD, which compares correctly as a plain string.
+  return date.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+}
+
+/**
+ * A `date` column (start_date / end_date) as YYYY-MM-DD.
+ *
+ * Drizzle hands these back as strings, but a driver or a test fixture can
+ * produce a Date at UTC midnight; converting that one to ET would walk it back
+ * a day, so it is read in UTC while a real string is just trimmed.
+ */
+export function calendarDateString(value: string | Date): string {
+  return typeof value === 'string'
+    ? value.slice(0, 10)
+    : new Date(value).toISOString().slice(0, 10);
+}
+
+/**
+ * The NFL week a kickoff belongs to, or null if it falls outside every week's
+ * date range.
+ *
+ * Shared by the odds puller and the spreads diagnostic so the preflight
+ * reports what a real pull would actually do rather than agreeing with a
+ * second copy of the rule.
+ */
+export function findWeekForKickoff<T extends { startDate: string | Date; endDate: string | Date }>(
+  weeks: T[],
+  kickoff: Date
+): T | null {
+  const kickoffDate = easternDateString(kickoff);
+  for (const week of weeks) {
+    if (
+      kickoffDate >= calendarDateString(week.startDate) &&
+      kickoffDate <= calendarDateString(week.endDate)
+    ) {
+      return week;
+    }
+  }
+  return null;
+}

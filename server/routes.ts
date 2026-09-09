@@ -15,6 +15,7 @@ import {
 } from "@shared/schema";
 import { sendLeagueArchivedEmail } from "./email";
 import { pullNFLGamesFromOddsAPI } from "./nflDataPuller";
+import { hasSpread } from "./spreadPullPolicy";
 import { pullNFLResultsFromESPN } from "./espnResultsPuller";
 import {
   isSuperAdmin,
@@ -2506,27 +2507,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin endpoint to pull games from The Odds API and populate the database
   app.post('/api/admin/pull-games', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      const userId = req.user.id;
-      
-      // Use the shared function to pull game data
-      const result = await pullNFLGamesFromOddsAPI(storage);
+      const currentWeek = await storage.getCurrentNFLWeek();
+      if (!currentWeek) {
+        return res.status(404).json({ message: "No current or upcoming NFL week found" });
+      }
+
+      const spreadsPosted = async () =>
+        (await storage.getNFLGames(currentWeek.id)).filter(g => hasSpread(g)).length;
+      const before = await spreadsPosted();
+
+      // Scoped to the current week. Unscoped, this wrote every game The Odds
+      // API returned, which once books put next week's lines up meant pulling
+      // a future week's spreads days early — the board would show them, and
+      // its own trigger would then have nothing left to post.
+      const result = await pullNFLGamesFromOddsAPI(storage, currentWeek.id);
 
       // Spreads are now live, so the week is open to picks. The scheduled pull
       // announces itself; a manual pull has to do the same or the league never
-      // hears that the board is up. Members already mailed for this week are
-      // skipped, so this is safe to run more than once.
-      let notifications: { weekNumber: number; emailsSent: number; emailsFailed: number; skipped: number } | null = null;
-      const currentWeek = await storage.getCurrentNFLWeek();
-      if (currentWeek) {
-        const { gameScheduler } = await import("./scheduler.js");
-        notifications = await gameScheduler.sendPicksUnlockedNotifications(
-          currentWeek.weekNumber,
-          { season: currentWeek.season }
-        );
-      }
+      // hears that the board is up — but only once, and never for a week the
+      // league has already been told about.
+      const { gameScheduler } = await import("./scheduler.js");
+      const notifications = await gameScheduler.announcePicksUnlockedIfDue(currentWeek, {
+        pulledFromEmpty: before === 0 && (await spreadsPosted()) > 0,
+      });
 
       return res.json({
-        message: "NFL games sync completed",
+        message: `NFL games sync completed for Week ${currentWeek.weekNumber}`,
+        weekNumber: currentWeek.weekNumber,
         results: result.results,
         notifications
       });
