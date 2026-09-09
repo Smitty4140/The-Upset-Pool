@@ -1287,8 +1287,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/games/fetch-from-api', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const { weekId } = req.body;
-      
-      console.log("Fetch from API route called", { weekId, user: req.user?.id });
+      // Spreads freeze once posted: members pick against the number on the
+      // board, and their pick records the spread it was made at. Re-pulling a
+      // live week would move the board out from under those picks. An admin
+      // fixing a bad line can still ask for it explicitly.
+      const overwrite = req.body?.overwrite === true;
+
+      console.log("Fetch from API route called", { weekId, overwrite, user: req.user?.id });
       
       // Check for API key
       const apiKey = process.env.THE_ODDS_API_KEY;
@@ -1320,6 +1325,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const results = {
         gamesCreated: 0,
         gamesUpdated: 0,
+        spreadsSet: 0,
+        spreadsKept: 0,
         errors: 0
       };
       
@@ -1399,15 +1406,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (existingGame.length > 0) {
             // Update existing game with spread only
             const gameId = existingGame[0].id;
+            const existingSpread = parseFloat(String(existingGame[0].spread)) || 0;
+            const update: Record<string, unknown> = {
+              gameTime: new Date(game.commence_time),
+              updatedAt: new Date()
+            };
+
+            if (existingSpread !== 0 && !overwrite) {
+              results.spreadsKept++;
+            } else if (homeSpread !== 0) {
+              update.spread = homeSpread.toString();
+              results.spreadsSet++;
+            }
+
             await db.update(nflGames)
-              .set({
-                spread: homeSpread.toString(),
-                gameTime: new Date(game.commence_time),
-                updatedAt: new Date()
-              })
+              .set(update)
               .where(eq(nflGames.id, gameId));
-            
-            console.log(`Updated existing game: ${homeTeam.name} vs ${awayTeam.name} in Week ${week.weekNumber} with spread ${homeSpread}`);
+
+            const what = update.spread
+              ? `with spread ${homeSpread}`
+              : `(spread ${existingSpread} already posted, keeping it)`;
+            console.log(`Updated existing game: ${homeTeam.name} vs ${awayTeam.name} in Week ${week.weekNumber} ${what}`);
             results.gamesUpdated++;
           } else {
             // Skip games that don't exist in this week - do not create new games
@@ -1420,9 +1439,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       return res.json({
-        message: `Successfully updated spreads for ${results.gamesUpdated} games in Week ${week.weekNumber}`,
+        message: `Week ${week.weekNumber}: posted ${results.spreadsSet} spreads` +
+          (results.spreadsKept ? `, kept ${results.spreadsKept} already posted` : ''),
         created: results.gamesCreated,
         updated: results.gamesUpdated,
+        spreadsSet: results.spreadsSet,
+        spreadsKept: results.spreadsKept,
+        overwrite,
         errors: results.errors,
         weekNumber: week.weekNumber
       });

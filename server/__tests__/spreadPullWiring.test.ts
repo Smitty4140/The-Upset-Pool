@@ -139,3 +139,31 @@ describe("the picks-lock warning is untouched by any of this", () => {
     expect(lockWarning()).toMatch(/missingLeagues\.length === 0/);
   });
 });
+
+const PULLER = readFileSync(resolve(import.meta.dirname, "../nflDataPuller.ts"), "utf8");
+
+/**
+ * A posted spread is what members picked against, and each pick records the
+ * number it was made at. Moving a live board would desync the two, so every
+ * path that writes spreads has to leave the posted ones alone.
+ */
+describe("a posted spread is never overwritten", () => {
+  it("the puller only fills a spread that is still 0", () => {
+    const fn = bodyBetween(PULLER, "if (existingGames.length > 0)", "// Create new game");
+    expect(fn).toMatch(/if \(existingSpread === 0 && homeSpread !== 0\)/);
+  });
+
+  it("the admin fetch route keeps a posted spread unless asked to overwrite", () => {
+    // This one used to set `spread` unconditionally on every matched game.
+    const fn = bodyBetween(ROUTES, "'/api/admin/games/fetch-from-api'", "fetch-preseason-games");
+    expect(fn).toMatch(/const overwrite = req\.body\?\.overwrite === true/);
+    expect(fn).toMatch(/if \(existingSpread !== 0 && !overwrite\)/);
+    expect(fn).not.toMatch(/\.set\(\{\s*spread: homeSpread\.toString\(\)/);
+  });
+
+  it("and the week's own trigger does not re-pull a complete board", () => {
+    // decideSpreadPull returns 'complete' and never reaches the API.
+    const fn = bodyBetween(SCHEDULER, "private async pullSpreadsIfDue", "private async scheduleWeekResultsPull");
+    expect(fn).toMatch(/if \(!decision\.pull\)/);
+  });
+});
