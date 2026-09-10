@@ -92,10 +92,10 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
   // "Selected Game" for both states is what made people think an unsaved
   // choice had been submitted, so each state gets its own wording and colour.
   const bannerStyle = isSubmittedPick && isPickLockedByKickoff
-    ? { className: 'bg-amber-600 text-white', icon: <Lock size={16} />, label: 'Your pick — locked' }
+    ? { className: 'bg-amber-600 border-amber-600 text-white', icon: <Lock size={16} />, label: 'Your pick — locked' }
     : isSubmittedPick
-      ? { className: 'bg-green-600 text-white', icon: <Check size={16} />, label: 'Your pick for this week' }
-      : { className: 'bg-blue-600 text-white', icon: <AlertCircle size={16} />, label: 'Selected — not saved yet' };
+      ? { className: 'bg-green-600 border-green-600 text-white', icon: <Check size={16} />, label: 'Your pick for this week' }
+      : { className: 'bg-blue-600 border-blue-600 text-white', icon: <AlertCircle size={16} />, label: 'Selected — not saved yet' };
 
   const isFullyLocked = disabled || isViewingFutureWeek || isInactive || hasGameStarted || isPickLockedByKickoff || spreadsNotPulled;
 
@@ -141,14 +141,6 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
       tabIndex={isPickable ? 0 : undefined}
       aria-label={isPickable && underdogTeam ? `Pick ${underdogTeam.name} ${spreadText}` : undefined}
     >
-      {/* Pick state banner: locked pick, saved pick, or an unsaved selection */}
-      {showHighlight && (
-        <div className={`${bannerStyle.className} text-sm font-bold text-center py-2 flex items-center justify-center space-x-1.5`}>
-          {bannerStyle.icon}
-          <span>{bannerStyle.label}</span>
-        </div>
-      )}
-      
       {/* Game time header */}
       <div className={`px-4 py-3 flex items-center justify-between text-sm border-b border-gray-100 transition-colors ${hasGameStarted ? 'bg-gray-100' : 'bg-white'} ${isPickable ? 'group-hover:bg-blue-50' : ''}`}>
         <div className="flex items-center">
@@ -220,22 +212,32 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
         </div>
       </div>
 
-      {/* A card with no underdog is otherwise unexplained. The week-wide "no
-          spreads yet" case is announced once at the page level instead of
-          repeating on all sixteen cards. */}
-      {!underdogTeam && !spreadsNotPulled && (
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-600 text-center">
+      {/* One status strip, always at the foot of the card. The pick-state
+          banner used to sit above the header while the prompt sat here, so
+          selecting a card pushed the team names down by the height of one
+          and shortened the card by the other. Swapping the strip's contents
+          in place keeps every row still. Each variant is the same height:
+          text-sm/py-2 and text-xs/py-2.5 both measure 36px, plus a 1px top
+          border on all of them. */}
+      {showHighlight ? (
+        <div className={`${bannerStyle.className} border-t text-sm font-bold text-center py-2 flex items-center justify-center space-x-1.5`}>
+          {bannerStyle.icon}
+          <span>{bannerStyle.label}</span>
+        </div>
+      ) : !underdogTeam && !spreadsNotPulled ? (
+        /* A card with no underdog is otherwise unexplained. The week-wide "no
+           spreads yet" case is announced once at the page level instead of
+           repeating on all sixteen cards. */
+        <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 text-xs text-gray-600 text-center">
           Even spread — no underdog in this game, so it can't be picked.
         </div>
-      )}
-
-      {/* Name the side this card picks. The underdogs-only rule lives in the
-          league rules, not on all sixteen cards. */}
-      {!isFullyLocked && !showHighlight && underdogTeam && (
+      ) : isPickable ? (
+        /* Name the side this card picks. The underdogs-only rule lives in the
+           league rules, not on all sixteen cards. */
         <div className="px-4 py-2.5 bg-blue-50/60 border-t border-blue-100 text-xs text-blue-800 text-center">
           Choose this card to pick <span className="font-semibold">{underdogTeam.name}</span>.
         </div>
-      )}
+      ) : null}
     </div>
   );
 
