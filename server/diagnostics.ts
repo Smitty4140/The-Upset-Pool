@@ -22,6 +22,7 @@ import { eq, and } from 'drizzle-orm';
 import type { IStorage } from './storage.js';
 import type { NFLWeek, NFLTeam } from '../shared/schema.js';
 import { findWeekForKickoff } from './timezoneUtils.js';
+import { getOddsApiKey } from './oddsApiKey.js';
 
 // ---------------------------------------------------------------------------
 // Shared shapes
@@ -134,14 +135,15 @@ export async function diagnoseSpreads(storage: IStorage, weekId: number): Promis
     endDate: String(week.endDate),
   };
 
-  if (!process.env.THE_ODDS_API_KEY) {
-    return { ...base, summary: 'THE_ODDS_API_KEY is not set — the spreads pull cannot run at all' };
+  const apiKey = getOddsApiKey();
+  if (!apiKey) {
+    return { ...base, summary: 'ODDS_API_KEY is not set — the spreads pull cannot run at all' };
   }
 
   let response: Response;
   try {
     response = await fetch(
-      `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?regions=us&markets=spreads&apiKey=${process.env.THE_ODDS_API_KEY}&bookmakers=draftkings`
+      `https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?regions=us&markets=spreads&apiKey=${apiKey}&bookmakers=draftkings`
     );
   } catch (error: any) {
     return { ...base, summary: `Could not reach The Odds API: ${error?.message || error}` };

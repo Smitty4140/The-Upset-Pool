@@ -2,6 +2,7 @@ import { db } from './db.js';
 import { golfTournaments, golfPlayers, golfTournamentField, golfResults } from '../shared/schema.js';
 import { eq, and, notInArray } from 'drizzle-orm';
 import type { IStorage } from './storage.js';
+import { getOddsApiKey } from './oddsApiKey.js';
 
 /**
  * Convert decimal odds to American integer odds.
@@ -35,8 +36,8 @@ export async function pullGolfFieldFromOddsAPI(tournamentId: number, storage: IS
   if (!tournament) throw new Error(`Tournament ${tournamentId} not found`);
   if (!tournament.oddsApiSportKey) throw new Error('Tournament has no oddsApiSportKey configured');
 
-  const apiKey = process.env.THE_ODDS_API_KEY;
-  if (!apiKey) throw new Error('THE_ODDS_API_KEY is not configured');
+  const apiKey = getOddsApiKey();
+  if (!apiKey) throw new Error('ODDS_API_KEY is not configured');
 
   const url = `https://api.the-odds-api.com/v4/sports/${tournament.oddsApiSportKey}/odds?regions=us&markets=outrights&apiKey=${apiKey}`;
   const res = await fetch(url);

@@ -4,6 +4,7 @@ import { resolve } from "path";
 import { buildPreflightTestEmail } from "../email";
 
 const DIAGNOSTICS = readFileSync(resolve(import.meta.dirname, "../diagnostics.ts"), "utf8");
+const ROUTES = readFileSync(resolve(import.meta.dirname, "../routes.ts"), "utf8");
 
 /**
  * The value of the preflight checks depends entirely on them being unable to
@@ -71,5 +72,24 @@ describe("preflight test email", () => {
     // 15:00 UTC on 2026-09-05 is 11:00 AM EDT
     expect(mail.subject).toContain("11:00 AM");
     expect(mail.subject).toContain("ET");
+  });
+});
+
+describe("diagnostic route safety contract", () => {
+  it("requires one explicit database week id instead of guessing a week", () => {
+    expect(ROUTES).toContain("An explicit numeric weekId is required.");
+    expect(ROUTES).not.toMatch(/resolvePreflightWeek[\s\S]{0,900}getCurrentNFLWeek/);
+    expect(ROUTES).not.toMatch(/resolvePreflightWeek[\s\S]{0,900}req\.query\.week(?!Id)/);
+  });
+
+  it("derives the email recipient from the authenticated stored account only", () => {
+    const emailPreflight = ROUTES.slice(
+      ROUTES.indexOf("async function runEmailPreflight"),
+      ROUTES.indexOf("// Are spreads pulling?")
+    );
+    expect(emailPreflight).toContain("storage.getUser(authenticatedUserId)");
+    expect(emailPreflight).not.toMatch(/req\.(body|query)/);
+    expect(emailPreflight).not.toMatch(/getLeagueMembers|getUserLeagues/);
+    expect(emailPreflight).toContain("sendPreflightTestEmail(to, name)");
   });
 });
