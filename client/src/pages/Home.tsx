@@ -421,9 +421,10 @@ export default function Home() {
   // Determine if the selected week allows picks (only current week + not locked + not archived)
   const canMakePicks = activeWeekId === pickableWeekId && !arePicksLocked && !currentLeagueInfo?.isArchived;
 
-  // ── Mobile sticky pick bar ─────────────────────────────────────────────
-  // On a phone the per-card submit button can sit below the fold, so the bar
-  // is the single always-visible answer to "is my pick in, and who is it?"
+  // ── Sticky pick bar ────────────────────────────────────────────────────
+  // A selected card can sit below the fold on any screen size, so the bar is
+  // the single always-visible answer to "is my pick in, and who is it?" — and
+  // the one place to submit it.
   const selectedBarGame = selectedGameId
     ? games?.find((g) => String(g.id) === String(selectedGameId))
     : undefined;
@@ -443,7 +444,7 @@ export default function Home() {
   const savedBarSpread = userPick?.game
     ? `+${Math.abs(Number(userPick.game.spread)).toFixed(1)}`
     : "";
-  const showMobilePickBar =
+  const showStickyPickBar =
     activeTab === "spreads" &&
     isAuthenticated &&
     !!activeWeekId &&
@@ -661,61 +662,68 @@ export default function Home() {
 
         {/* Pick Selection */}
         {activeTab === "spreads" && (
-          <div className={showMobilePickBar ? "pb-28 sm:pb-0" : ""}>
-            {/* Mobile sticky pick bar: always-visible answer to "is my pick
-                in, and who is it?" Fixed to the bottom on phones only; the
-                per-card submit button covers desktop. */}
-            {showMobilePickBar && (
-              <div className="sm:hidden fixed inset-x-0 bottom-0 z-40">
+          <div className={showStickyPickBar ? "pb-28" : ""}>
+            {/* Sticky pick bar: always-visible answer to "is my pick in, and
+                who is it?", and the only submit button at every width. */}
+            {showStickyPickBar && (
+              <div className="fixed inset-x-0 bottom-0 z-40">
                 {arePicksLocked || isPickLockedByKickoff ? (
-                  <div className="bg-gray-800 text-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.15)] flex items-center gap-3">
-                    <Lock className="h-5 w-5 flex-shrink-0 text-gray-300" />
-                    <div className="min-w-0">
-                      {savedBarTeamName ? (
-                        <>
-                          <p className="text-xs text-gray-300">Locked in for Week {currentWeek?.weekNumber}</p>
-                          <p className="font-bold truncate">{savedBarTeamName} {savedBarSpread}</p>
-                        </>
-                      ) : (
-                        <p className="font-semibold text-sm">No pick this week — picks are locked</p>
-                      )}
+                  <div className="bg-gray-800 text-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.15)]">
+                    <div className="max-w-7xl mx-auto sm:px-2 lg:px-4 flex items-center gap-3">
+                      <Lock className="h-5 w-5 flex-shrink-0 text-gray-300" />
+                      <div className="min-w-0">
+                        {savedBarTeamName ? (
+                          <>
+                            <p className="text-xs text-gray-300">Locked in for Week {currentWeek?.weekNumber}</p>
+                            <p className="font-bold truncate">{savedBarTeamName} {savedBarSpread}</p>
+                          </>
+                        ) : (
+                          <p className="font-semibold text-sm">No pick this week — picks are locked</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ) : hasUnsavedSelection && selectedBarTeamName ? (
-                  <div className="bg-blue-600 text-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.15)] flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs text-blue-100">Selected — not saved yet</p>
-                      <p className="font-bold truncate">{selectedBarTeamName} {selectedBarSpread}</p>
+                  <div className="bg-blue-600 text-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.15)]">
+                    <div className="max-w-7xl mx-auto sm:px-2 lg:px-4 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs text-blue-100">Selected — not saved yet</p>
+                        <p className="font-bold truncate">{selectedBarTeamName} {selectedBarSpread}</p>
+                      </div>
+                      <Button
+                        onClick={handleSubmitPick}
+                        disabled={isSubmittingPick}
+                        className="flex-shrink-0 bg-white text-blue-700 hover:bg-blue-50 font-bold"
+                      >
+                        {isSubmittingPick ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Submit Pick"
+                        )}
+                      </Button>
                     </div>
-                    <Button
-                      onClick={handleSubmitPick}
-                      disabled={isSubmittingPick}
-                      className="flex-shrink-0 bg-white text-blue-700 hover:bg-blue-50 font-bold"
-                    >
-                      {isSubmittingPick ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        "Submit Pick"
-                      )}
-                    </Button>
                   </div>
                 ) : savedBarTeamName ? (
-                  <div className="bg-green-600 text-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.15)] flex items-center gap-3">
-                    <Check className="h-5 w-5 flex-shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-xs text-green-100">Your Week {currentWeek?.weekNumber} pick is in</p>
-                      <p className="font-bold truncate">{savedBarTeamName} {savedBarSpread} <span className="font-normal text-green-100 text-sm">· tap another game to change</span></p>
+                  <div className="bg-green-600 text-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.15)]">
+                    <div className="max-w-7xl mx-auto sm:px-2 lg:px-4 flex items-center gap-3">
+                      <Check className="h-5 w-5 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-green-100">Your Week {currentWeek?.weekNumber} pick is in</p>
+                        <p className="font-bold truncate">{savedBarTeamName} {savedBarSpread} <span className="font-normal text-green-100 text-sm">· choose another game to change</span></p>
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-white border-t border-gray-200 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.1)] flex items-center gap-3">
-                    <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-500" />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 text-sm">No pick yet for Week {currentWeek?.weekNumber}</p>
-                      <p className="text-xs text-gray-500">Tap an underdog above to select one.</p>
+                  <div className="bg-white border-t border-gray-200 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.1)]">
+                    <div className="max-w-7xl mx-auto sm:px-2 lg:px-4 flex items-center gap-3">
+                      <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-500" />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm">No pick yet for Week {currentWeek?.weekNumber}</p>
+                        <p className="text-xs text-gray-500">Choose an underdog above to select one.</p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -851,11 +859,9 @@ export default function Home() {
                               selectedGameId={selectedGameId}
                               submittedPickGameId={selectedWeekPick?.gameId ? String(selectedWeekPick.gameId) : null}
                               onSelect={handleTeamSelection}
-                              onSubmit={handleSubmitPick}
                               disabled={!canMakePicks || !isAuthenticated}
                               isViewingFutureWeek={isViewingFutureWeek}
                               spreadsNotPulled={spreadsNotPulled}
-                              isSubmitting={isSubmittingPick}
                               isInactive={
                                 memberStatus ? !memberStatus.isActive : null
                               }
