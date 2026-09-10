@@ -687,8 +687,26 @@ export default function Home() {
                   <div className="bg-blue-600 text-white px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.15)]">
                     <div className="max-w-7xl mx-auto sm:px-2 lg:px-4 flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-xs text-blue-100">Selected — not saved yet</p>
-                        <p className="font-bold truncate">{selectedBarTeamName} {selectedBarSpread}</p>
+                        {savedBarTeamName ? (
+                          <>
+                            {/* Replacing a pick: both sides stay visible, so it
+                                is clear a pick is already in and what would
+                                take its place. */}
+                            <p className="text-xs text-blue-100 flex items-center gap-1 truncate">
+                              <Check className="h-3 w-3 flex-shrink-0" />
+                              <span>Saved pick: {savedBarTeamName} {savedBarSpread}</span>
+                            </p>
+                            <p className="font-bold truncate">
+                              New pick: {selectedBarTeamName} {selectedBarSpread}
+                              <span className="font-normal text-blue-100 text-xs"> — not saved yet</span>
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-xs text-blue-100">Selected — not saved yet</p>
+                            <p className="font-bold truncate">{selectedBarTeamName} {selectedBarSpread}</p>
+                          </>
+                        )}
                       </div>
                       <Button
                         onClick={handleSubmitPick}
@@ -700,6 +718,8 @@ export default function Home() {
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                             Saving...
                           </>
+                        ) : savedBarTeamName ? (
+                          "Replace Pick"
                         ) : (
                           "Submit Pick"
                         )}
@@ -712,7 +732,7 @@ export default function Home() {
                       <Check className="h-5 w-5 flex-shrink-0" />
                       <div className="min-w-0">
                         <p className="text-xs text-green-100">Your Week {currentWeek?.weekNumber} pick is in</p>
-                        <p className="font-bold truncate">{savedBarTeamName} {savedBarSpread} <span className="font-normal text-green-100 text-sm">· choose another game to change</span></p>
+                        <p className="font-bold truncate">{savedBarTeamName} {savedBarSpread}</p>
                       </div>
                     </div>
                   </div>
@@ -897,9 +917,11 @@ export default function Home() {
                         <div className="mt-8 text-center">
                           {selectedTeamId && canMakePicks && (
                             <p className="text-gray-600">
-                              {hasSubmittedPick
-                                ? "Your pick is saved. You can change it until 1:00 PM ET Sunday, or until your game kicks off."
-                                : "Nothing is saved until you press Submit Pick."}
+                              {hasUnsavedSelection
+                                ? hasSubmittedPick
+                                  ? "Your saved pick is still the one that counts. Press Replace Pick to swap it for the game you just selected."
+                                  : "Nothing is saved until you press Submit Pick."
+                                : "Your pick is saved. You can change it until 1:00 PM ET Sunday, or until your game kicks off."}
                             </p>
                           )}
                           {isViewingFutureWeek && (
