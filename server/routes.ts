@@ -15,6 +15,7 @@ import {
 } from "@shared/schema";
 import { sendLeagueArchivedEmail } from "./email";
 import { pullNFLGamesFromOddsAPI } from "./nflDataPuller";
+import { hasSpread } from "./spreadPullPolicy";
 import { pullNFLResultsFromESPN } from "./espnResultsPuller";
 import { getOddsApiKey } from "./oddsApiKey";
 import {
@@ -1287,8 +1288,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/games/fetch-from-api', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
       const { weekId } = req.body;
-      
-      console.log("Fetch from API route called", { weekId, user: req.user?.id });
+      // Spreads freeze once posted: members pick against the number on the
+      // board, and their pick records the spread it was made at. Re-pulling a
+      // live week would move the board out from under those picks. An admin
+      // fixing a bad line can still ask for it explicitly.
+      const overwrite = req.body?.overwrite === true;
+
+      console.log("Fetch from API route called", { weekId, overwrite, user: req.user?.id });
       
       // Check for API key
       const apiKey = getOddsApiKey();
@@ -1320,6 +1326,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const results = {
         gamesCreated: 0,
         gamesUpdated: 0,
+        spreadsSet: 0,
+        spreadsKept: 0,
         errors: 0
       };
       
@@ -1399,15 +1407,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (existingGame.length > 0) {
             // Update existing game with spread only
             const gameId = existingGame[0].id;
+            const existingSpread = parseFloat(String(existingGame[0].spread)) || 0;
+            const update: Record<string, unknown> = {
+              gameTime: new Date(game.commence_time),
+              updatedAt: new Date()
+            };
+
+            if (existingSpread !== 0 && !overwrite) {
+              results.spreadsKept++;
+            } else if (homeSpread !== 0) {
+              update.spread = homeSpread.toString();
+              results.spreadsSet++;
+            }
+
             await db.update(nflGames)
-              .set({
-                spread: homeSpread.toString(),
-                gameTime: new Date(game.commence_time),
-                updatedAt: new Date()
-              })
+              .set(update)
               .where(eq(nflGames.id, gameId));
-            
-            console.log(`Updated existing game: ${homeTeam.name} vs ${awayTeam.name} in Week ${week.weekNumber} with spread ${homeSpread}`);
+
+            const what = update.spread
+              ? `with spread ${homeSpread}`
+              : `(spread ${existingSpread} already posted, keeping it)`;
+            console.log(`Updated existing game: ${homeTeam.name} vs ${awayTeam.name} in Week ${week.weekNumber} ${what}`);
             results.gamesUpdated++;
           } else {
             // Skip games that don't exist in this week - do not create new games
@@ -1420,9 +1440,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       return res.json({
-        message: `Successfully updated spreads for ${results.gamesUpdated} games in Week ${week.weekNumber}`,
+        message: `Week ${week.weekNumber}: posted ${results.spreadsSet} spreads` +
+          (results.spreadsKept ? `, kept ${results.spreadsKept} already posted` : ''),
         created: results.gamesCreated,
         updated: results.gamesUpdated,
+        spreadsSet: results.spreadsSet,
+        spreadsKept: results.spreadsKept,
+        overwrite,
         errors: results.errors,
         weekNumber: week.weekNumber
       });
@@ -2506,27 +2530,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin endpoint to pull games from The Odds API and populate the database
   app.post('/api/admin/pull-games', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
-      const userId = req.user.id;
-      
-      // Use the shared function to pull game data
-      const result = await pullNFLGamesFromOddsAPI(storage);
+      const currentWeek = await storage.getCurrentNFLWeek();
+      if (!currentWeek) {
+        return res.status(404).json({ message: "No current or upcoming NFL week found" });
+      }
+
+      const spreadsPosted = async () =>
+        (await storage.getNFLGames(currentWeek.id)).filter(g => hasSpread(g)).length;
+      const before = await spreadsPosted();
+
+      // Scoped to the current week. Unscoped, this wrote every game The Odds
+      // API returned, which once books put next week's lines up meant pulling
+      // a future week's spreads days early — the board would show them, and
+      // its own trigger would then have nothing left to post.
+      const result = await pullNFLGamesFromOddsAPI(storage, currentWeek.id);
 
       // Spreads are now live, so the week is open to picks. The scheduled pull
       // announces itself; a manual pull has to do the same or the league never
-      // hears that the board is up. Members already mailed for this week are
-      // skipped, so this is safe to run more than once.
-      let notifications: { weekNumber: number; emailsSent: number; emailsFailed: number; skipped: number } | null = null;
-      const currentWeek = await storage.getCurrentNFLWeek();
-      if (currentWeek) {
-        const { gameScheduler } = await import("./scheduler.js");
-        notifications = await gameScheduler.sendPicksUnlockedNotifications(
-          currentWeek.weekNumber,
-          { season: currentWeek.season }
-        );
-      }
+      // hears that the board is up — but only once, and never for a week the
+      // league has already been told about.
+      const { gameScheduler } = await import("./scheduler.js");
+      const notifications = await gameScheduler.announcePicksUnlockedIfDue(currentWeek, {
+        pulledFromEmpty: before === 0 && (await spreadsPosted()) > 0,
+      });
 
       return res.json({
-        message: "NFL games sync completed",
+        message: `NFL games sync completed for Week ${currentWeek.weekNumber}`,
+        weekNumber: currentWeek.weekNumber,
         results: result.results,
         notifications
       });

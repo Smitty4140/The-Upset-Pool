@@ -363,7 +363,7 @@ export default function SuperAdminPage() {
             title="Pull Games & Spreads"
             tone="blue"
             icon={<Database className="h-5 w-5 text-blue-500" />}
-            blurb="Populates this week's NFL games from The Odds API using DraftKings spreads. Existing games are updated with the latest odds."
+            blurb="Populates this week's NFL games from The Odds API using DraftKings spreads. Spreads already posted are left alone — members have picked against them."
           >
             <div className="flex justify-end">
               <Button

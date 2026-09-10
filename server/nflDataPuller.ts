@@ -1,6 +1,7 @@
 import { db } from './db.js';
 import { nflGames } from '../shared/schema.js';
 import { eq, and } from 'drizzle-orm';
+import { findWeekForKickoff } from './timezoneUtils.js';
 import type { IStorage } from './storage.js';
 import { getOddsApiKey } from './oddsApiKey.js';
 
@@ -45,11 +46,14 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
     // Get all NFL teams for reference
     const teams = await storage.getNFLTeams();
     
-    // Track results
+    // Track results. `spreadsSet` is the one the scheduler acts on: a run can
+    // update rows (kickoff times) without posting a single spread, and that is
+    // not a week the league should be emailed about.
     const results = {
       gamesFound: oddsData.length,
       gamesCreated: 0,
       gamesUpdated: 0,
+      spreadsSet: 0,
       errors: 0
     };
     
@@ -59,24 +63,11 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
       teamNameMap.set(team.name.toLowerCase(), team);
     });
     
-    // Helper function to find the correct week for a game based on its commence time
-    function findWeekForGame(gameTime: Date): typeof allWeeks[0] | null {
-      const gameDate = new Date(gameTime);
-      // Use date string comparison (YYYY-MM-DD format)
-      const gameDateStr = gameDate.toISOString().split('T')[0];
-      
-      for (const week of allWeeks) {
-        // Convert dates to string format for comparison
-        const startDateStr = new Date(week.startDate).toISOString().split('T')[0];
-        const endDateStr = new Date(week.endDate).toISOString().split('T')[0];
-        
-        // Check if game date falls within week's date range
-        if (gameDateStr >= startDateStr && gameDateStr <= endDateStr) {
-          return week;
-        }
-      }
-      return null;
-    }
+    // Which week a kickoff belongs to, bucketed on the Eastern-Time calendar
+    // date: a Sunday 8:20 PM ET kickoff is already Monday in UTC and a Monday
+    // night one is Tuesday, so bucketing on the UTC date pushed those games
+    // into the next week's window or off the schedule entirely.
+    const findWeekForGame = (gameTime: Date) => findWeekForKickoff(allWeeks, gameTime);
     
     // Process each game from the API
     for (const game of oddsData) {
@@ -162,8 +153,9 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
           
           // Convert spread to number for comparison (handles both string "0.0" and numeric 0)
           const existingSpread = parseFloat(String(existingGame.spread)) || 0;
-          if (existingSpread === 0) {
+          if (existingSpread === 0 && homeSpread !== 0) {
             updateObj.spread = homeSpread.toString();
+            results.spreadsSet++;
           }
           
           await db.update(nflGames)
@@ -188,6 +180,7 @@ export async function pullNFLGamesFromOddsAPI(storage: IStorage, weekId?: number
           
           console.log(`[NFLDataPuller] Created game ID ${newGame.id}: ${homeTeam.name} vs ${awayTeam.name} in Week ${gameWeek.weekNumber}`);
           results.gamesCreated++;
+          if (homeSpread !== 0) results.spreadsSet++;
         }
       } catch (error) {
         console.error(`[NFLDataPuller] Error processing game ${game.home_team} vs ${game.away_team}:`, error);

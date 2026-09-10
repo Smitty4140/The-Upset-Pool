@@ -21,6 +21,7 @@ import { nflGames, userPicks } from '../shared/schema.js';
 import { eq, and } from 'drizzle-orm';
 import type { IStorage } from './storage.js';
 import type { NFLWeek, NFLTeam } from '../shared/schema.js';
+import { findWeekForKickoff } from './timezoneUtils.js';
 import { getOddsApiKey } from './oddsApiKey.js';
 
 // ---------------------------------------------------------------------------
@@ -170,18 +171,12 @@ export async function diagnoseSpreads(storage: IStorage, weekId: number): Promis
   const teamNameMap = buildTeamNameMap(await storage.getNFLTeams());
   const existingGames = await db.select().from(nflGames).where(eq(nflGames.weekId, week.id));
 
-  // Same UTC date-string bucketing production uses (nflDataPuller.ts findWeekForGame).
-  // Kickoffs are reported in ET alongside it so a human can spot a mis-bucketed
-  // Monday night game rather than the diagnostic silently agreeing with the rule.
-  const findWeekForGame = (gameTime: Date): NFLWeek | null => {
-    const gameDateStr = gameTime.toISOString().split('T')[0];
-    for (const w of allWeeks) {
-      const startDateStr = new Date(w.startDate).toISOString().split('T')[0];
-      const endDateStr = new Date(w.endDate).toISOString().split('T')[0];
-      if (gameDateStr >= startDateStr && gameDateStr <= endDateStr) return w;
-    }
-    return null;
-  };
+  // Literally the function production uses (nflDataPuller.ts findWeekForGame),
+  // so this reports what a real pull would do rather than agreeing with a
+  // second copy of the rule. Kickoffs are reported in ET alongside it so a
+  // human can still spot a mis-bucketed Monday night game.
+  const findWeekForGame = (gameTime: Date): NFLWeek | null =>
+    findWeekForKickoff(allWeeks, gameTime);
 
   for (const game of oddsData) {
     const kickoff = new Date(game.commence_time);
