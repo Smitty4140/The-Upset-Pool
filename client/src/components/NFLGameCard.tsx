@@ -3,7 +3,6 @@ import { NFLGame } from "@/lib/types";
 import { getTeamLogo } from "@/lib/teamLogos";
 import { formatGameTime } from "@/lib/formatDate";
 import { Clock, Check, Lock, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -17,16 +16,14 @@ type NFLGameCardProps = {
   selectedGameId: string | null;
   submittedPickGameId?: string | null;
   onSelect: (gameId: string, teamId: number) => void;
-  onSubmit?: () => void;
   disabled?: boolean;
   isViewingFutureWeek?: boolean;
-  isSubmitting?: boolean;
   isInactive?: boolean;
   isPickLockedByKickoff?: boolean;
   spreadsNotPulled?: boolean;
 };
 
-export default function NFLGameCard({ game, selectedTeamId, selectedGameId, submittedPickGameId, onSelect, onSubmit, disabled = false, isViewingFutureWeek = false, isSubmitting = false, isInactive = false, isPickLockedByKickoff = false, spreadsNotPulled = false }: NFLGameCardProps) {
+export default function NFLGameCard({ game, selectedTeamId, selectedGameId, submittedPickGameId, onSelect, disabled = false, isViewingFutureWeek = false, isInactive = false, isPickLockedByKickoff = false, spreadsNotPulled = false }: NFLGameCardProps) {
   // State to track current time for automatic refresh (triggers re-renders)
   const [, setCurrentTime] = useState<Date>(new Date());
   
@@ -94,7 +91,6 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
   // A selection that exists only in the browser is NOT a saved pick. Saying
   // "Selected Game" for both states is what made people think an unsaved
   // choice had been submitted, so each state gets its own wording and colour.
-  const isUnsavedSelection = isGameSelected && !isSubmittedPick;
   const bannerStyle = isSubmittedPick && isPickLockedByKickoff
     ? { className: 'bg-amber-600 text-white', icon: <Lock size={16} />, label: 'Your pick — locked' }
     : isSubmittedPick
@@ -103,21 +99,13 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
 
   const isFullyLocked = disabled || isViewingFutureWeek || isInactive || hasGameStarted || isPickLockedByKickoff || spreadsNotPulled;
 
-  // Always select the underdog team regardless of which team is clicked
-  const handleHomeTeamClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isFullyLocked) return;
-    if (underdogTeamId) {
-      onSelect(game.id, underdogTeamId);
-    }
-  };
-  
-  const handleAwayTeamClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isFullyLocked) return;
-    if (underdogTeamId) {
-      onSelect(game.id, underdogTeamId);
-    }
+  // An even-spread game has no underdog, so it is unpickable even when open
+  const isPickable = !isFullyLocked && !!underdogTeamId;
+
+  // The card is one pick, so anywhere on it selects the underdog
+  const handleCardClick = () => {
+    if (!isPickable || !underdogTeamId) return;
+    onSelect(game.id, underdogTeamId);
   };
 
   const tooltipContent = isInactive
@@ -136,12 +124,22 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
 
   const gameCard = (
     <div 
-      className={`game-card transition-all duration-150 ease-in-out border rounded-lg overflow-hidden shadow-sm 
-        ${!isFullyLocked ? 'hover:shadow-md' : ''} 
+      className={`game-card group transition-all duration-150 ease-in-out border rounded-lg overflow-hidden shadow-sm 
+        ${isPickable ? 'cursor-pointer hover:shadow-md hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2' : 'cursor-not-allowed'} 
         ${showHighlight ? 'border-primary border-2 shadow-md relative' : 'border-gray-200'}
         ${isFullyLocked ? 'opacity-75' : ''}
-        ${isFullyLocked ? 'cursor-not-allowed' : ''}
         ${hasGameStarted || (isPickLockedByKickoff && !showHighlight) ? 'bg-gray-50 border-gray-300' : ''}`}
+      onClick={handleCardClick}
+      onKeyDown={(e) => {
+        if (!isPickable) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleCardClick();
+        }
+      }}
+      role={isPickable ? 'button' : undefined}
+      tabIndex={isPickable ? 0 : undefined}
+      aria-label={isPickable && underdogTeam ? `Pick ${underdogTeam.name} ${spreadText}` : undefined}
     >
       {/* Pick state banner: locked pick, saved pick, or an unsaved selection */}
       {showHighlight && (
@@ -152,7 +150,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
       )}
       
       {/* Game time header */}
-      <div className={`px-4 py-3 flex items-center justify-between text-sm border-b border-gray-100 ${hasGameStarted ? 'bg-gray-100' : 'bg-white'}`}>
+      <div className={`px-4 py-3 flex items-center justify-between text-sm border-b border-gray-100 transition-colors ${hasGameStarted ? 'bg-gray-100' : 'bg-white'} ${isPickable ? 'group-hover:bg-blue-50' : ''}`}>
         <div className="flex items-center">
           <Clock className={`h-4 w-4 mr-2 ${hasGameStarted ? 'text-gray-500' : 'text-blue-700'}`} />
           <span className={`font-medium ${hasGameStarted ? 'text-gray-600' : 'text-blue-800'}`}>{formatGameTime(game.gameTime)}</span>
@@ -165,15 +163,9 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
         )}
       </div>
       
-      <div className="bg-white">
+      <div className={`bg-white transition-colors ${isPickable ? 'group-hover:bg-blue-50' : ''}`}>
         {/* Away Team Row */}
-        <div 
-          className={`px-4 py-4 flex items-center justify-between transition-colors ${
-            !isFullyLocked ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
-          } ${isFullyLocked ? 'opacity-60' : ''
-          }`} 
-          onClick={handleAwayTeamClick}
-        >
+        <div className={`px-4 py-4 flex items-center justify-between ${isFullyLocked ? 'opacity-60' : ''}`}>
           <div className="flex items-center">
             <div className="w-12 h-12 flex-shrink-0 mr-3">
               <img 
@@ -191,13 +183,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
           
           {/* Away Team spread if they're the underdog */}
           {isAwayUnderdog && (
-            <div className="flex flex-col items-end flex-shrink-0">
-              <div className="bg-green-100 text-green-800 px-4 py-1.5 rounded-full font-bold text-lg">
-                {spreadText}
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-green-700 mt-0.5">
-                Underdog
-              </span>
+            <div className="bg-green-100 text-green-800 px-4 py-1.5 rounded-full font-bold text-lg flex-shrink-0">
+              {spreadText}
             </div>
           )}
         </div>
@@ -208,13 +195,7 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
         </div>
         
         {/* Home Team Row */}
-        <div 
-          className={`px-4 py-4 flex items-center justify-between transition-colors ${
-            !isFullyLocked ? 'cursor-pointer hover:bg-blue-50' : 'cursor-not-allowed'
-          } ${isFullyLocked ? 'opacity-60' : ''
-          }`} 
-          onClick={handleHomeTeamClick}
-        >
+        <div className={`px-4 py-4 flex items-center justify-between ${isFullyLocked ? 'opacity-60' : ''}`}>
           <div className="flex items-center">
             <div className="w-12 h-12 flex-shrink-0 mr-3">
               <img 
@@ -232,13 +213,8 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
           
           {/* Home Team spread if they're the underdog */}
           {isHomeUnderdog && (
-            <div className="flex flex-col items-end flex-shrink-0">
-              <div className="bg-green-100 text-green-800 px-4 py-1.5 rounded-full font-bold text-lg">
-                {spreadText}
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-green-700 mt-0.5">
-                Underdog
-              </span>
+            <div className="bg-green-100 text-green-800 px-4 py-1.5 rounded-full font-bold text-lg flex-shrink-0">
+              {spreadText}
             </div>
           )}
         </div>
@@ -253,38 +229,11 @@ export default function NFLGameCard({ game, selectedTeamId, selectedGameId, subm
         </div>
       )}
 
-      {/* Tell first-time users that the underdog is the only pickable side */}
+      {/* Name the side this card picks. The underdogs-only rule lives in the
+          league rules, not on all sixteen cards. */}
       {!isFullyLocked && !showHighlight && underdogTeam && (
         <div className="px-4 py-2.5 bg-blue-50/60 border-t border-blue-100 text-xs text-blue-800 text-center">
-          Choose this card to pick <span className="font-semibold">{underdogTeam.name}</span> — you can only pick underdogs.
-        </div>
-      )}
-
-      {/* Submit button at the bottom only when newly selected (not already
-          submitted). Hidden on mobile, where the sticky bottom bar is the one
-          submit affordance. */}
-      {isUnsavedSelection && onSubmit && !isFullyLocked && (
-        <div className="hidden sm:block bg-gray-50 px-4 py-3 border-t border-gray-100">
-          <Button 
-            onClick={(e) => {
-              e.stopPropagation();
-              onSubmit();
-            }}
-            className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-2 px-4 rounded"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <span className="flex items-center space-x-2">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Submitting...</span>
-              </span>
-            ) : (
-              "Submit Pick"
-            )}
-          </Button>
+          Choose this card to pick <span className="font-semibold">{underdogTeam.name}</span>.
         </div>
       )}
     </div>
