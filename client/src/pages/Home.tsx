@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -411,6 +411,30 @@ export default function Home() {
     // Fallback: check current week's lock time
     return now >= new Date(currentWeek.picksLockAt);
   })();
+
+  // Once a week is locked there is nothing to do on "Make Picks" — the board is
+  // read-only — so land on Everyone's Picks instead. Applied once, as a default:
+  // an email deep link that named a tab wins, and so does any tab the member
+  // has already navigated to themselves.
+  // Keyed by league so switching leagues re-evaluates the default — the league
+  // the app first guesses can be replaced once the member's leagues load.
+  const lockedTabDefaultAppliedFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (lockedTabDefaultAppliedFor.current === leagueId) return;
+    if (emailLink.tab) {
+      lockedTabDefaultAppliedFor.current = leagueId;
+      return;
+    }
+    // Wait until the week data that decides the lock state has actually loaded.
+    if (!currentWeek || !activeWeekId) return;
+
+    lockedTabDefaultAppliedFor.current = leagueId;
+    // Only ever redirect away from the pick board — never off a tab the member
+    // chose for themselves.
+    if (arePicksLocked && activeTab === "spreads") {
+      setActiveTab("weeklypicks");
+    }
+  }, [leagueId, currentWeek, activeWeekId, arePicksLocked, activeTab, emailLink.tab]);
 
   // Spreads are considered "not pulled yet" when games exist but every game still has a 0 spread
   const spreadsNotPulled =
