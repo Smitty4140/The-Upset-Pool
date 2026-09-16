@@ -413,11 +413,14 @@ export default function Home() {
   })();
 
   // Once a week is locked there is nothing to do on "Make Picks" — the board is
-  // read-only — so land on Everyone's Picks instead. Applied once, as a default:
-  // an email deep link that named a tab wins, and so does any tab the member
-  // has already navigated to themselves.
-  // Keyed by league so switching leagues re-evaluates the default — the league
-  // the app first guesses can be replaced once the member's leagues load.
+  // read-only — so land on Everyone's Picks instead. The lock is also exactly
+  // what makes Everyone's Picks worth landing on: before it, that tab only
+  // shows "picks are hidden", so `arePicksLocked` is the right condition here
+  // rather than the broader `canMakePicks` (an archived league with an unlocked
+  // week keeps the pick board, which at least explains why it is read-only).
+  //
+  // Applied once per league, as a default: an email deep link that named a tab
+  // wins, and so does any tab the member has already navigated to themselves.
   const lockedTabDefaultAppliedFor = useRef<number | null>(null);
   useEffect(() => {
     if (lockedTabDefaultAppliedFor.current === leagueId) return;
@@ -425,8 +428,11 @@ export default function Home() {
       lockedTabDefaultAppliedFor.current = leagueId;
       return;
     }
-    // Wait until the week data that decides the lock state has actually loaded.
-    if (!currentWeek || !activeWeekId) return;
+    // Decide only once the league's own season has scoped the week queries.
+    // Until currentLeagueInfo lands they run unseasoned and resolve against
+    // today's date, so a past-season league would otherwise latch onto the
+    // wrong week — and this effect only ever runs once per league.
+    if (!currentLeagueInfo || !currentWeek || !activeWeekId) return;
 
     lockedTabDefaultAppliedFor.current = leagueId;
     // Only ever redirect away from the pick board — never off a tab the member
@@ -434,7 +440,7 @@ export default function Home() {
     if (arePicksLocked && activeTab === "spreads") {
       setActiveTab("weeklypicks");
     }
-  }, [leagueId, currentWeek, activeWeekId, arePicksLocked, activeTab, emailLink.tab]);
+  }, [leagueId, currentLeagueInfo, currentWeek, activeWeekId, arePicksLocked, activeTab, emailLink.tab]);
 
   // Spreads are considered "not pulled yet" when games exist but every game still has a 0 spread
   const spreadsNotPulled =
