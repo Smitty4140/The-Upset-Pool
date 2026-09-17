@@ -1,4 +1,4 @@
-import { eq, and, sql, desc, asc, not, gte, lt, lte, isNull, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, asc, not, gte, lte, isNull, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 // Generate a unique 6-character invite code
@@ -11,6 +11,7 @@ function generateInviteCode(): string {
   return result;
 }
 import { db, pool } from "./db";
+import { lockedWeeksForSeason } from "./leaderboardEligibility";
 import { 
   users, 
   nflTeams, 
@@ -1107,16 +1108,16 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(sql`COALESCE(SUM(${userPicks.pointsEarned}), 0)`));
     
     // Get weeks for eligibility calculation:
-    // Only include weeks where picks have locked (picksLockAt is in the past)
+    // Only weeks of THIS league's season count, and only ones whose picks have
+    // locked. nfl_weeks spans every season, so leaving the season out asks a
+    // 2026 league to have picked 2025's weeks as well and sends "last pick"
+    // looking at a week the league never played.
     const now = new Date();
-    
-    // Get all weeks where picks have locked
-    const eligibilityWeeks = await db
-      .select()
-      .from(nflWeeks)
-      .where(lt(nflWeeks.picksLockAt, now))
-      .orderBy(nflWeeks.weekNumber);
-    
+    const league = await this.getLeague(leagueId);
+
+    const allWeeks = await db.select().from(nflWeeks);
+    const eligibilityWeeks = lockedWeeksForSeason(allWeeks, league?.season, now);
+
     const eligibilityWeekIds = eligibilityWeeks.map(week => week.id);
     
     // If no weeks to check, everyone is eligible

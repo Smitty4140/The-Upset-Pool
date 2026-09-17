@@ -365,7 +365,7 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center text-base">
                 <Trophy className="mr-2 h-5 w-5 text-green-600" />
-                Points by Winning Team
+                League Points Earned by Team
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -525,7 +525,7 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
               return userPick.won ? (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                   <Check className="h-3 w-3 mr-1" />
-                  +{userPick.pointsEarned}
+                  Upset
                 </span>
               ) : (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -543,17 +543,15 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
                     const userPick = Object.values(usersWithPicks).find(p => p.userId === user.id);
                     return (
                       <div key={user.id} className="px-4 py-3 space-y-1.5">
-                        {/* Line 1: standing + name | pts */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-xs font-semibold text-gray-400 w-7 flex-shrink-0">
-                              {getOrdinalSuffix(user.standing)}
-                            </span>
-                            <span className="font-medium text-gray-900 text-sm truncate">
-                              {user.nickname ?? user.username}
-                            </span>
-                          </div>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 flex-shrink-0 ml-2">
+                        {/* Line 1: standing + name + season total */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-semibold text-gray-400 w-7 flex-shrink-0">
+                            {getOrdinalSuffix(user.standing)}
+                          </span>
+                          <span className="font-medium text-gray-900 text-sm truncate">
+                            {user.nickname ?? user.username}
+                          </span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 flex-shrink-0">
                             {user.totalPoints || 0} pts
                           </span>
                         </div>
@@ -675,7 +673,7 @@ export default function WeeklyPicks({ leagueId, weekId, weekNumber, isPicksLocke
                                   userPick.won ? (
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                       <Check className="h-3 w-3 mr-1" />
-                                      Won +{userPick.pointsEarned}
+                                      Upset
                                     </span>
                                   ) : (
                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
