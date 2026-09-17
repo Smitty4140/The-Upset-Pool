@@ -27,12 +27,27 @@ export const SPREAD_PULL_FALLBACK_BEFORE_LOCK_MS = (3 * 24 + 1) * 60 * 60 * 1000
 export const SPREAD_PULL_RETRY_MS = 30 * 60 * 1000;
 
 /**
- * Attempts per week before the scheduler stops and asks for a human. The Odds
- * API bills per request, so a week that cannot be filled — a date range that
- * matches nothing, a book with no lines up — must not retry until the
- * season's quota is gone.
+ * Attempts per week at the normal cadence before the scheduler slows down. The
+ * Odds API bills per request, so a week that cannot be filled — a date range
+ * that matches nothing, a book with no lines up — must not retry every half
+ * hour until the season's quota is gone.
  */
 export const MAX_SPREAD_PULL_ATTEMPTS = 12;
+
+/**
+ * The cadence after that budget is spent.
+ *
+ * It used to be "never again" — the week was `exhausted` and the only ways out
+ * were a restart or an admin pressing the button. That is a week whose board
+ * can be fixed by the very next attempt (a book that posts its lines late, an
+ * API hiccup, a schedule row corrected an hour later) sitting dead for the rest
+ * of the week while everyone waits, which is exactly what "it got stuck" looks
+ * like from the outside. Slowing down protects the quota; stopping does not
+ * protect anything a slow retry would spend. Twelve fast attempts then one
+ * every two hours is at most ~20 requests a day for a week that cannot be
+ * filled, against a season budget in the thousands.
+ */
+export const SPREAD_PULL_SLOW_RETRY_MS = 2 * 60 * 60 * 1000;
 
 export interface SpreadPullWeek {
   id: number;
@@ -84,7 +99,10 @@ export type SpreadPullStatus =
   | 'waiting'
   /** Due, but pulled too recently to try again. */
   | 'throttled'
-  /** Out of attempts; a human needs to look. */
+  /**
+   * Past its fast-retry budget: still retrying, but only every couple of
+   * hours, and a human should look at why the board will not fill.
+   */
   | 'exhausted'
   /** Pull now. */
   | 'due';
@@ -129,7 +147,6 @@ export function decideSpreadPull(
   if (games.length > 0 && missing === 0) return decision('complete');
   if (now >= new Date(week.picksLockAt).getTime()) return decision('locked');
   if (now < pullAt.getTime()) return decision('waiting');
-  if (attempts.count >= MAX_SPREAD_PULL_ATTEMPTS) return decision('exhausted');
 
   // The in-memory attempt counter is gone after a restart, and on an
   // autoscale deployment that is every few minutes — so the throttle also
@@ -140,8 +157,15 @@ export function decideSpreadPull(
     (latest, game) => Math.max(latest, game.updatedAt ? new Date(game.updatedAt).getTime() : 0),
     0
   );
-  if (now - Math.max(attempts.lastAttemptAt, lastTouched) < SPREAD_PULL_RETRY_MS) {
-    return decision('throttled');
+  const lastAttempt = Math.max(attempts.lastAttemptAt, lastTouched);
+
+  // Over the fast-retry budget the week keeps trying, just slowly. It never
+  // stops on its own: a board nobody is watching is worse than a few extra
+  // requests, and the status below is what tells an admin to look.
+  const overBudget = attempts.count >= MAX_SPREAD_PULL_ATTEMPTS;
+  const retryAfter = overBudget ? SPREAD_PULL_SLOW_RETRY_MS : SPREAD_PULL_RETRY_MS;
+  if (now - lastAttempt < retryAfter) {
+    return decision(overBudget ? 'exhausted' : 'throttled');
   }
 
   return decision('due', true);

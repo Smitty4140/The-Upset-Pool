@@ -338,9 +338,10 @@ class GameScheduler {
     if (decision.status === 'exhausted' && !attempts.exhaustedLogged) {
       this.spreadPullAttempts.set(week.id, { ...attempts, exhaustedLogged: true });
       console.error(
-        `[Scheduler] ❌ Gave up pulling spreads for week ${week.weekNumber} after ` +
+        `[Scheduler] ⚠️  Week ${week.weekNumber} has spent its fast-retry budget after ` +
         `${attempts.count} attempts — ${decision.missing}/${decision.total} games still have no spread. ` +
-        `Check GET /api/admin/system/preflight/spreads, then pull by hand with ` +
+        `It keeps retrying every two hours, but something is wrong: check ` +
+        `GET /api/admin/system/preflight/spreads, then pull by hand with ` +
         `POST /api/admin/scheduler/manual-pull.`
       );
     }
@@ -619,6 +620,55 @@ class GameScheduler {
       // week's spreads are due and where that week currently stands.
       spreadPulls: Array.from(this.spreadPullState.values()),
     };
+  }
+
+  /**
+   * What the sweep would decide about every upcoming week, right now.
+   *
+   * Read-only, and computed fresh rather than read from `spreadPullState`:
+   * that map only holds what *this* container has already swept, which after a
+   * restart is nothing at all. When a week's spreads do not post, this is the
+   * question to ask first — is it waiting (and until when), throttled, over
+   * its attempt budget, or does the automation not consider it due at all?
+   */
+  async describeSpreadPulls() {
+    const now = Date.now();
+    const weeks = await this.upcomingWeeks();
+    const rows = [];
+
+    for (const week of weeks) {
+      const games = await db
+        .select()
+        .from(nflGames)
+        .where(eq(nflGames.weekId, week.id))
+        .orderBy(asc(nflGames.gameTime));
+
+      const attempts = this.spreadPullAttempts.get(week.id)
+        ?? { count: 0, lastAttemptAt: 0, exhaustedLogged: false };
+      const decision = decideSpreadPull(week, games, now, attempts);
+      const lastTouched = games.reduce(
+        (latest, game) => Math.max(latest, game.updatedAt ? new Date(game.updatedAt).getTime() : 0),
+        0
+      );
+
+      rows.push({
+        weekId: week.id,
+        weekNumber: week.weekNumber,
+        season: week.season,
+        status: decision.status,
+        // Why it says that, in the three numbers the answer always turns on.
+        pullAt: formatDateInEasternTime(decision.pullAt),
+        picksLockAt: formatDateInEasternTime(new Date(week.picksLockAt)),
+        gamesWithSpreads: decision.total - decision.missing,
+        gamesTotal: decision.total,
+        firstKickoff: games.length > 0 ? formatDateInEasternTime(new Date(games[0].gameTime)) : null,
+        attemptsThisInstance: attempts.count,
+        lastTouchedAt: lastTouched > 0 ? formatDateInEasternTime(new Date(lastTouched)) : null,
+        announcedThisInstance: this.announcedWeeks.has(week.id),
+      });
+    }
+
+    return rows;
   }
 
   /**

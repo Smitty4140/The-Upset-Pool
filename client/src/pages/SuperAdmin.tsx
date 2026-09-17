@@ -42,13 +42,38 @@ interface SchedulerLeaseRow {
   lastResult: string | null;
 }
 
+interface SpreadPullRow {
+  weekNumber: number;
+  season?: number;
+  status: string;
+  pullAt: string;
+  picksLockAt: string;
+  gamesWithSpreads: number;
+  gamesTotal: number;
+  firstKickoff: string | null;
+  attemptsThisInstance: number;
+  lastTouchedAt: string | null;
+}
+
 interface SchedulerStatus {
   isRunning: boolean;
   jobCount: number;
   /** When each automated job last actually ran, from the database. */
   leases?: SchedulerLeaseRow[];
+  /** What the sweep decides about each upcoming week right now, and why. */
+  spreadPulls?: SpreadPullRow[];
   heartbeatConfigured?: boolean;
 }
+
+/** Plain English for the decision the spread sweep just made about a week. */
+const SPREAD_STATUS_TEXT: Record<string, string> = {
+  complete: "every game has a spread",
+  locked: "picks are closed",
+  waiting: "not due yet",
+  throttled: "pulled recently, will retry",
+  exhausted: "over its retry budget — something is wrong",
+  due: "due now",
+};
 
 const JOB_LABELS: Record<string, string> = {
   spreads: "Spread sweep + \"picks are open\" email",
@@ -571,6 +596,25 @@ export default function SuperAdminPage() {
                         ran {timeAgo(lease.lastRunAt)}
                         {lease.lastSource ? ` (${lease.lastSource})` : ""}
                         {lease.lastResult ? ` — ${lease.lastResult}` : ""}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/*
+                  The answer to "why has this week not pulled?", computed on
+                  request rather than remembered, with the numbers the answer
+                  turns on: when the sweep thinks it is due, and how many games
+                  still have no line.
+                */}
+                {schedulerStatus?.spreadPulls && schedulerStatus.spreadPulls.length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    {schedulerStatus.spreadPulls.slice(0, 3).map(week => (
+                      <div key={`${week.season}-${week.weekNumber}`} className="text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">Week {week.weekNumber}:</span>{" "}
+                        {SPREAD_STATUS_TEXT[week.status] ?? week.status} — {week.gamesWithSpreads}/{week.gamesTotal}{" "}
+                        spreads, due {week.pullAt}
+                        {week.attemptsThisInstance > 0 ? `, ${week.attemptsThisInstance} attempt${week.attemptsThisInstance === 1 ? "" : "s"}` : ""}
                       </div>
                     ))}
                   </div>

@@ -8,6 +8,7 @@ import {
   hasSpread,
   MAX_SPREAD_PULL_ATTEMPTS,
   SPREAD_PULL_RETRY_MS,
+  SPREAD_PULL_SLOW_RETRY_MS,
 } from "../spreadPullPolicy";
 
 // A real week 2 of the 2026 season: picks lock Sunday 1 PM ET, the Thursday
@@ -20,6 +21,7 @@ const WEEK = {
 const THURSDAY_KICKOFF = "2026-09-18T00:15:00Z"; // Thu 8:15 PM ET
 const SUNDAY_KICKOFF = "2026-09-20T17:00:00Z";
 const DUE_AT = Date.parse("2026-09-17T16:15:00Z"); // Thu 12:15 PM ET
+const LOCK_AT = WEEK.picksLockAt.getTime();
 
 const game = (over: Partial<{ gameTime: string; spread: unknown; updatedAt: string | null }> = {}) => ({
   gameTime: SUNDAY_KICKOFF,
@@ -140,10 +142,29 @@ describe("decideSpreadPull", () => {
     expect(decision.status).toBe("throttled");
   });
 
-  it("gives up after the attempt budget rather than draining the API quota", () => {
-    const attempts = { count: MAX_SPREAD_PULL_ATTEMPTS, lastAttemptAt: 0 };
-    const decision = decideSpreadPull(WEEK, emptyBoard(), DUE_AT + 24 * 60 * 60 * 1000, attempts);
+  it("slows down after the attempt budget rather than draining the API quota", () => {
+    const now = DUE_AT + 60 * 60 * 1000;
+    const attempts = { count: MAX_SPREAD_PULL_ATTEMPTS, lastAttemptAt: now - 30 * 60 * 1000 };
+    const decision = decideSpreadPull(WEEK, emptyBoard(), now, attempts);
     expect(decision.status).toBe("exhausted");
+    expect(decision.pull).toBe(false);
+  });
+
+  it("but keeps trying, because a week that stops on its own never restarts", () => {
+    // This used to be a dead end: past the budget the week was never pulled
+    // again by anything except a restart or an admin pressing the button, so a
+    // book that posted its lines an hour late left the board empty all week.
+    const now = DUE_AT + 6 * 60 * 60 * 1000;
+    const attempts = { count: MAX_SPREAD_PULL_ATTEMPTS + 5, lastAttemptAt: now - SPREAD_PULL_SLOW_RETRY_MS - 1000 };
+    const decision = decideSpreadPull(WEEK, emptyBoard(), now, attempts);
+    expect(decision.status).toBe("due");
+    expect(decision.pull).toBe(true);
+  });
+
+  it("a week over budget still stops once its picks lock", () => {
+    const attempts = { count: MAX_SPREAD_PULL_ATTEMPTS + 5, lastAttemptAt: 0 };
+    const decision = decideSpreadPull(WEEK, emptyBoard(), LOCK_AT, attempts);
+    expect(decision.status).toBe("locked");
     expect(decision.pull).toBe(false);
   });
 });

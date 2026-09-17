@@ -3353,8 +3353,18 @@ ${!apply && result.weeksNeedingFix > 0
       // both times the spreads failed to post.
       const leases = await readSchedulerLeases();
 
+      // Computed now, not remembered: a container that restarted a minute ago
+      // has swept nothing, and "no data" reads exactly like "nothing is due".
+      let spreadPulls = status.spreadPulls;
+      try {
+        spreadPulls = await gameScheduler.describeSpreadPulls() as any;
+      } catch (error) {
+        console.error("Could not describe spread pulls:", error);
+      }
+
       res.json({
         ...status,
+        spreadPulls,
         leases,
         leaseLogAvailable: isLeaseTableAvailable(),
         lastTickThisInstance: getLastTick(),
