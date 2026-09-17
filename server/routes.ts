@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
+import { schedulerTickMiddleware, runSchedulerTick, getLastTick, secretMatches } from "./schedulerTick";
+import { readSchedulerLeases, isLeaseTableAvailable } from "./schedulerLease";
 
 import { z } from "zod";
 import { userPickFormSchema } from "@shared/schema";
@@ -238,9 +240,66 @@ async function getOddsGamesData() {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
+  // Let ordinary API traffic drive the scheduler.
+  //
+  // The production deployment is Replit Autoscale: containers only run while
+  // they are serving, so an in-process timer is not a promise that anything
+  // happens at a given minute — which is exactly why the spreads have twice
+  // waited for an admin to press "pull spreads" by hand. Every job behind
+  // this claims a database lease first, so traffic cannot run the same sweep
+  // twice, and a request waits a few seconds for it at most.
+  app.use('/api', schedulerTickMiddleware());
 
+  /**
+   * The heartbeat endpoint.
+   *
+   * An external pinger (the GitHub Actions workflow in this repo, a Replit
+   * Scheduled Deployment, or any uptime monitor) hits this every ten minutes
+   * so the automation runs even when nobody is on the site — the case that
+   * matters most, because the email telling people the board is up is the
+   * thing that has been missing.
+   *
+   * Authenticated by CRON_SECRET rather than a session, since the caller is a
+   * machine. The work itself is idempotent and leased; the secret is there so
+   * the endpoint cannot be used to make this app hammer the Odds API.
+   */
+  app.all('/api/cron/tick', async (req, res) => {
+    const expected = process.env.CRON_SECRET;
+    if (!expected) {
+      return res.status(503).json({
+        ok: false,
+        message: 'CRON_SECRET is not set on this deployment, so the heartbeat endpoint is disabled. ' +
+          'Add it as a Replit secret and give the same value to whatever calls this URL.',
+      });
+    }
+
+    // Header first, then `Authorization: Bearer`, then `?key=` for pingers that
+    // cannot send a custom header. `||` rather than `??`: an empty header is
+    // no credential, and should fall through to the next form.
+    const provided = String(
+      req.get('x-cron-secret')
+      || req.get('authorization')?.replace(/^Bearer\s+/i, '')
+      || req.query.key
+      || ''
+    );
+    if (!provided || !secretMatches(provided, expected)) {
+      // Deliberately terse: a machine caller needs no detail, and an attacker
+      // should learn nothing from the difference between wrong and missing.
+      return res.status(401).json({ ok: false, message: 'Unauthorized' });
+    }
+
+    try {
+      const summary = await runSchedulerTick('heartbeat', { force: true });
+      res.json({ ok: true, ...summary });
+    } catch (error) {
+      console.error('[Cron] Heartbeat tick failed:', error);
+      res.status(500).json({ ok: false, message: error instanceof Error ? error.message : 'Tick failed' });
+    }
+  });
+
+  // Auth middleware (registers its own /api routes, so it comes after the
+  // tick middleware above — otherwise a login would never carry a tick).
+  await setupAuth(app);
 
   // Auth routes are now handled in setupAuth
   
@@ -3287,8 +3346,20 @@ ${!apply && result.weeksNeedingFix > 0
       // Import scheduler and get status
       const { gameScheduler } = await import("./scheduler.js");
       const status = gameScheduler.getStatus();
-      
-      res.json(status);
+
+      // What actually ran, and when — read from the database rather than from
+      // this container's memory, which on Autoscale is usually minutes old.
+      // "The sweep has not run since Tuesday" is the fact that was missing
+      // both times the spreads failed to post.
+      const leases = await readSchedulerLeases();
+
+      res.json({
+        ...status,
+        leases,
+        leaseLogAvailable: isLeaseTableAvailable(),
+        lastTickThisInstance: getLastTick(),
+        heartbeatConfigured: Boolean(process.env.CRON_SECRET),
+      });
     } catch (error) {
       console.error("Error getting scheduler status:", error);
       res.status(500).json({ message: "Failed to get scheduler status" });

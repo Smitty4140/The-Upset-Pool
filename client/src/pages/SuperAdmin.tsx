@@ -34,9 +34,39 @@ import { NFLWeek } from "@/lib/types";
 import WeekSelector from "@/components/WeekSelector";
 import GameResults from "@/components/GameResults";
 
+interface SchedulerLeaseRow {
+  job: string;
+  lastRunAt: string | null;
+  lastFinishedAt: string | null;
+  lastSource: string | null;
+  lastResult: string | null;
+}
+
 interface SchedulerStatus {
   isRunning: boolean;
   jobCount: number;
+  /** When each automated job last actually ran, from the database. */
+  leases?: SchedulerLeaseRow[];
+  heartbeatConfigured?: boolean;
+}
+
+const JOB_LABELS: Record<string, string> = {
+  spreads: "Spread sweep + \"picks are open\" email",
+  "lock-warnings": "Picks-lock warning",
+  results: "Results pull",
+};
+
+/** "4 minutes ago" — the only form of this timestamp anyone reads. */
+function timeAgo(iso: string | null): string {
+  if (!iso) return "never";
+  const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (!Number.isFinite(seconds)) return "never";
+  if (seconds < 90) return `${Math.max(seconds, 0)}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 90) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 36) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
 }
 
 type PreflightStatus = "pass" | "warn" | "fail";
@@ -523,6 +553,36 @@ export default function SuperAdminPage() {
                   {schedulerStatus &&
                     `${schedulerStatus.jobCount || 0} scheduled job${schedulerStatus.jobCount !== 1 ? "s" : ""}`}
                 </div>
+
+                {/*
+                  "Running" above only means the container answering this
+                  request is up — on Autoscale that container may be seconds
+                  old. These lines are the real answer to "is the automation
+                  running?", because they are written to the database by
+                  whichever container did the work.
+                */}
+                {schedulerStatus?.leases && schedulerStatus.leases.length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    {schedulerStatus.leases.map(lease => (
+                      <div key={lease.job} className="text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">
+                          {JOB_LABELS[lease.job] ?? lease.job}:
+                        </span>{" "}
+                        ran {timeAgo(lease.lastRunAt)}
+                        {lease.lastSource ? ` (${lease.lastSource})` : ""}
+                        {lease.lastResult ? ` — ${lease.lastResult}` : ""}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {schedulerStatus && schedulerStatus.heartbeatConfigured === false && (
+                  <div className="mt-3 text-xs text-amber-600">
+                    No heartbeat is configured (CRON_SECRET is unset), so the automation
+                    only runs while someone is on the site. Set CRON_SECRET and point a
+                    pinger at /api/cron/tick — see docs/scheduler-on-autoscale.md.
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2 ml-auto">

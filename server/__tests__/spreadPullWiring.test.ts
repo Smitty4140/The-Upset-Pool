@@ -30,7 +30,25 @@ describe("spreads pull on a sweep, not a one-shot job", () => {
 
   it("the sweep also runs on startup, so a cold start catches up", () => {
     const start = bodyBetween(SCHEDULER, "start() {", "stop() {");
-    expect(start).toMatch(/Also run immediately on startup[\s\S]*sweepSpreadPulls\(\)/);
+    expect(start).toMatch(/Also run immediately on startup[\s\S]*sweepSpreadPulls\('startup'\)/);
+  });
+
+  it("the cron is not the only thing that can drive it", () => {
+    // The cron is a timer inside a container, and on Autoscale a container
+    // only runs while it is serving a request — which is why the spreads have
+    // twice waited for an admin to press the button. Request traffic and the
+    // heartbeat endpoint kick the same sweep through runDueWork().
+    const runDueWork = bodyBetween(SCHEDULER, "async runDueWork", "async runDueResultsPull");
+    expect(runDueWork).toMatch(/this\.sweepSpreadPulls\(source\)/);
+    expect(runDueWork).toMatch(/this\.checkPickLockWarnings\(\{ source \}\)/);
+  });
+
+  it("every caller claims one lease, so traffic cannot re-pull the same week", () => {
+    const fn = bodyBetween(SCHEDULER, "private async sweepSpreadPulls", "checkAndScheduleResultsPulls");
+    expect(fn).toMatch(/claimSchedulerLease\('spreads', SPREAD_SWEEP_LEASE_MS, source\)/);
+    // And the outcome is written where another container can read it: after a
+    // recycle, in-memory state says nothing about whether the sweep ever ran.
+    expect(fn).toMatch(/finishSchedulerLease\('spreads'/);
   });
 
   it("a week with no games is not skipped", () => {
@@ -116,6 +134,13 @@ describe("the picks-lock warning is untouched by any of this", () => {
   it("still runs on its own five-minute check", () => {
     const start = bodyBetween(SCHEDULER, "start() {", "stop() {");
     expect(start).toMatch(/cron\.schedule\('\*\/5 \* \* \* \*'[\s\S]*?checkPickLockWarnings/);
+  });
+
+  it("an admin preview is never held back by the lease", () => {
+    // `asOf` and `dryRun` send nothing and exist to answer a question now.
+    const check = bodyBetween(SCHEDULER, "async checkPickLockWarnings", "async sendPickLockWarnings");
+    expect(check).toMatch(/const automatic = !options\.asOf && !options\.dryRun;/);
+    expect(check).toMatch(/if \(automatic && !await claimSchedulerLease\('lock-warnings'/);
   });
 
   it("is driven by each week's own picksLockAt, not by the spreads sweep", () => {

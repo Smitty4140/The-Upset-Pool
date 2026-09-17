@@ -15,6 +15,9 @@ import {
   decideSpreadPull, announcementDue, announcedOutOfBand, hasSpread, MAX_SPREAD_PULL_ATTEMPTS,
 } from './spreadPullPolicy.js';
 import { pullNFLResultsFromESPN, pullResultsForActiveWeeks } from './espnResultsPuller.js';
+import {
+  claimSchedulerLease, finishSchedulerLease, type LeaseSource,
+} from './schedulerLease.js';
 import type { IStorage } from './storage.js';
 import { storage } from './storage.js';
 import { eq, and, gte, lte, lt, asc, desc } from 'drizzle-orm';
@@ -27,6 +30,18 @@ export interface EmailRecipient {
   leagues: string[];
   link: string;
 }
+
+/**
+ * How often each job may actually run, across every container and every caller.
+ *
+ * These are the lease windows, not a schedule: the crons, ordinary API
+ * traffic, the external heartbeat and startup all kick the same jobs, and the
+ * lease is what keeps that from turning into four sweeps a minute. A job that
+ * is kicked while its window is still open returns without doing anything.
+ */
+export const SPREAD_SWEEP_LEASE_MS = 5 * 60 * 1000;
+export const LOCK_WARNING_LEASE_MS = 4 * 60 * 1000;
+export const RESULTS_LEASE_MS = 20 * 60 * 1000;
 
 class GameScheduler {
   private scheduledJobs: Map<string, cron.ScheduledTask> = new Map();
@@ -80,8 +95,14 @@ class GameScheduler {
     // sweep re-derives what is due from the database on every tick, so any
     // instance that is up (including one that cold-starts an hour late)
     // catches it, and the pull lands within ten minutes of its trigger.
+    //
+    // This cron is now the backup, not the guarantee: on Autoscale the timer
+    // itself only fires while a container is awake, so the same sweep is also
+    // kicked by API traffic and by the external heartbeat that hits
+    // /api/cron/tick. All three claim the same lease, so only one of them
+    // does the work in any five-minute window.
     cron.schedule('*/10 * * * *', async () => {
-      await this.sweepSpreadPulls();
+      await this.sweepSpreadPulls('cron');
     });
 
     // Results are still scheduled hourly off each week's last kickoff.
@@ -96,7 +117,7 @@ class GameScheduler {
     // outage inside the window still delivers — the send log keeps it to one
     // email per member per week.
     cron.schedule('*/5 * * * *', async () => {
-      await this.checkPickLockWarnings();
+      await this.checkPickLockWarnings({ source: 'cron' });
     });
 
     // Schedule hourly results pulls during game windows:
@@ -104,7 +125,7 @@ class GameScheduler {
     cron.schedule('0 13-23 * * 0', async () => {
       const hour = new Date().toLocaleString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
       console.log(`[Scheduler] Executing Sunday results pull at ${hour} ET...`);
-      await this.executeDailyResultsPull();
+      await this.runDueResultsPull('cron');
     }, {
       timezone: 'America/New_York'
     });
@@ -116,7 +137,7 @@ class GameScheduler {
     cron.schedule('0 0-1 * * 1', async () => {
       const hour = new Date().toLocaleString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
       console.log(`[Scheduler] Executing late Sunday (Monday ${hour} ET) results pull...`);
-      await this.executeDailyResultsPull();
+      await this.runDueResultsPull('cron');
     }, {
       timezone: 'America/New_York'
     });
@@ -125,7 +146,7 @@ class GameScheduler {
     cron.schedule('0 20-23 * * 1', async () => {
       const hour = new Date().toLocaleString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
       console.log(`[Scheduler] Executing Monday results pull at ${hour} ET...`);
-      await this.executeDailyResultsPull();
+      await this.runDueResultsPull('cron');
     }, {
       timezone: 'America/New_York'
     });
@@ -134,14 +155,16 @@ class GameScheduler {
     cron.schedule('0 0-1 * * 2', async () => {
       const hour = new Date().toLocaleString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
       console.log(`[Scheduler] Executing Tuesday results pull at ${hour} ET...`);
-      await this.executeDailyResultsPull();
+      await this.runDueResultsPull('cron');
     }, {
       timezone: 'America/New_York'
     });
 
     // Also run immediately on startup, so a deploy or a cold start picks up
-    // anything that came due while nothing was running.
-    this.sweepSpreadPulls();
+    // anything that came due while nothing was running. On Autoscale this is
+    // the common case rather than the rare one: containers are recycled
+    // constantly, and a cold start is often the first thing to run all day.
+    this.sweepSpreadPulls('startup');
     this.checkAndScheduleResultsPulls();
   }
 
@@ -158,6 +181,59 @@ class GameScheduler {
     this.isRunning = false;
   }
 
+  /**
+   * Every time-driven job, kicked from wherever this container is awake.
+   *
+   * On Replit Autoscale a background timer is not a promise that anything
+   * runs: containers are started for requests, get little CPU between them,
+   * and are shut down when the site is quiet. So ordinary API traffic and the
+   * external heartbeat both call this, and each job inside claims its own
+   * lease — kicking it a hundred times a minute still runs it once.
+   */
+  async runDueWork(source: LeaseSource = 'request') {
+    const spreads = await this.sweepSpreadPulls(source);
+    const lockWarnings = await this.checkPickLockWarnings({ source });
+    const results = await this.runDueResultsPull(source);
+    return { spreads, lockWarnings, results };
+  }
+
+  /**
+   * The results pull, behind its own lease so traffic cannot turn it into a
+   * request to ESPN every few seconds. The pull itself decides which weeks
+   * are active; this only decides whether it is time to ask again.
+   */
+  async runDueResultsPull(source: LeaseSource = 'cron') {
+    // Nothing to ask ESPN for until a game has actually kicked off. Traffic
+    // kicks this all week; without the check it would poll a free API every
+    // twenty minutes for results that cannot exist yet.
+    try {
+      const now = new Date();
+      const recent = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
+      const unscored = await db
+        .select({ id: nflGames.id })
+        .from(nflGames)
+        .where(and(
+          eq(nflGames.completed, false),
+          lte(nflGames.gameTime, now),
+          gte(nflGames.gameTime, recent)
+        ))
+        .limit(1);
+      if (unscored.length === 0) {
+        return { ran: false as const, reason: 'no kicked-off game is still unscored' };
+      }
+    } catch (error) {
+      console.error('[Scheduler] Could not check for unscored games:', error);
+      // Fall through: a failed check is not a reason to skip the pull.
+    }
+
+    if (!await claimSchedulerLease('results', RESULTS_LEASE_MS, source)) {
+      return { ran: false as const, reason: 'another run has this window' };
+    }
+    await this.executeDailyResultsPull();
+    await finishSchedulerLease('results', `results pull ran (${source})`);
+    return { ran: true as const };
+  }
+
   /** Every NFL week that has not finished yet, earliest first. */
   private async upcomingWeeks() {
     return await db
@@ -169,14 +245,24 @@ class GameScheduler {
 
   /**
    * Check every upcoming week and pull spreads for any that are due.
+   *
+   * Claims the shared lease first. Several containers can be up at once on
+   * Autoscale and every request kicks this, so without the lease a busy
+   * minute would be a dozen sweeps — a dozen Odds API calls and a real chance
+   * of two of them announcing the same week.
    */
-  private async sweepSpreadPulls() {
+  private async sweepSpreadPulls(source: LeaseSource = 'cron') {
+    if (!await claimSchedulerLease('spreads', SPREAD_SWEEP_LEASE_MS, source)) {
+      return { ran: false as const, reason: 'another run has this window' };
+    }
+
     let weeks: Awaited<ReturnType<GameScheduler['upcomingWeeks']>>;
     try {
       weeks = await this.upcomingWeeks();
     } catch (error) {
       console.error('[Scheduler] Error sweeping for spread pulls:', error);
-      return;
+      await finishSchedulerLease('spreads', `failed to read weeks: ${String(error)}`);
+      return { ran: true as const, error: String(error) };
     }
 
     for (const week of weeks) {
@@ -195,6 +281,15 @@ class GameScheduler {
         console.error(`[Scheduler] Error servicing spreads for week ${week.weekNumber}:`, error);
       }
     }
+
+    // Written where any container can read it: after an Autoscale recycle,
+    // in-memory state is gone and this row is the only answer to "did the
+    // sweep actually run, and what did it see?"
+    const summary = Array.from(this.spreadPullState.values())
+      .map(w => `W${w.weekNumber} ${w.status} ${w.gamesWithSpreads}/${w.gamesTotal}`)
+      .join('; ') || 'no upcoming weeks';
+    await finishSchedulerLease('spreads', `${summary} (${source})`);
+    return { ran: true as const, summary };
   }
 
   /**
@@ -834,8 +929,17 @@ class GameScheduler {
    * Every five minutes: is any week inside the final hour before its picks
    * lock? If so, warn the members who still have no pick in.
    */
-  async checkPickLockWarnings(options: { asOf?: Date; dryRun?: boolean } = {}) {
+  async checkPickLockWarnings(options: { asOf?: Date; dryRun?: boolean; source?: LeaseSource } = {}) {
     const results: Array<Awaited<ReturnType<GameScheduler['sendPickLockWarnings']>>> = [];
+
+    // Only the automatic run takes the lease. An admin preview (`asOf` or
+    // `dryRun`) sends nothing and must answer every time it is asked.
+    const automatic = !options.asOf && !options.dryRun;
+    if (automatic && !await claimSchedulerLease('lock-warnings', LOCK_WARNING_LEASE_MS, options.source ?? 'cron')) {
+      return results;
+    }
+    let failure: unknown = null;
+
     try {
       // `asOf` lets an admin ask "who would this mail if it were Sunday
       // 12:05?" without waiting for Sunday. Only ever passed by the dry-run
@@ -858,6 +962,18 @@ class GameScheduler {
       }
     } catch (error) {
       console.error('[Scheduler] Error checking for picks-lock warnings:', error);
+      failure = error;
+    }
+    if (automatic) {
+      const sent = results.reduce((n, r) => n + r.emailsSent, 0);
+      const failed = results.reduce((n, r) => n + r.emailsFailed, 0);
+      const via = options.source ?? 'cron';
+      await finishSchedulerLease(
+        'lock-warnings',
+        failure ? `failed: ${String(failure)} (${via})`
+          : results.length === 0 ? `no week locks within the hour (${via})`
+          : `${sent} sent, ${failed} failed (${via})`
+      );
     }
     return results;
   }

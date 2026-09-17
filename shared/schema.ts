@@ -260,6 +260,30 @@ export const emailNotifications = pgTable("email_notifications", {
   kindWeekIdx: index("idx_email_notifications_kind_week").on(table.kind, table.weekId),
 }));
 
+// Which time-driven job last ran, and when — the lease that lets several
+// instances (and several requests) share one scheduler without doing the same
+// work twice.
+//
+// The production deployment is Replit Autoscale: containers are started for
+// traffic, frozen between requests and scaled to zero when the site is quiet,
+// so an in-process `node-cron` timer is not a promise that anything runs at a
+// given minute. Work is therefore also kicked by ordinary requests and by an
+// external heartbeat, and every one of those callers claims the lease below
+// first. The claim is a single conditional UPSERT, so exactly one caller wins
+// a given window and the rest return immediately.
+export const schedulerLeases = pgTable("scheduler_leases", {
+  /** 'spreads' | 'lock-warnings' | 'results' */
+  job: varchar("job").primaryKey(),
+  /** When the winning caller started this job's last run. */
+  lastRunAt: timestamp("last_run_at").defaultNow().notNull(),
+  /** 'cron' | 'startup' | 'request' | 'heartbeat' | 'admin' — who kicked it. */
+  lastSource: varchar("last_source"),
+  /** One line about what that run did, for the admin scheduler page. */
+  lastResult: text("last_result"),
+  /** Set when the run finished; null means it was claimed and never returned. */
+  lastFinishedAt: timestamp("last_finished_at"),
+});
+
 export const EMAIL_SENT = 'sent' as const;
 export const EMAIL_FAILED = 'failed' as const;
 
@@ -447,6 +471,7 @@ export type InsertGolfPickSelection = typeof golfPickSelections.$inferInsert;
 export type GolfResult = typeof golfResults.$inferSelect;
 export type InsertGolfResult = typeof golfResults.$inferInsert;
 
+export type SchedulerLease = typeof schedulerLeases.$inferSelect;
 export type EmailNotification = typeof emailNotifications.$inferSelect;
 export type InsertEmailNotification = typeof emailNotifications.$inferInsert;
 

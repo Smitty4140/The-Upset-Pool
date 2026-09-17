@@ -1,0 +1,81 @@
+# Wake the app so its scheduler runs.
+#
+# The site is deployed to Replit Autoscale, where a container exists to serve
+# requests: it is started when traffic arrives and shut down when the site is
+# quiet. An in-process timer ("pull the spreads eight hours before kickoff")
+# only fires if a container happens to be awake at that minute, which is why
+# the spreads have twice waited for an admin to press "pull spreads" by hand.
+#
+# This workflow makes the request nobody else is there to make. The endpoint
+# only runs work that is actually due, and every job behind it takes a database
+# lease, so pinging it more often than needed costs nothing.
+#
+# Setup (once):
+#   1. Replit → Secrets: CRON_SECRET = <a long random string>
+#   2. GitHub → Settings → Secrets and variables → Actions:
+#        CRON_SECRET          same value
+#        SCHEDULER_TICK_URL   optional; defaults to the production URL below
+#
+# Without those secrets every run exits 0 and does nothing, so the workflow is
+# harmless until it is configured.
+#
+# The schedule is deliberately clustered around the moments that matter rather
+# than running every ten minutes all week — scheduled runs on a private repo
+# bill against the account's Actions minutes, and a 24/7 ping would spend most
+# of them on a sleeping league. Times are UTC and the windows are wide enough
+# to cover both EDT (UTC-4) and EST (UTC-5).
+name: Scheduler heartbeat
+
+on:
+  schedule:
+    # Thursday 14:00–20:59 UTC (10:00–16:59 ET): spreads post ~8 hours before
+    # the Thursday night kickoff, and the "picks are open" email goes with them.
+    - cron: '*/15 14-20 * * 4'
+    # Sunday 14:00–23:59 UTC: the 1 PM ET picks lock, its one-hour warning, and
+    # the afternoon results.
+    - cron: '*/15 14-23 * * 0'
+    # Sunday night into Monday, and Monday night into Tuesday: final results.
+    - cron: '0 0-6 * * 1,2'
+    - cron: '0 23 * * 1'
+    # A safety net the rest of the week, so a week that comes due at an odd
+    # hour (a flexed game, a reseeded schedule) is never more than ~3 hours late.
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+# A late tick is better than two at once, and the work is leased anyway.
+concurrency:
+  group: scheduler-heartbeat
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping the scheduler
+        env:
+          TICK_URL: ${{ secrets.SCHEDULER_TICK_URL || 'https://www.upsetpool.com/api/cron/tick' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -uo pipefail
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "CRON_SECRET is not set for this repository — nothing to do."
+            echo "See the comments at the top of this workflow to finish setup."
+            exit 0
+          fi
+
+          # One retry: a cold Autoscale container can take a few seconds to
+          # accept its first connection after the site has been idle.
+          for attempt in 1 2 3; do
+            code=$(curl -sS -X POST "${TICK_URL}" \
+              -H "x-cron-secret: ${CRON_SECRET}" \
+              --max-time 120 -o response.json -w '%{http_code}') && true
+            echo "attempt ${attempt}: HTTP ${code}"
+            cat response.json 2>/dev/null || true
+            echo
+            if [ "${code}" = "200" ]; then exit 0; fi
+            sleep 10
+          done
+
+          echo "::error::The scheduler heartbeat could not reach ${TICK_URL}."
+          exit 1

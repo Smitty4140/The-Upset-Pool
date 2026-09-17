@@ -31,7 +31,8 @@ Preferred communication style: Simple, everyday language.
 - **Key Features**:
     - Automated user assignment to a default league.
     - Server-side validation for pick submissions, ensuring underdog selection and enforcing deadlines.
-    - Automated game data and results pulling via scheduled jobs (e.g., 12 hours before first game for data, 5 hours after last game for results).
+    - Automated game data and results pulling via scheduled jobs (e.g., 8 hours before first game for data, 5 hours after last game for results).
+    - **Those jobs are not driven by cron alone.** The deployment target is Replit Autoscale, where a container only runs while it is serving a request, so an in-process timer cannot be relied on to fire at a given minute — twice this left a week's spreads unpulled and its "picks are open" email unsent until an admin pressed the button. The same work is now kicked by API traffic and by an external heartbeat (`POST /api/cron/tick`, gated on `CRON_SECRET`), with every job claiming a lease in `scheduler_leases` so it still runs exactly once per window. See `docs/scheduler-on-autoscale.md` for the setup and for how to tell, from `/api/admin/scheduler/status`, whether the automation ran at all.
     - Comprehensive tie handling in leaderboards.
     - League management including unique invite codes and member management.
     - Two distinct admin roles: league admin (one league's settings) and super admin (site-wide).
