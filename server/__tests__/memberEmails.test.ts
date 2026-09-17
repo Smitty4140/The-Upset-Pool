@@ -117,6 +117,6 @@ describe("one-hour warning email (no pick in yet)", () => {
   it("never points a member at the bare homepage", () => {
     const mail = buildWeeklyPickReminderEmail("dana", 3, [{ leagueName: "Sunday Dogs", leagueId: 7 }], lockTime);
     // The footer links to the site; the calls to action must not.
-    expect(mail.text).toContain("Make your pick: https://upsetpool.com/?tab=spreads&league=7");
+    expect(mail.text).toContain("Make your pick: https://www.upsetpool.com/?tab=spreads&league=7");
   });
 });

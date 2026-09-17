@@ -9,7 +9,7 @@ if (!process.env.BREVO_FROM_EMAIL) {
 // Shared branding
 // ---------------------------------------------------------------------------
 
-const SITE_URL = 'https://upsetpool.com';
+const SITE_URL = 'https://www.upsetpool.com';
 const LOGO_URL = `${SITE_URL}/email-logo.png`;
 
 // Pulled from the app's own tokens so email and product read as one thing.
@@ -144,7 +144,7 @@ function emailLayout(opts: { preheader?: string; eyebrow: string; heading: strin
     <!-- Footer -->
     <div style="padding: 16px 8px 0 8px; text-align: center;">
       <p style="margin: 0 0 4px 0; color: ${MUTED}; font-size: 12px;">
-        The Upset Pool &middot; <a href="${SITE_URL}" style="color: ${MUTED}; text-decoration: underline;">upsetpool.com</a>
+        The Upset Pool &middot; <a href="${SITE_URL}" style="color: ${MUTED}; text-decoration: underline;">www.upsetpool.com</a>
       </p>
       <p style="margin: 0; color: #9ca3af; font-size: 11px;">
         Manage email notifications in your <a href="${SITE_URL}/profile" style="color: #9ca3af; text-decoration: underline;">profile settings</a>.
