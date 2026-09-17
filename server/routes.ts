@@ -1398,6 +1398,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const week = targetWeek[0];
       console.log(`Pulling spreads for Week ${week.weekNumber} only`);
+
+      // "Picks are open" is the board going from empty to posted, so the count
+      // has to be taken on both sides of the pull.
+      const spreadsPostedInWeek = async () =>
+        (await db.select().from(nflGames).where(eq(nflGames.weekId, weekId)))
+          .filter(g => hasSpread(g)).length;
+      const spreadsBefore = await spreadsPostedInWeek();
       
       // Get existing games for the specified week only
       const homeTeamAlias = alias(nflTeams, 'homeTeam');
@@ -1498,9 +1505,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Tell the league, exactly as the scheduled pull and /api/admin/pull-games
+      // do. This is the button in the admin UI, so it is the one an admin
+      // reaches for when the automation is late — and until now it was the one
+      // path that put a board up without anybody hearing about it. The gate is
+      // shared, so a week already announced is not mailed twice.
+      const { gameScheduler } = await import("./scheduler.js");
+      const notifications = await gameScheduler.announcePicksUnlockedIfDue(week, {
+        pulledFromEmpty: spreadsBefore === 0 && (await spreadsPostedInWeek()) > 0,
+      });
+
       return res.json({
         message: `Week ${week.weekNumber}: posted ${results.spreadsSet} spreads` +
-          (results.spreadsKept ? `, kept ${results.spreadsKept} already posted` : ''),
+          (results.spreadsKept ? `, kept ${results.spreadsKept} already posted` : '') +
+          (notifications ? `, ${notifications.emailsSent} members emailed` : ''),
+        notifications,
         created: results.gamesCreated,
         updated: results.gamesUpdated,
         spreadsSet: results.spreadsSet,

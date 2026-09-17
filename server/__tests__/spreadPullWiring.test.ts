@@ -24,8 +24,20 @@ describe("spreads pull on a sweep, not a one-shot job", () => {
   it("a recurring cron drives the spread pull", () => {
     // A cron armed for the trigger minute only fires if this exact container
     // is still alive then, which on an autoscale deployment it usually is not.
-    expect(SCHEDULER).toMatch(/cron\.schedule\('\*\/10 \* \* \* \*'/);
+    // It sweeps every minute: the board reads "Any moment now" from the second
+    // the countdown expires, so the gap between that and the lines appearing is
+    // the feature, and ten minutes of it reads as broken.
+    expect(SCHEDULER).toMatch(/cron\.schedule\('\* \* \* \* \*'/);
     expect(bodyBetween(SCHEDULER, "start() {", "stop() {")).toMatch(/sweepSpreadPulls/);
+  });
+
+  it("sweeping that often cannot cost Odds API requests", () => {
+    // The sweep is cheap by design — one batched read — and the API call is
+    // rationed separately, by a lease that outlives the container.
+    const fn = bodyBetween(SCHEDULER, "private async sweepSpreadPulls", "checkAndScheduleResultsPulls");
+    expect(fn).toMatch(/this\.gamesForWeeks\(weeks\.map\(w => w\.id\)\)/);
+    const pull = bodyBetween(SCHEDULER, "private async pullSpreadsIfDue", "private async scheduleWeekResultsPull");
+    expect(pull).toMatch(/claimSchedulerLease\(spreadPullLeaseKey\(week\.id\), retryWindow/);
   });
 
   it("the sweep also runs on startup, so a cold start catches up", () => {
@@ -110,6 +122,16 @@ describe("the picks-unlocked email fires once, when the board goes up", () => {
     const fn = bodyBetween(ROUTES, "'/api/admin/pull-games'", "// NFL Odds Games route");
     expect(fn).toMatch(/pullNFLGamesFromOddsAPI\(storage, currentWeek\.id\)/);
     expect(fn).toMatch(/announcePicksUnlockedIfDue\(currentWeek/);
+    expect(fn).not.toMatch(/sendPicksUnlockedNotifications/);
+  });
+
+  it("and so does the one in the admin UI", () => {
+    // /api/admin/games/fetch-from-api is what the "Pull NFL Games from API"
+    // button calls — the button an admin uses when the automation is late. It
+    // posted the board and told nobody, so a hand-pulled week went out silent.
+    const fn = bodyBetween(ROUTES, "'/api/admin/games/fetch-from-api'", "fetch-preseason-games");
+    expect(fn).toMatch(/announcePicksUnlockedIfDue\(week, \{/);
+    expect(fn).toMatch(/pulledFromEmpty: spreadsBefore === 0/);
     expect(fn).not.toMatch(/sendPicksUnlockedNotifications/);
   });
 

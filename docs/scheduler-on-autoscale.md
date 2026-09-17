@@ -1,25 +1,62 @@
-# Why the spreads did not pull, and how to tell next time
+# Why the board sat on "Any moment now"
 
 ## What happened
 
-Twice now the week's spreads stayed empty until an admin pressed the pull
-button in the site admin, and because the board never went up on its own, the
-"picks are open" email never went out either. The pull itself was never broken:
-the moment a human asked for it, it worked on the first try.
+The countdown on the league header reached zero, the header switched to "Any
+moment now", and the spreads did not appear. After three to five minutes an
+admin pressed **Pull NFL Games from API** in the site admin; the board went up
+immediately, and the league still got no "picks are open" email.
 
-There are exactly two ways that happens, and they need different fixes:
+Three separate things are in that one sentence.
 
-1. **Nothing ran.** No container was awake to run the sweep at the moment the
-   week came due.
-2. **The sweep ran and decided not to pull** — or pulled and wrote nothing.
+## 1. The sweep only ran every ten minutes
 
-The second is the more likely one when someone was on the site around that
-time, because a visit wakes a container and the sweep runs on startup as well
-as every ten minutes. Both are addressed below, and the admin Scheduler card
-now says plainly which one you are looking at.
+The header says "Any moment now" the instant the countdown expires. The server
+swept for due weeks every ten minutes. So the gap between the promise and the
+lines going up was anywhere from a few seconds to ten minutes, and there was no
+way for anyone watching to tell a slow sweep from a broken one. Three to five
+minutes of it is enough to reach for the manual button — which is what happened,
+and why the automation never got the chance to prove it worked.
 
-## Failure mode 1: nothing ran
+The sweep now runs every minute (`SPREAD_SWEEP_LEASE_MS`), and it is cheap
+enough to do that: it reads every upcoming week's games in one batched query
+instead of one query per week.
 
+Sweeping more often does not mean asking The Odds API more often. Those are two
+different limits, and only the second one costs money:
+
+- **Sweeping** — deciding whether any week is due — is two queries, every minute.
+- **Pulling** — calling the Odds API for a week — still happens at most once
+  every 30 minutes per week, and that interval is now durable. It used to rely
+  on an in-memory counter plus the `updated_at` on the week's game rows, which
+  says nothing at all about a week with no games yet: exactly the week the
+  fallback trigger exists for. Each week now claims its own
+  `spread-pull:w<id>` lease before the request goes out, so a week that keeps
+  failing costs one request per window across every container, not one per
+  sweep.
+
+The page helps too: while the header reads "Any moment now" it re-checks twice a
+minute, and each of those requests is itself what kicks the server's sweep
+(see 3 below). Sitting on the page waiting is now the thing that makes the
+spreads appear.
+
+## 2. The admin pull button never sent the email
+
+There are two admin pull paths, and they behaved differently:
+
+| Route | Posts spreads | Tells the league |
+| --- | --- | --- |
+| `POST /api/admin/pull-games` | yes | yes |
+| `POST /api/admin/games/fetch-from-api` — **the button in the admin UI** | yes | **no** |
+
+So the one an admin actually reaches for when the automation looks late was the
+one path that could put a whole board up in silence. `fetch-from-api` now
+announces through the same gate as everything else (`announcePicksUnlockedIfDue`),
+which counts posted spreads either side of the pull so it only announces a board
+that actually went from empty to up, and never mails a week the league has
+already been told about.
+
+## 3. Nothing runs when nothing is awake
 `.replit` deploys this app to **Replit Autoscale**:
 
 ```
@@ -46,15 +83,15 @@ the site because nobody has been told the board is up: the email that would tell
 them is the thing that did not send. The automation was waiting on traffic that
 its own output was supposed to create.
 
-This is a real gap whether or not it caused either incident. If someone *was* on
-the site when a week came due, a container was awake and this is not the
-explanation — see failure mode 2.
+This did not cause the incident above — someone was on the site, so a container
+was awake — but it is a real gap on any quiet Thursday, and the fix is also what
+makes point 1 work: a request is now a thing that drives the scheduler.
 
 Switching the deployment to a Reserved VM would also fix this (a VM runs all the
 time, so the crons are real), at the cost of an always-on instance. The approach
 below keeps Autoscale.
 
-### The fix
+### The fix — requests drive the scheduler
 
 The same jobs are now kicked from the contexts that actually run on Autoscale:
 
@@ -79,45 +116,39 @@ RETURNING job
 
 Postgres serializes that statement, so in any window exactly one caller gets a
 row back and does the work; everyone else gets nothing and returns immediately.
-A thousand requests a minute still mean one spread sweep every five minutes, one
-Odds API call, one email to the league.
+A thousand requests a minute still mean one spread sweep a minute, one Odds API
+call per week per 30 minutes, one email to the league.
 
-Windows are in `server/scheduler.ts`: spreads 5 min, lock warnings 4 min,
-results 20 min. The per-week rules (when a week is due, the 30-minute retry, the
-12-attempt budget) are unchanged and still live in `spreadPullPolicy.ts`.
+Windows are in `server/scheduler.ts`: spreads 1 min, lock warnings 4 min,
+results 20 min, plus the per-week `spread-pull:w<id>` window that rations the
+Odds API itself (30 minutes, or 2 hours once a week is over budget). When a week
+is due, the rules for what to do about it still live in `spreadPullPolicy.ts`.
 
 If `scheduler_leases` does not exist yet, claims fall back to a per-process
 lease and log what to run. Jobs still happen; two containers might briefly
 duplicate one. The email send log (`email_notifications`) still keeps members
 from being mailed twice.
 
-## Failure mode 2: it ran and did not pull
+## 4. A week that gave up stayed given up
 
 The sweep asks `decideSpreadPull` (`server/spreadPullPolicy.ts`) about each
 upcoming week, and only one of its answers pulls:
 
-| Status | Meaning | Why the board can stay empty |
-| --- | --- | --- |
-| `complete` | every game has a line | — |
-| `locked` | picks already closed | a board that opened too late is never filled |
-| `waiting` | the trigger has not arrived | the trigger is **8 hours before the earliest kickoff already in the database**, so a week whose Thursday game was never seeded waits until Sunday morning instead |
-| `throttled` | pulled within the last 30 minutes | temporary, by design |
-| `exhausted` | past its fast-retry budget | **this one used to be permanent** |
-| `due` | pulls now | — |
+| Status | Meaning |
+| --- | --- |
+| `complete` | every game has a line |
+| `locked` | picks already closed |
+| `waiting` | the trigger has not arrived — it is 8 hours before the **earliest kickoff already in the database**, so a week whose Thursday game was never seeded waits until Sunday morning |
+| `throttled` | pulled within the last 30 minutes |
+| `exhausted` | past its fast-retry budget |
+| `due` | pulls now |
 
-`exhausted` was the dead end. After 12 failed attempts the week stopped being
-pulled by anything except a restart or an admin pressing the button — so a book
-that posted its lines an hour late, or an API hiccup during the trigger window,
-left the board empty for the rest of the week with only a single line in the
-logs to say so. That is what "it got stuck" looks like from the outside.
-
-It now backs off instead of stopping: 12 attempts at 30 minutes, then one every
-two hours until the week locks (`SPREAD_PULL_SLOW_RETRY_MS`). Worst case that is
-about 20 requests a day for a week that cannot be filled, against a season quota
-in the thousands, and the status still reads `exhausted` so an admin knows to
-look. The status line and `GET /api/admin/system/preflight/spreads` say why the
-attempts are failing — a team name that does not map, a kickoff that buckets
-outside the week's date range, no lines posted yet, a quota wall.
+`exhausted` used to be permanent: after 12 failed attempts the week was never
+pulled again by anything but a restart or an admin. A book posting its lines an
+hour late could therefore strand a board for the rest of the week. It now backs
+off instead of stopping — 12 attempts at 30 minutes, then one every two hours
+until the week locks (`SPREAD_PULL_SLOW_RETRY_MS`) — while still reading
+`exhausted` so an admin knows something is wrong.
 
 ## Setup
 
@@ -187,8 +218,8 @@ Read it in this order:
 - **`leases.spreads.lastRunAt` is hours old** → nothing is kicking the app
   (failure mode 1). Check the heartbeat: workflow runs, pinger, `CRON_SECRET`
   set on both ends.
-- **It ran recently, and the week says `waiting`** → the trigger has not
-  arrived. Compare `pullAt` with `firstKickoff`: the example above is the giveaway
+- **It ran within the last couple of minutes and the week says `waiting`** →
+  the trigger has not arrived. Compare `pullAt` with `firstKickoff`: the example above is the giveaway
   that the Thursday game is missing from the schedule, which pushed the trigger
   to Sunday morning. Seed the missing game, or pull by hand.
 - **`throttled`** → it pulled within the last 30 minutes and will try again.

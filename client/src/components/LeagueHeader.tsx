@@ -50,7 +50,13 @@ export default function LeagueHeader({ leagueId, hasSubmittedPick, userPick, sel
       const postAt = spreadsPostAt(games);
       // No games on the board yet: the pull creates them, so keep looking.
       if (!postAt) return 5 * 60 * 1000;
-      return Date.now() >= postAt.getTime() - 15 * 60 * 1000 ? 60 * 1000 : false;
+      const dueAt = postAt.getTime();
+      // Once the countdown has expired the header reads "Any moment now", and
+      // every one of these polls is also what kicks the server's sweep, so
+      // sitting on the page is what makes the spreads appear. Twice a minute
+      // while that is on screen; once a minute in the quarter hour before.
+      if (Date.now() >= dueAt) return 30 * 1000;
+      return Date.now() >= dueAt - 15 * 60 * 1000 ? 60 * 1000 : false;
     },
   });
 

@@ -13,14 +13,16 @@ import { formatPicksLockAt, formatPicksLockTimeOnly, easternDateString, formatDa
 import { pullNFLGamesFromOddsAPI } from './nflDataPuller.js';
 import {
   decideSpreadPull, announcementDue, announcedOutOfBand, hasSpread, MAX_SPREAD_PULL_ATTEMPTS,
+  SPREAD_PULL_RETRY_MS, SPREAD_PULL_SLOW_RETRY_MS,
 } from './spreadPullPolicy.js';
 import { pullNFLResultsFromESPN, pullResultsForActiveWeeks } from './espnResultsPuller.js';
 import {
-  claimSchedulerLease, finishSchedulerLease, type LeaseSource,
+  claimSchedulerLease, finishSchedulerLease, releaseSchedulerLease, spreadPullLeaseKey,
+  type LeaseSource,
 } from './schedulerLease.js';
 import type { IStorage } from './storage.js';
 import { storage } from './storage.js';
-import { eq, and, gte, lte, lt, asc, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, lt, asc, desc, inArray } from 'drizzle-orm';
 
 /** One member a send run touched — the manifest a dry run reports back. */
 export interface EmailRecipient {
@@ -39,7 +41,15 @@ export interface EmailRecipient {
  * lease is what keeps that from turning into four sweeps a minute. A job that
  * is kicked while its window is still open returns without doing anything.
  */
-export const SPREAD_SWEEP_LEASE_MS = 5 * 60 * 1000;
+/**
+ * The spread sweep runs about once a minute, because the page says "Any moment
+ * now" the instant the countdown expires and everyone on it is refreshing.
+ * Ten minutes of that is the automation looking broken, which is how this last
+ * went wrong. A sweep is two queries; the Odds API is protected separately, by
+ * the per-week attempt lease below, so sweeping often costs nothing but rows
+ * read.
+ */
+export const SPREAD_SWEEP_LEASE_MS = 60 * 1000;
 export const LOCK_WARNING_LEASE_MS = 4 * 60 * 1000;
 export const RESULTS_LEASE_MS = 20 * 60 * 1000;
 
@@ -100,8 +110,13 @@ class GameScheduler {
     // itself only fires while a container is awake, so the same sweep is also
     // kicked by API traffic and by the external heartbeat that hits
     // /api/cron/tick. All three claim the same lease, so only one of them
-    // does the work in any five-minute window.
-    cron.schedule('*/10 * * * *', async () => {
+    // does the work in any given window.
+    //
+    // Every minute, not every ten: the board says "Any moment now" the moment
+    // the countdown expires, and the wait after that is the whole experience
+    // of the feature. The lease makes a kick a no-op when another caller has
+    // just swept, and the sweep itself is two queries.
+    cron.schedule('* * * * *', async () => {
       await this.sweepSpreadPulls('cron');
     });
 
@@ -243,6 +258,22 @@ class GameScheduler {
       .orderBy(asc(nflWeeks.weekNumber));
   }
 
+  /** Every game for the given weeks, keyed by week id, in kickoff order. */
+  private async gamesForWeeks(weekIds: number[]) {
+    const byWeek = new Map<number, Array<typeof nflGames.$inferSelect>>();
+    if (weekIds.length === 0) return byWeek;
+
+    const rows = await db
+      .select()
+      .from(nflGames)
+      .where(inArray(nflGames.weekId, weekIds))
+      .orderBy(asc(nflGames.gameTime));
+
+    for (const id of weekIds) byWeek.set(id, []);
+    for (const row of rows) byWeek.get(row.weekId)?.push(row);
+    return byWeek;
+  }
+
   /**
    * Check every upcoming week and pull spreads for any that are due.
    *
@@ -265,10 +296,15 @@ class GameScheduler {
       return { ran: true as const, error: String(error) };
     }
 
+    // One query for every upcoming week's games rather than one per week: the
+    // sweep runs every minute now, and sixteen round trips a minute to learn
+    // that nothing is due is a waste of the database.
+    const gamesByWeek = await this.gamesForWeeks(weeks.map(w => w.id));
+
     for (const week of weeks) {
       // Per week, so one bad week does not cost every later week its pull.
       try {
-        const { pulledFromEmpty, boardIsUp } = await this.pullSpreadsIfDue(week);
+        const { pulledFromEmpty, boardIsUp } = await this.pullSpreadsIfDue(week, gamesByWeek.get(week.id) ?? [], source);
 
         // Announcing is a separate question from pulling, and asked on every
         // tick a board exists: a week whose lines were already in the
@@ -314,14 +350,8 @@ class GameScheduler {
    * games the Odds API returns for any other week are read and skipped, never
    * written. The rule itself lives in spreadPullPolicy.ts.
    */
-  private async pullSpreadsIfDue(week: any) {
+  private async pullSpreadsIfDue(week: any, games: any[], source: LeaseSource = 'cron') {
     const now = Date.now();
-
-    const games = await db
-      .select()
-      .from(nflGames)
-      .where(eq(nflGames.weekId, week.id))
-      .orderBy(asc(nflGames.gameTime));
 
     const attempts = this.spreadPullAttempts.get(week.id)
       ?? { count: 0, lastAttemptAt: 0, exhaustedLogged: false };
@@ -347,6 +377,20 @@ class GameScheduler {
     }
 
     if (!decision.pull) {
+      return { pulledFromEmpty: false, boardIsUp: decision.total > decision.missing };
+    }
+
+    // The retry interval has to hold across containers, and the in-memory
+    // counter does not: on Autoscale a cold start forgets it, and a sweep now
+    // runs every minute. `decideSpreadPull` reads the games' updatedAt as a
+    // durable stand-in, but a week with no games at all has no rows to read —
+    // which is exactly the week the fallback trigger exists for. This lease is
+    // that week's record, so a quiet failure costs one request per window
+    // rather than one per sweep.
+    const retryWindow = attempts.count >= MAX_SPREAD_PULL_ATTEMPTS
+      ? SPREAD_PULL_SLOW_RETRY_MS
+      : SPREAD_PULL_RETRY_MS;
+    if (!await claimSchedulerLease(spreadPullLeaseKey(week.id), retryWindow, source)) {
       return { pulledFromEmpty: false, boardIsUp: decision.total > decision.missing };
     }
 
@@ -636,12 +680,10 @@ class GameScheduler {
     const weeks = await this.upcomingWeeks();
     const rows = [];
 
+    const gamesByWeek = await this.gamesForWeeks(weeks.map(w => w.id));
+
     for (const week of weeks) {
-      const games = await db
-        .select()
-        .from(nflGames)
-        .where(eq(nflGames.weekId, week.id))
-        .orderBy(asc(nflGames.gameTime));
+      const games = gamesByWeek.get(week.id) ?? [];
 
       const attempts = this.spreadPullAttempts.get(week.id)
         ?? { count: 0, lastAttemptAt: 0, exhaustedLogged: false };
@@ -1199,8 +1241,11 @@ class GameScheduler {
       const result = await this.executeDataPull(week);
 
       // Attempts are per week, and a human asking again is a reason to keep
-      // trying — otherwise a week that burned its budget stays stuck.
+      // trying — otherwise a week that burned its budget stays stuck. The
+      // durable retry window goes with it, so the automatic sweep is free to
+      // try again as soon as this pull's own throttle has passed.
       this.spreadPullAttempts.delete(week.id);
+      await releaseSchedulerLease(spreadPullLeaseKey(week.id));
 
       const notifications = await this.announcePicksUnlockedIfDue(week, {
         pulledFromEmpty: Boolean(result && result.before === 0 && result.after > 0),

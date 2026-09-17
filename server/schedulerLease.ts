@@ -27,7 +27,17 @@
 import { sql } from 'drizzle-orm';
 import { db } from './db.js';
 
-export type LeaseJob = 'spreads' | 'lock-warnings' | 'results';
+export type LeaseJob =
+  | 'spreads'
+  | 'lock-warnings'
+  | 'results'
+  /** One per week: the durable "don't call the Odds API again yet" record. */
+  | `spread-pull:w${number}`;
+
+/** The lease key for a week's Odds API attempts. */
+export function spreadPullLeaseKey(weekId: number): LeaseJob {
+  return `spread-pull:w${weekId}`;
+}
 
 /** Who kicked a run — recorded so the admin page can say where work came from. */
 export type LeaseSource = 'cron' | 'startup' | 'request' | 'heartbeat' | 'admin';
@@ -107,6 +117,22 @@ export async function finishSchedulerLease(job: LeaseJob, summary: string) {
     `);
   } catch (error) {
     console.error(`[SchedulerLease] Could not record the outcome of "${job}":`, error);
+  }
+}
+
+/**
+ * Forget a lease, so the next caller claims it immediately.
+ *
+ * For an admin saying "do it now": a human asking again is a reason to try
+ * again, not to wait out a window meant for unattended retries.
+ */
+export async function releaseSchedulerLease(job: LeaseJob) {
+  memoryLeases.delete(job);
+  if (!leaseTableAvailable) return;
+  try {
+    await db.execute(sql`delete from scheduler_leases where job = ${job}`);
+  } catch (error) {
+    console.error(`[SchedulerLease] Could not release "${job}":`, error);
   }
 }
 
