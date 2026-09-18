@@ -169,6 +169,57 @@ describe("decideSpreadPull", () => {
   });
 });
 
+/**
+ * The sweep looks at every upcoming week on every tick — now once a minute —
+ * and it reads all of their games in one query. What keeps that from posting
+ * next week's board days early is this: each week is judged against its own
+ * trigger, and only the week whose trigger has passed is ever pulled.
+ *
+ * Getting this wrong has happened before, from the other direction: an
+ * unscoped pull wrote every game The Odds API returned, so as soon as books
+ * put the following week's lines up, that week's board appeared early and its
+ * own trigger had nothing left to post.
+ */
+describe("a sweep over many weeks only pulls the week that is due", () => {
+  const WEEKS = [
+    { id: 3, weekNumber: 3, picksLockAt: new Date("2026-09-20T17:00:00Z"), firstKickoff: "2026-09-18T00:15:00Z" },
+    { id: 4, weekNumber: 4, picksLockAt: new Date("2026-09-27T17:00:00Z"), firstKickoff: "2026-09-25T00:15:00Z" },
+    { id: 5, weekNumber: 5, picksLockAt: new Date("2026-10-04T17:00:00Z"), firstKickoff: "2026-10-02T00:15:00Z" },
+  ];
+
+  /** Every week's board empty, as it is before any of them has been pulled. */
+  const boardFor = (week: typeof WEEKS[number]) => [
+    game({ gameTime: week.firstKickoff, updatedAt: "2026-09-01T00:00:00Z" }),
+    game({ gameTime: week.firstKickoff, updatedAt: "2026-09-01T00:00:00Z" }),
+  ];
+
+  it("week 3 is due at its trigger and weeks 4 and 5 are still waiting", () => {
+    const decisions = WEEKS.map(week => decideSpreadPull(week, boardFor(week), DUE_AT));
+
+    expect(decisions.map(d => d.status)).toEqual(["due", "waiting", "waiting"]);
+    expect(decisions.filter(d => d.pull)).toHaveLength(1);
+  });
+
+  it("holds a week later in the season for its own week, not this one", () => {
+    const week15 = { id: 15, weekNumber: 15, picksLockAt: new Date("2026-12-13T18:00:00Z") };
+    const board = [game({ gameTime: "2026-12-11T01:15:00Z", updatedAt: null })];
+    const decision = decideSpreadPull(week15, board, DUE_AT);
+
+    expect(decision.status).toBe("waiting");
+    expect(decision.pull).toBe(false);
+  });
+
+  it("a future week with no games yet waits on its own lock, not this week's", () => {
+    // The fallback trigger is derived from that week's picksLockAt, so an
+    // unseeded December week is not suddenly due in September.
+    const week15 = { id: 15, weekNumber: 15, picksLockAt: new Date("2026-12-13T18:00:00Z") };
+    const decision = decideSpreadPull(week15, [], DUE_AT);
+
+    expect(decision.status).toBe("waiting");
+    expect(decision.pullAt.getTime()).toBeGreaterThan(DUE_AT);
+  });
+});
+
 describe("announcementDue", () => {
   const posted = () => emptyBoard().map(g => ({ ...g, spread: "-3.5" }));
 

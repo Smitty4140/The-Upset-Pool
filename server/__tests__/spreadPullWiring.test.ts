@@ -200,6 +200,16 @@ describe("a posted spread is never overwritten", () => {
     expect(fn).toMatch(/if \(existingSpread === 0 && homeSpread !== 0\)/);
   });
 
+  it("a pull scoped to one week cannot write another week's game", () => {
+    // The sweep reads every upcoming week in one query and calls the pull with
+    // one week id. This is the line that keeps the second thing true: a game
+    // the API returns is written only if it buckets into the week being pulled,
+    // so next week's lines can never land on this week's pull (or vice versa).
+    expect(PULLER).toMatch(/if \(weekId && gameWeek\.id !== weekId\) \{\s*continue;/);
+    // And a game that buckets nowhere is skipped rather than guessed at.
+    expect(PULLER).toMatch(/if \(!gameWeek\) \{[\s\S]*?continue;/);
+  });
+
   it("the admin fetch route keeps a posted spread unless asked to overwrite", () => {
     // This one used to set `spread` unconditionally on every matched game.
     const fn = bodyBetween(ROUTES, "'/api/admin/games/fetch-from-api'", "fetch-preseason-games");
