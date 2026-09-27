@@ -13,6 +13,7 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import SetupUsername from "@/pages/SetupUsername";
 import JoinLeague from "@/pages/JoinLeague";
+import ResetPassword from "@/pages/ResetPassword";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,6 +39,11 @@ function Router() {
     return <div className="flex h-screen w-screen items-center justify-center">Processing login...</div>;
   }
   
+  // Reset links arrive from email and work whether or not someone is signed in.
+  if (location.startsWith('/reset-password')) {
+    return <ResetPassword />;
+  }
+
   // Check for OAuth success/failure in URL params
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const authResult = urlParams.get('auth');

@@ -8,6 +8,8 @@ import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser, InsertUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
+import { createResetToken, readResetTokenUserId, verifyResetToken } from "./passwordReset";
+import { passwordResetUrl, sendPasswordResetEmail } from "./email";
 
 declare global {
   namespace Express {
@@ -273,6 +275,93 @@ export function setupAuth(app: Express) {
       if (err) return next(err);
       res.json({ message: "Logged out successfully" });
     });
+  });
+
+  // Forgot password: email a signed, one-hour, single-use reset link. Always
+  // answers the same way so the form can't be used to probe which emails have
+  // accounts.
+  const lastResetRequest = new Map<string, number>();
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    if (!email) {
+      return res.status(400).json({ message: "Email address is required" });
+    }
+
+    const genericReply = {
+      message: "If an account exists for that email, a reset link is on its way.",
+    };
+
+    // One email per address per minute, so the form can't be used to flood an inbox.
+    const now = Date.now();
+    if (now - (lastResetRequest.get(email) ?? 0) < 60 * 1000) {
+      return res.json(genericReply);
+    }
+    if (lastResetRequest.size > 1000) lastResetRequest.clear();
+    lastResetRequest.set(email, now);
+
+    try {
+      const user = await storage.getUserByEmail(email);
+      if (user) {
+        const token = createResetToken(user, process.env.SESSION_SECRET!);
+        const result = await sendPasswordResetEmail(
+          user.email,
+          user.username || user.firstName || "there",
+          passwordResetUrl(token),
+        );
+        if (!result.ok) {
+          console.error("Password reset email failed:", result.reason);
+        }
+      }
+    } catch (error) {
+      console.error("Forgot password error:", error);
+    }
+
+    res.json(genericReply);
+  });
+
+  app.post("/api/auth/reset-password", async (req, res, next) => {
+    try {
+      const { token, password } = req.body ?? {};
+      if (typeof token !== "string" || !token) {
+        return res.status(400).json({ message: "Reset link is missing or incomplete" });
+      }
+      if (typeof password !== "string" || password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters long" });
+      }
+
+      const userId = readResetTokenUserId(token);
+      const user = userId ? await storage.getUser(userId) : undefined;
+      if (!user || !verifyResetToken(token, user, process.env.SESSION_SECRET!)) {
+        return res.status(400).json({
+          message: "This reset link is invalid or has expired. Please request a new one.",
+        });
+      }
+
+      // Changing the hash is also what retires this link and any others.
+      // Following the emailed link proves the address, so mark it verified.
+      const updatedUser = await storage.updateUser(user.id, {
+        password: await hashPassword(password),
+        emailVerified: true,
+      });
+
+      req.login(updatedUser, (err) => {
+        if (err) return next(err);
+        res.json({
+          id: updatedUser.id,
+          email: updatedUser.email,
+          username: updatedUser.username,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          profileImageUrl: updatedUser.profileImageUrl,
+          totalPoints: updatedUser.totalPoints,
+          emailVerified: updatedUser.emailVerified,
+          receiveNotifications: updatedUser.receiveNotifications,
+        });
+      });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
   });
 
   app.get("/api/auth/user", (req, res) => {
