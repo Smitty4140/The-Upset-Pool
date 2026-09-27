@@ -57,3 +57,36 @@ export function verifyResetToken(
   const supplied = Buffer.from(signature);
   return expected.length === supplied.length && timingSafeEqual(expected, supplied);
 }
+
+const PRODUCTION_HOSTS = ["upsetpool.com", "www.upsetpool.com"];
+
+/**
+ * Origin to put in the emailed reset link: the site the request came from, so
+ * a reset started in the dev preview lands back in dev. The Host header is
+ * attacker-controlled, so only known hosts are honoured — otherwise anyone
+ * could request a reset for someone else and make the link in that person's
+ * email point at a site they control, which receives the working token the
+ * moment it's clicked. Anything unknown gets undefined, meaning production.
+ */
+export function resetLinkOrigin(
+  host: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  if (!host) return undefined;
+  const normalized = host.trim().toLowerCase();
+
+  const replitHosts = [
+    ...(env.REPLIT_DOMAINS ?? "").split(","),
+    env.REPLIT_DEV_DOMAIN ?? "",
+  ]
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (PRODUCTION_HOSTS.includes(normalized) || replitHosts.includes(normalized)) {
+    return `https://${normalized}`;
+  }
+  if (env.NODE_ENV === "development" && /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized)) {
+    return `http://${normalized}`;
+  }
+  return undefined;
+}

@@ -4,6 +4,7 @@ import {
   readResetTokenUserId,
   verifyResetToken,
   RESET_TOKEN_TTL_MS,
+  resetLinkOrigin,
 } from "../passwordReset";
 import { buildPasswordResetEmail, passwordResetUrl } from "../email";
 
@@ -47,6 +48,32 @@ describe("password reset tokens", () => {
   });
 });
 
+describe("reset link origin", () => {
+  const env = {
+    NODE_ENV: "production",
+    REPLIT_DOMAINS: "upset-pool.replit.app,other.replit.app",
+    REPLIT_DEV_DOMAIN: "abc-123.picard.replit.dev",
+  };
+
+  it("keeps the site the request came from when it is a known host", () => {
+    expect(resetLinkOrigin("www.upsetpool.com", env)).toBe("https://www.upsetpool.com");
+    expect(resetLinkOrigin("UpsetPool.com", env)).toBe("https://upsetpool.com");
+    expect(resetLinkOrigin("other.replit.app", env)).toBe("https://other.replit.app");
+    expect(resetLinkOrigin("abc-123.picard.replit.dev", env)).toBe("https://abc-123.picard.replit.dev");
+  });
+
+  it("falls back to production for unknown or missing hosts", () => {
+    expect(resetLinkOrigin("evil.example.com", env)).toBeUndefined();
+    expect(resetLinkOrigin("www.upsetpool.com.evil.com", env)).toBeUndefined();
+    expect(resetLinkOrigin(undefined, env)).toBeUndefined();
+  });
+
+  it("allows localhost only in development", () => {
+    expect(resetLinkOrigin("localhost:5000", env)).toBeUndefined();
+    expect(resetLinkOrigin("localhost:5000", { ...env, NODE_ENV: "development" })).toBe("http://localhost:5000");
+  });
+});
+
 describe("password reset email", () => {
   it("links to the reset page with the token in both parts", () => {
     const url = passwordResetUrl("abc.123.xyz");
@@ -54,5 +81,9 @@ describe("password reset email", () => {
     const content = buildPasswordResetEmail("Commish", url);
     expect(content.html).toContain(url);
     expect(content.text).toContain(url);
+  });
+
+  it("uses the given origin when one is passed", () => {
+    expect(passwordResetUrl("t", "https://abc.replit.dev")).toBe("https://abc.replit.dev/reset-password?token=t");
   });
 });

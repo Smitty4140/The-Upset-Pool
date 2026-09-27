@@ -8,7 +8,7 @@ import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser, InsertUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
-import { createResetToken, readResetTokenUserId, verifyResetToken } from "./passwordReset";
+import { createResetToken, readResetTokenUserId, resetLinkOrigin, verifyResetToken } from "./passwordReset";
 import { passwordResetUrl, sendPasswordResetEmail } from "./email";
 
 declare global {
@@ -306,7 +306,7 @@ export function setupAuth(app: Express) {
         const result = await sendPasswordResetEmail(
           user.email,
           user.username || user.firstName || "there",
-          passwordResetUrl(token),
+          passwordResetUrl(token, resetLinkOrigin(req.get("host"))),
         );
         if (!result.ok) {
           console.error("Password reset email failed:", result.reason);

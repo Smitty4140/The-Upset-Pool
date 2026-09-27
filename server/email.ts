@@ -408,9 +408,13 @@ If an admin restores the league, it moves back to your active list automatically
   };
 }
 
-/** Link to the page where a member chooses a new password. */
-export function passwordResetUrl(token: string): string {
-  return `${SITE_URL}/reset-password?token=${encodeURIComponent(token)}`;
+/**
+ * Link to the page where a member chooses a new password. `siteUrl` lets a
+ * request from the dev preview get a dev link; callers must only pass an
+ * allowlisted origin (see resetLinkOrigin), never a raw Host header.
+ */
+export function passwordResetUrl(token: string, siteUrl: string = SITE_URL): string {
+  return `${siteUrl}/reset-password?token=${encodeURIComponent(token)}`;
 }
 
 /** "Forgot password" link. Also how a Google-only account adds a password. */
