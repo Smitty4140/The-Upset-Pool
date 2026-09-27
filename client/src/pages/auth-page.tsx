@@ -124,10 +124,15 @@ export default function AuthPage({ authResult }: AuthPageProps) {
     onSuccess: (_result, data) => {
       setResetSentTo(data.email);
     },
-    onError: () => {
+    onError: (error: Error) => {
+      // apiRequest errors read "404: {json}"; show the server's own message.
+      let reason = error.message.replace(/^\d+:\s*/, "");
+      try {
+        reason = JSON.parse(reason).message || reason;
+      } catch {}
       toast({
         title: "Couldn't send reset link",
-        description: "Something went wrong. Please try again in a minute.",
+        description: reason || "Something went wrong. Please try again in a minute.",
         variant: "destructive",
       });
     },
