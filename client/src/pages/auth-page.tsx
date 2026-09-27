@@ -332,7 +332,9 @@ export default function AuthPage({ authResult }: AuthPageProps) {
                         </Button>
                       </div>
                     ) : (
-                      <Form {...forgotForm}>
+                      // Keyed so React builds fresh fields rather than reusing the
+                      // sign-in form's, which stay wired to the sign-in form's state.
+                      <Form key="forgot" {...forgotForm}>
                         <form
                           onSubmit={forgotForm.handleSubmit((data) => forgotMutation.mutate(data))}
                           className="space-y-4"
@@ -372,7 +374,7 @@ export default function AuthPage({ authResult }: AuthPageProps) {
                       </Form>
                     )
                   ) : (
-                  <Form {...loginForm}>
+                  <Form key="login" {...loginForm}>
                     <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
                       <FormField
                         control={loginForm.control}
