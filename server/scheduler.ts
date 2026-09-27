@@ -17,7 +17,7 @@ import {
 import { pullNFLResultsFromESPN, pullResultsForActiveWeeks } from './espnResultsPuller.js';
 import type { IStorage } from './storage.js';
 import { storage } from './storage.js';
-import { eq, and, gte, lte, lt, asc, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, asc, desc } from 'drizzle-orm';
 
 /** One member a send run touched — the manifest a dry run reports back. */
 export interface EmailRecipient {
@@ -81,7 +81,7 @@ class GameScheduler {
     // instance that is up (including one that cold-starts an hour late)
     // catches it, and the pull lands within ten minutes of its trigger.
     cron.schedule('*/10 * * * *', async () => {
-      await this.sweepSpreadPulls();
+      await this.singleFlight('spreads', () => this.sweepSpreadPulls());
     });
 
     // Results are still scheduled hourly off each week's last kickoff.
@@ -95,8 +95,13 @@ class GameScheduler {
     // minutes (instead of firing one job at T-60) means a restart or a brief
     // outage inside the window still delivers — the send log keeps it to one
     // email per member per week.
+    //
+    // None of these timers is a guarantee on autoscale, though: an instance
+    // with no traffic is stopped, and a stopped process has no timers. What
+    // makes the timing hold is an outside scheduler calling runDueWork()
+    // through POST /api/cron/tick — see docs/scheduled-email-reliability.md.
     cron.schedule('*/5 * * * *', async () => {
-      await this.checkPickLockWarnings();
+      await this.singleFlight('lock-warnings', () => this.checkPickLockWarnings());
     });
 
     // Schedule hourly results pulls during game windows:
@@ -140,9 +145,43 @@ class GameScheduler {
     });
 
     // Also run immediately on startup, so a deploy or a cold start picks up
-    // anything that came due while nothing was running.
-    this.sweepSpreadPulls();
+    // anything that came due while nothing was running — the lock warning
+    // included, which otherwise waited for the next five-minute mark.
+    this.runDueWork();
     this.checkAndScheduleResultsPulls();
+  }
+
+  /**
+   * Everything time-critical that is due right now: pull and announce spreads,
+   * and warn members an hour before lock. Idempotent — the send log and the
+   * pull policy decide what is actually due — so it is safe to call as often
+   * as anyone likes.
+   *
+   * This is what the external tick calls. It awaits the work rather than
+   * firing it off, because on autoscale an instance only reliably has CPU
+   * while it is answering a request; work left running after the response is
+   * exactly the work that gets frozen or killed.
+   */
+  async runDueWork() {
+    const spreads = await this.singleFlight('spreads', () => this.sweepSpreadPulls());
+    const lockWarnings = await this.singleFlight('lock-warnings', () => this.checkPickLockWarnings());
+    return { spreads, lockWarnings };
+  }
+
+  /** Jobs running in this process, so the cron and the external tick never overlap. */
+  private inFlight = new Map<string, Promise<unknown>>();
+
+  /**
+   * Run `job` unless the same job is already running here, in which case join
+   * it. Two overlapping runs would both read "nobody mailed yet" from the send
+   * log before either wrote to it, and mail the league twice.
+   */
+  private singleFlight<T>(key: string, job: () => Promise<T>): Promise<T> {
+    const running = this.inFlight.get(key);
+    if (running) return running as Promise<T>;
+    const run = job().finally(() => this.inFlight.delete(key));
+    this.inFlight.set(key, run);
+    return run;
   }
 
   /**
@@ -171,12 +210,13 @@ class GameScheduler {
    * Check every upcoming week and pull spreads for any that are due.
    */
   private async sweepSpreadPulls() {
+    const summary: Array<{ weekNumber: number; picksUnlockedEmailsSent: number }> = [];
     let weeks: Awaited<ReturnType<GameScheduler['upcomingWeeks']>>;
     try {
       weeks = await this.upcomingWeeks();
     } catch (error) {
       console.error('[Scheduler] Error sweeping for spread pulls:', error);
-      return;
+      return summary;
     }
 
     for (const week of weeks) {
@@ -188,13 +228,17 @@ class GameScheduler {
         // tick a board exists: a week whose lines were already in the
         // database — an early pull, a manual one — needs no API call but
         // still has to be announced when its trigger comes round.
+        let emailsSent = 0;
         if (boardIsUp) {
-          await this.announcePicksUnlockedIfDue(week, { pulledFromEmpty });
+          const outcome = await this.announcePicksUnlockedIfDue(week, { pulledFromEmpty });
+          emailsSent = outcome?.emailsSent ?? 0;
         }
+        summary.push({ weekNumber: week.weekNumber, picksUnlockedEmailsSent: emailsSent });
       } catch (error) {
         console.error(`[Scheduler] Error servicing spreads for week ${week.weekNumber}:`, error);
       }
     }
+    return summary;
   }
 
   /**
@@ -843,13 +887,15 @@ class GameScheduler {
       const now = options.asOf ?? new Date();
       const oneHourOut = new Date(now.getTime() + 60 * 60 * 1000);
 
-      // Weeks locking within the next hour (and not yet locked).
+      // Weeks locking within the next hour (and not yet locked). Inclusive
+      // at the far end: the tick at exactly 12:00:00 is the "one hour out"
+      // tick for a 1:00 lock, and a strict `<` pushed it to 12:05.
       const weeks = await db
         .select()
         .from(nflWeeks)
         .where(and(
           gte(nflWeeks.picksLockAt, now),
-          lt(nflWeeks.picksLockAt, oneHourOut)
+          lte(nflWeeks.picksLockAt, oneHourOut)
         ))
         .orderBy(asc(nflWeeks.picksLockAt));
 

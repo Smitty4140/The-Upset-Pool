@@ -16,6 +16,7 @@ import {
 import { sendLeagueArchivedEmail } from "./email";
 import { pullNFLGamesFromOddsAPI } from "./nflDataPuller";
 import { hasSpread } from "./spreadPullPolicy";
+import { checkCronSecret, presentedCronSecret } from "./cronAuth";
 import { pullNFLResultsFromESPN } from "./espnResultsPuller";
 import { getOddsApiKey } from "./oddsApiKey";
 import {
@@ -3281,6 +3282,39 @@ ${!apply && result.weeksNeedingFix > 0
       res.status(500).json({ message: error?.message || "Failed to audit lock times" });
     }
   });
+
+  // External tick. The deployment is autoscale, so with no traffic there is no
+  // process and no in-process cron — which is how a week's "picks are open"
+  // email never went out and the one-hour warning landed at 12:45 instead of
+  // 12:00. An outside scheduler calls this every five minutes; the work is
+  // awaited so the instance has CPU until it is done. Safe to call as often
+  // as you like: the pull policy and the send log decide what is due.
+  const cronTick = async (req: any, res: any) => {
+    const auth = checkCronSecret(process.env.CRON_SECRET, presentedCronSecret(req));
+    if (!auth.ok) {
+      return res.status(auth.status).json({ message: auth.message });
+    }
+    try {
+      const { gameScheduler } = await import("./scheduler.js");
+      const result = await gameScheduler.runDueWork();
+      res.json({
+        ok: true,
+        at: new Date().toISOString(),
+        spreads: result.spreads,
+        lockWarnings: result.lockWarnings.map(w => ({
+          weekNumber: w.weekNumber,
+          emailsSent: w.emailsSent,
+          emailsFailed: w.emailsFailed,
+          skipped: w.skipped,
+        })),
+      });
+    } catch (error) {
+      console.error("Error running cron tick:", error);
+      res.status(500).json({ message: "Cron tick failed" });
+    }
+  };
+  app.post('/api/cron/tick', cronTick);
+  app.get('/api/cron/tick', cronTick);
 
   app.get('/api/admin/scheduler/status', isAuthenticated, requireSuperAdmin, async (req: any, res) => {
     try {
