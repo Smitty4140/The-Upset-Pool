@@ -408,6 +408,42 @@ If an admin restores the league, it moves back to your active list automatically
   };
 }
 
+/**
+ * Link to the page where a member chooses a new password. `siteUrl` lets a
+ * request from the dev preview get a dev link; callers must only pass an
+ * allowlisted origin (see resetLinkOrigin), never a raw Host header.
+ */
+export function passwordResetUrl(token: string, siteUrl: string = SITE_URL): string {
+  return `${siteUrl}/reset-password?token=${encodeURIComponent(token)}`;
+}
+
+/** "Forgot password" link. Also how a Google-only account adds a password. */
+export function buildPasswordResetEmail(username: string, resetUrl: string): EmailContent {
+  const subject = 'Reset your Upset Pool password';
+  return {
+    subject,
+    html: emailLayout({
+      preheader: 'Use this link within the hour to choose a new password.',
+      eyebrow: 'Account',
+      heading: 'Reset your password',
+      bodyHtml: `
+        <p style="margin: 0 0 12px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">Hi ${esc(username)},</p>
+        <p style="margin: 0 0 4px 0; color: ${BODY}; font-size: 15px; line-height: 1.6;">Someone asked to reset the password for your Upset Pool account. Click below to choose a new one. The link works once and expires in an hour.</p>
+        ${ctaButton('Choose a new password', esc(resetUrl))}
+        <p style="margin: 18px 0 0 0; color: ${MUTED}; font-size: 13px; line-height: 1.6;">If you didn't ask for this, you can ignore this email — your password won't change.</p>`
+    }),
+    text: `${subject}
+
+Hi ${username},
+
+Someone asked to reset the password for your Upset Pool account. Open this link to choose a new one. It works once and expires in an hour.
+
+${resetUrl}
+
+If you didn't ask for this, you can ignore this email — your password won't change.${TEXT_FOOTER}`
+  };
+}
+
 /** Preflight delivery check, sent only to the signed-in super admin. */
 export function buildPreflightTestEmail(username: string, sentAt: Date = new Date()): EmailContent {
   const stamp = sentAt.toLocaleString('en-US', {
@@ -466,6 +502,7 @@ export const EMAIL_TEMPLATE_SAMPLES: Record<string, (name: string) => EmailConte
     ),
   'league-archived': name => buildLeagueArchivedEmail(name, 'NFL Upset Pool'),
   'preflight-test': name => buildPreflightTestEmail(name),
+  'password-reset': name => buildPasswordResetEmail(name, passwordResetUrl('sample-token')),
 };
 
 export const EMAIL_TEMPLATE_KEYS = Object.keys(EMAIL_TEMPLATE_SAMPLES);
@@ -481,6 +518,10 @@ export const EMAIL_TEMPLATE_KEYS = Object.keys(EMAIL_TEMPLATE_SAMPLES);
  */
 export async function sendPreflightTestEmail(email: string, username: string): Promise<SendResult> {
   return sendEmailDetailed({ to: email, ...buildPreflightTestEmail(username) });
+}
+
+export async function sendPasswordResetEmail(email: string, username: string, resetUrl: string): Promise<SendResult> {
+  return sendEmailDetailed({ to: email, ...buildPasswordResetEmail(username, resetUrl) });
 }
 
 export async function sendLeagueArchivedEmail(email: string, username: string, leagueName: string): Promise<boolean> {

@@ -30,7 +30,12 @@ const registerSchema = z.object({
   lastName: z.string().optional(),
 });
 
+const forgotSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+});
+
 type LoginFormData = z.infer<typeof loginSchema>;
+type ForgotFormData = z.infer<typeof forgotSchema>;
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 // Google's own mark — the Chrome browser logo previously stood in for it,
@@ -55,6 +60,8 @@ export default function AuthPage({ authResult }: AuthPageProps) {
   const { user, isLoading: isAuthLoading } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("login");
+  const [showForgot, setShowForgot] = useState(false);
+  const [resetSentTo, setResetSentTo] = useState<string | null>(null);
 
   // Handle OAuth results
   useEffect(() => {
@@ -103,6 +110,39 @@ export default function AuthPage({ authResult }: AuthPageProps) {
       lastName: "",
     },
   });
+
+  const forgotForm = useForm<ForgotFormData>({
+    resolver: zodResolver(forgotSchema),
+    defaultValues: { email: "" },
+  });
+
+  const forgotMutation = useMutation({
+    mutationFn: async (data: ForgotFormData) => {
+      const res = await apiRequest("POST", "/api/auth/forgot-password", data);
+      return await res.json();
+    },
+    onSuccess: (_result, data) => {
+      setResetSentTo(data.email);
+    },
+    onError: (error: Error) => {
+      // apiRequest errors read "404: {json}"; show the server's own message.
+      let reason = error.message.replace(/^\d+:\s*/, "");
+      try {
+        reason = JSON.parse(reason).message || reason;
+      } catch {}
+      toast({
+        title: "Couldn't send reset link",
+        description: reason || "Something went wrong. Please try again in a minute.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openForgot = () => {
+    forgotForm.reset({ email: loginForm.getValues("email") });
+    setResetSentTo(null);
+    setShowForgot(true);
+  };
 
   // Login mutation
   const loginMutation = useMutation({
@@ -285,7 +325,61 @@ export default function AuthPage({ authResult }: AuthPageProps) {
                 </div>
 
                 <TabsContent value="login" className="space-y-4">
-                  <Form {...loginForm}>
+                  {showForgot ? (
+                    resetSentTo ? (
+                      <div className="space-y-4 text-center">
+                        <p className="text-sm text-gray-600">
+                          If an account exists for <strong className="text-gray-900">{resetSentTo}</strong>,
+                          we&apos;ve emailed it a link to choose a new password. The link expires in an hour.
+                        </p>
+                        <Button variant="outline" className="w-full" onClick={() => setShowForgot(false)}>
+                          Back to sign in
+                        </Button>
+                      </div>
+                    ) : (
+                      // Keyed so React builds fresh fields rather than reusing the
+                      // sign-in form's, which stay wired to the sign-in form's state.
+                      <Form key="forgot" {...forgotForm}>
+                        <form
+                          onSubmit={forgotForm.handleSubmit((data) => forgotMutation.mutate(data))}
+                          className="space-y-4"
+                        >
+                          <p className="text-sm text-gray-600">
+                            Enter your account email and we&apos;ll send you a link to choose a new password.
+                          </p>
+                          <FormField
+                            control={forgotForm.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="your-email@example.com"
+                                    type="email"
+                                    autoComplete="email"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <Button type="submit" className="w-full" disabled={forgotMutation.isPending}>
+                            {forgotMutation.isPending ? "Sending..." : "Email me a reset link"}
+                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => setShowForgot(false)}
+                            className="block w-full text-center text-sm text-primary hover:underline"
+                          >
+                            Back to sign in
+                          </button>
+                        </form>
+                      </Form>
+                    )
+                  ) : (
+                  <Form key="login" {...loginForm}>
                     <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
                       <FormField
                         control={loginForm.control}
@@ -311,7 +405,16 @@ export default function AuthPage({ authResult }: AuthPageProps) {
                         name="password"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Password</FormLabel>
+                            <div className="flex items-center justify-between">
+                              <FormLabel>Password</FormLabel>
+                              <button
+                                type="button"
+                                onClick={openForgot}
+                                className="text-sm text-primary hover:underline"
+                              >
+                                Forgot password?
+                              </button>
+                            </div>
                             <FormControl>
                               <Input 
                                 placeholder="Enter your password" 
@@ -334,6 +437,7 @@ export default function AuthPage({ authResult }: AuthPageProps) {
                       </Button>
                     </form>
                   </Form>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="register" className="space-y-4">
